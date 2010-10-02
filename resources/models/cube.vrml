@@ -1,0 +1,72 @@
+#VRML V1.0 ascii
+
+# Blender V249
+
+# 'Switch' is used as a hack, to ensure it is not part of the drawing
+
+Separator {
+Switch {
+	DEF Material
+	Material {
+		diffuseColor 0.800000 0.800000 0.800000
+		specularColor 1.000000 1.000000 1.000000
+		shininess 0.500000 
+		transparency 0.000000 
+	}
+	DEF Cube
+	Separator {
+		Coordinate3 {
+			point [
+				 1.000000 1.000000 -1.000000,
+				 1.000000 -1.000000 -1.000000,
+				 -1.000000 -1.000000 -1.000000,
+				 -1.000000 1.000000 -1.000000,
+				 1.000000 0.999999 1.000000,
+				 0.999999 -1.000001 1.000000,
+				 -1.000000 -1.000000 1.000000,
+				 -1.000000 1.000000 1.000000,
+			]
+		}
+		USE Material
+
+		IndexedFaceSet {
+			coordIndex [
+				 0, 1, 2, 3, -1,
+				 4, 7, 6, 5, -1,
+				 0, 4, 5, 1, -1,
+				 1, 5, 6, 2, -1,
+				 2, 6, 7, 3, -1,
+				 4, 0, 3, 7, -1,
+			]
+		}
+	}
+
+	# Hidden Objects, in invisible layers
+
+}
+
+# Visible Objects
+
+Separator {
+	MatrixTransform {
+	matrix 
+		0.685880 -0.317370 0.654862 0.000000
+		0.727634 0.312469 -0.610666 0.000000
+		-0.010817 0.895343 0.445245 0.000000
+		-0.338183 -0.376694 -11.252342 1.000000
+	}
+	PerspectiveCamera {
+		focalDistance 3.500000
+	}
+	Separator {
+		MatrixTransform {
+		matrix 
+			1.000000 0.000000 0.000000 0.000000
+			0.000000 1.000000 0.000000 0.000000
+			0.000000 0.000000 1.000000 0.000000
+			0.000000 0.000000 0.000000 1.000000
+		}
+		USE Cube
+	}
+}
+}
