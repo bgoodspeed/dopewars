@@ -16,7 +16,7 @@ include FontLoader
 
   # called from the game class in each loop. updates options that are displayed
   def update options
-    @time = options[:time]
+    @time = "#{options[:time]}, Items collected: #{@player.inventory.keys.size}"
   end
 
   # called from the game class in the draw method. render any options

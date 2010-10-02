@@ -23,6 +23,10 @@ class TopoMap
     rv
   end
 
+  def update(tx,ty, new_value)
+    @data[ty * @x + tx] = new_value
+  end
+
   def left_side(tilex)
     @xsize * tilex
   end

@@ -42,6 +42,11 @@ class TopoMapTest < Test::Unit::TestCase
     
   end
 
+  def test_can_update_on_the_fly
+    @topo.update(0,0,'X')
+    assert_equal('X', @topo.data_at(0,0))
+  end
+
   def test_can_calculate_boundaries_from_tile_coords
     assert_equal(0, @topo.left_side(0))
     assert_equal(100, @topo.left_side(1))

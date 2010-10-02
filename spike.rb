@@ -27,14 +27,18 @@ class Ship
   include Sprites::Sprite
   include EventHandler::HasEventHandler
 
-  attr_reader :px, :py
+  attr_reader :px, :py, :inventory
 
+  def add_inventory(qty, item)
+    @inventory[item] += qty
+  end
 
-
-  def initialize( px, py, topomap=nil, terrainmap = nil, tp=nil, interactmap=nil, intpallet=nil)
+  def initialize( px, py, topomap=nil, topopal = nil, terrainmap = nil, tp=nil, interactmap=nil, intpallet=nil, bgsurface=nil)
+    @bgsurface = bgsurface
     @terrain_pallette = tp
     @terrainmap = terrainmap
     @topomap = topomap
+    @topo_pallette = topopal
     @interactionmap = interactmap
     @interaction_pallette = intpallet
     @px, @py = px, py # Current Position
@@ -43,7 +47,7 @@ class Ship
     @hero_x_dim = 48
     @hero_y_dim = 64
     @facing = :down
-
+    @inventory = Hash.new(0)
     update_tile_coords
     @max_speed = 400.0 # Max speed on an axis
     @accel = 1200.0 # Max Acceleration on an axis
@@ -101,26 +105,32 @@ class Ship
     end
 
     if @facing == :down
-      facing_tile_interacts = @interaction_pallette[@interactionmap.data_at(tilex,tiley + 1)]
+      facing_tilex = tilex
+      facing_tiley = tiley + 1
       facing_tile_dist = (@interactionmap.top_side(tiley + 1) - @py).abs
     end
     if @facing == :up
-      facing_tile_interacts = @interaction_pallette[@interactionmap.data_at(tilex,tiley - 1)]
+      facing_tilex = tilex
+      facing_tiley = tiley - 1
       facing_tile_dist = (@interactionmap.bottom_side(tiley - 1) - @py).abs
     end
     if @facing == :left
-      facing_tile_interacts = @interaction_pallette[@interactionmap.data_at(tilex - 1,tiley)]
+      facing_tilex = tilex - 1
+      facing_tiley = tiley
       facing_tile_dist = (@interactionmap.right_side(tilex - 1) - @px).abs
     end
     if @facing == :right
-      facing_tile_interacts = @interaction_pallette[@interactionmap.data_at(tilex + 1,tiley)]
+      facing_tilex = tilex + 1
+      facing_tiley = tiley
       facing_tile_dist = (@interactionmap.left_side(tilex + 1) - @px).abs
     end
 
+    facing_tile_interacts = @interaction_pallette[@interactionmap.data_at(facing_tilex, facing_tiley)]
     facing_tile_close_enough = facing_tile_dist < @@INTERACTION_DISTANCE_THRESHOLD
 
     if facing_tile_close_enough and facing_tile_interacts
-      puts "you can interact with the facing tile"
+      puts "you can interact with the facing tile in the #{@facing} direction, it is at #{facing_tilex} #{facing_tiley}"
+      facing_tile_interacts.activate(self, @interactionmap, facing_tilex, facing_tiley, @bgsurface, @topomap, @topo_pallette)
     end
 
     
@@ -142,7 +152,10 @@ class Ship
 
   # Add it to the list of keys being pressed.
   def key_pressed( event )
-    @facing = event.key
+    newkey = event.key
+    if [:down, :left,:up, :right].include?(newkey)
+      @facing = newkey
+    end
     
     if event.key == :down
       set_frame(0)
@@ -333,10 +346,28 @@ class Ship
 end
 
 
+@@OPEN_TREASURE = 'O'
+
 class Treasure
   attr_accessor :name
   def initialize(name)
     @name = name
+  end
+
+  def activate(player, interactionmap, tilex, tiley, bgsurface, topomap, pallette)
+    interactionmap.update(tilex, tiley, @@OPEN_TREASURE)
+    #XXX this is not graceful, don't have to reblit the whole thing
+
+    topomap.update(tilex, tiley, @@OPEN_TREASURE)
+    topomap.blit_to(pallette, bgsurface)
+    puts "also, give it to the player"
+    player.add_inventory(1, @name)
+  end
+end
+
+class OpenTreasure < Treasure
+  def activate(player, interactionmap, tilex, tiley, bgsurface, topomap, pallette)
+    puts "Nothing to do, already opened"
   end
 end
 
@@ -496,7 +527,7 @@ class Game
 
   # Create the player ship in the middle of the screen
   def make_ship
-    @ship = Ship.new( @screen.w/2, @screen.h/2, @topomap, @terrainmap, terrain_pallette, @interactmap, interaction_pallette )
+    @ship = Ship.new( @screen.w/2, @screen.h/2, @topomap, pallette, @terrainmap, terrain_pallette, @interactmap, interaction_pallette, @bgsurface )
 
     # Make event hook to pass all events to @ship#handle().
     make_magic_hooks_for( @ship, { YesTrigger.new() => :handle } )
@@ -555,6 +586,7 @@ class Game
   end
   def interaction_pallette
     pal = Hash.new(false)
+    pal['O'] = OpenTreasure.new("O")
     pal['T'] = Treasure.new("T")
     pal['w'] = WarpPoint.new("Destination")
     pal
@@ -582,9 +614,10 @@ class Game
     pal['j'] = tile(:brown)
     pal['k'] = tile(:magenta)
     pal['l'] = tile(:magenta)
-    pal['T'] = tile(:pink)
-    pal['W'] = tile(:purple)
-
+    
+    pal['O'] = Surface.load("open-treasure-on-grass-bg-160.png")
+    pal['T'] = Surface.load("treasure-on-grass-bg-160.png")
+    pal['W'] = Surface.load("town-on-grass-bg-160.png")
     pal['M'] = Surface.load("mountain-bg-160.png")
     pal['G'] = Surface.load("grass-bg-160.png")
     pal
