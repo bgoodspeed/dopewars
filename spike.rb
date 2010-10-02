@@ -378,12 +378,12 @@ class Game
   end
   def make_background
 
-    bg_data = ['a','b','c','d','e','f','g','h',
-               'i','j','k','l','a','b','c','d',
-               'e','f','T','h','i','j','k','l',
-               'a','a','a','a','b','b','b','c',
-               'c','d','e','e','f','f','W','f',
-               'g','g','g','h','h','i','a','b'
+    bg_data = ['M','M','M','M','M','M','M','M',
+               'M','G','G','G','G','G','G','M',
+               'M','G','T','G','G','G','G','M',
+               'M','G','G','G','G','G','G','M',
+               'M','G','G','G','G','G','W','M',
+               'M','M','M','M','M','M','M','M'
     ]
     terrain_data = [ '.','.','.','.','.','.','.','.',
                       '.','e','e','e','e','e','e','.',
@@ -453,7 +453,6 @@ class Game
   end
 
   def interact_with_facing(event)
-    puts "monkeymagic"
     @ship.interact_with_facing
   end
 
@@ -585,6 +584,9 @@ class Game
     pal['l'] = tile(:magenta)
     pal['T'] = tile(:pink)
     pal['W'] = tile(:purple)
+
+    pal['M'] = Surface.load("mountain-bg-160.png")
+    pal['G'] = Surface.load("grass-bg-160.png")
     pal
   end
 
