@@ -37,13 +37,59 @@ class WorldState
   end
 end
 
+class KeyHolder
+  def initialize
+    @keys = []
+  end
+  def include?(other)
+    @keys.include?(other)
+  end
+  def empty?
+    @keys.empty?
+  end
 
+  def delete_key(key)
+    @keys -= [key]
+  end
+  def add_key(key)
+    @keys += [key]
+  end
+  
+end
+
+class AnimationHelper
+  @@FRAME_SWITCH_THRESHOLD = 0.40
+  @@ANIMATION_FRAMES = 4
+
+  def current_frame
+    @animation_frame
+  end
+
+  def initialize(key_holder)
+    @key_holder = key_holder
+    @animation_counter = 0
+    @animation_frame = 0
+  end
+  def update_animation(dt)
+    @animation_counter += dt
+    puts "herro? frame ##{@animation_frame} #{@animation_counter}"
+    if @animation_counter > @@FRAME_SWITCH_THRESHOLD
+      @animation_counter = 0
+      unless @key_holder.empty?
+        @animation_frame = (@animation_frame + 1) % @@ANIMATION_FRAMES
+        yield @animation_frame
+      end
+    end
+
+  end
+  
+end
 
 # A class representing the player's ship moving in "space".
 class Ship
   include Sprites::Sprite
   include EventHandler::HasEventHandler
-
+  
   attr_reader :px, :py, :inventory
 
   def add_inventory(qty, item)
@@ -66,9 +112,9 @@ class Ship
     @max_speed = 400.0 # Max speed on an axis
     @accel = 1200.0 # Max Acceleration on an axis
     @slowdown = 800.0 # Deceleration when not accelerating
-    @keys = [] # Keys being pressed
-    @animation_counter = 0
-    @animation_frame = 0
+    @keys = KeyHolder.new
+
+    @animation_helper = AnimationHelper.new(@keys)
 
     # The ship's appearance. A white square for demonstration.
     #@image = Surface.new([20,20])
@@ -157,9 +203,9 @@ class Ship
     @last_direction_offset = last_dir
   end
 
-  def replace_avatar
+  def replace_avatar(animation_frame)
     @image.fill(@all_char_postures.colorkey)
-    @all_char_postures.blit(@image, [0,0], Rect.new(@animation_frame * @hero_x_dim, @last_direction_offset,@hero_x_dim, @hero_y_dim))
+    @all_char_postures.blit(@image, [0,0], Rect.new(animation_frame * @hero_x_dim, @last_direction_offset,@hero_x_dim, @hero_y_dim))
   end
 
 
@@ -180,35 +226,27 @@ class Ship
     elsif event.key == :up
       set_frame(3 * @hero_y_dim)
     end
-    replace_avatar
+    replace_avatar(@animation_helper.current_frame)
 
-    @keys += [event.key]
+    @keys.add_key(event.key)
   end
 
 
   # Remove it from the list of keys being pressed.
   def key_released( event )
-    @keys -= [event.key]
+    @keys.delete_key(event.key)
+    
   end
 
-  @@FRAME_SWITCH_THRESHOLD = 0.40
-  @@ANIMATION_FRAMES = 4
   # Update the ship state. Called once per frame.
   def update( event )
     dt = event.seconds # Time since last update
-
-    @animation_counter += dt
-    if @animation_counter > @@FRAME_SWITCH_THRESHOLD
-      @animation_counter = 0
-      unless @keys.empty?
-        @animation_frame = (@animation_frame + 1) % @@ANIMATION_FRAMES
-        replace_avatar
-      end
-    end
+    @animation_helper.update_animation(dt) { |frame| replace_avatar(frame) }
     update_accel
     update_vel( dt )
     update_pos( dt )
   end
+
 
 
   # Update the acceleration based on what keys are pressed.
