@@ -137,128 +137,34 @@ class InteractionHelper
   end
 end
 
-# A class representing the player's ship moving in "space".
-class Ship
-  include Sprites::Sprite
-  include EventHandler::HasEventHandler
-  
-  attr_reader :px, :py, :inventory
 
-  def add_inventory(qty, item)
-    @inventory[item] += qty
-  end
+class CoordinateHelper
+  attr_accessor :px, :py
 
-  def initialize( px, py,  worldstate)
+  def initialize(px,py, key,worldstate, hero_x_dim, hero_y_dim)
+     @hero_x_dim, @hero_y_dim =  hero_x_dim, hero_y_dim
     @worldstate = worldstate
-
-
-
+    @keys = key
     @px, @py = px, py # Current Position
     @vx, @vy = 0, 0 # Current Velocity
     @ax, @ay = 0, 0 # Current Acceleration
-    @hero_x_dim = 48
-    @hero_y_dim = 64
-    @interaction_helper = InteractionHelper.new(self, worldstate)
-    @inventory = Hash.new(0)
-    update_tile_coords
     @max_speed = 400.0 # Max speed on an axis
     @accel = 1200.0 # Max Acceleration on an axis
     @slowdown = 800.0 # Deceleration when not accelerating
-    @keys = KeyHolder.new
-
-    @animation_helper = AnimationHelper.new(@keys)
-
-    # The ship's appearance. A white square for demonstration.
-    #@image = Surface.new([20,20])
-    #@image.fill(:white)
-    @all_char_postures = Surface.load("Charactern8.png")
-    @all_char_postures.colorkey = @all_char_postures.get_at(0,0)
-    #@all_char_postures.colorkey = [128,128,128]
-    @all_char_postures.alpha = 255
-    
-    @image = Surface.new([@hero_x_dim,@hero_y_dim])
-    @image.fill(@all_char_postures.colorkey)
-    @image.colorkey = @all_char_postures.colorkey
-    @image.alpha = 255
-    puts "screen color key #{@image.colorkey}"
-    
-    @all_char_postures.blit(@image, [0,0], Rect.new(0,0,@hero_x_dim,@hero_y_dim))
-    set_frame(0)
-
-    @rect = @image.make_rect
-    @rect.center = [@px, @py]
-
-    # Create event hooks in the easiest way.
-    make_magic_hooks(
-
-      # Send keyboard events to #key_pressed() or #key_released().
-      KeyPressed => :key_pressed,
-      KeyReleased => :key_released,
-
-      # Send ClockTicked events to #update()
-      ClockTicked => :update
-
-    )
   end
 
-
-  def interact_with_facing
-    @interaction_helper.interact_with_facing(@px, @py)
+  def update_tile_coords
+    @mintilex = @worldstate.topo_map.x_offset_for_world(@px - x_ext)
+    @maxtilex = @worldstate.topo_map.x_offset_for_world(@px + x_ext)
+    @mintiley = @worldstate.topo_map.y_offset_for_world(@py - y_ext)
+    @maxtiley = @worldstate.topo_map.y_offset_for_world(@py + y_ext)
   end
-
-  private
-
-
-  def set_frame(last_dir=0)
-    @last_direction_offset = last_dir
+  def x_ext
+    @hero_x_dim/2
   end
-
-  def replace_avatar(animation_frame)
-    @image.fill(@all_char_postures.colorkey)
-    @all_char_postures.blit(@image, [0,0], Rect.new(animation_frame * @hero_x_dim, @last_direction_offset,@hero_x_dim, @hero_y_dim))
+  def y_ext
+    @hero_y_dim/2
   end
-
-
-
-  # Add it to the list of keys being pressed.
-  def key_pressed( event )
-    newkey = event.key
-    if [:down, :left,:up, :right].include?(newkey)
-      @interaction_helper.facing = newkey
-    end
-    
-    if event.key == :down
-      set_frame(0)
-    elsif event.key == :left
-      set_frame(@hero_y_dim)
-    elsif event.key == :right
-      set_frame(2 * @hero_y_dim)
-    elsif event.key == :up
-      set_frame(3 * @hero_y_dim)
-    end
-    replace_avatar(@animation_helper.current_frame)
-
-    @keys.add_key(event.key)
-  end
-
-
-  # Remove it from the list of keys being pressed.
-  def key_released( event )
-    @keys.delete_key(event.key)
-    
-  end
-
-  # Update the ship state. Called once per frame.
-  def update( event )
-    dt = event.seconds # Time since last update
-    @animation_helper.update_animation(dt) { |frame| replace_avatar(frame) }
-    update_accel
-    update_vel( dt )
-    update_pos( dt )
-  end
-
-
-
   # Update the acceleration based on what keys are pressed.
   def update_accel
     x, y = 0,0
@@ -314,25 +220,6 @@ class Ship
     return v
   end
 
-
-  # Update the position based on the velocity and the time since last
-  # update.
-  def update_tile_coords
-
-
-    @mintilex = @worldstate.topo_map.x_offset_for_world(@px - x_ext)
-    @maxtilex = @worldstate.topo_map.x_offset_for_world(@px + x_ext)
-    @mintiley = @worldstate.topo_map.y_offset_for_world(@py - y_ext)
-    @maxtiley = @worldstate.topo_map.y_offset_for_world(@py + y_ext)
-  end
-
-  def x_ext
-    @hero_x_dim/2
-  end
-  def y_ext
-    @hero_y_dim/2
-  end
-
   def clamp_to_world_dimensions
 
     minx = @px - x_ext
@@ -346,52 +233,15 @@ class Ship
     @py = @@BGY - y_ext if maxy > @@BGY
   end
 
-  def update_pos( dt )
-    dx = @vx * dt
-    dy = @vy * dt
-    @px += dx
-    @py += dy
-
-    clamp_to_world_dimensions
-    #    @bgsurface = worldstate.background_surface
-#    @terrain_pallette = worldstate.terrain_pallette
-#    @terrainmap = worldstate.terrain_map
-#    @topomap = worldstate.topo_map
-#    @topo_pallette = worldstate.topo_pallette
-#    @interactionmap = worldstate.interaction_map
-#    @interaction_pallette = worldstate.interaction_pallette
-    new_mintilex = @worldstate.topo_map.x_offset_for_world(@px - x_ext)
-    new_maxtilex = @worldstate.topo_map.x_offset_for_world(@px + x_ext)
-    new_mintiley = @worldstate.topo_map.y_offset_for_world(@py - y_ext)
-    new_maxtiley = @worldstate.topo_map.y_offset_for_world(@py + y_ext)
-    tp = @worldstate.terrain_pallette
-
-    undo_x = false
-    undo_y = false
-
-    if new_mintilex != @mintilex
-      bottom_left = @worldstate.terrain_map.data_at(new_mintilex, new_mintiley)
-      top_left = @worldstate.terrain_map.data_at(new_mintilex, new_maxtiley)
-      unless tp[bottom_left] and tp[top_left]
-        undo_x = true
-      end
-    end
-
-    if new_maxtilex != @maxtilex
-      bottom_right = @worldstate.terrain_map.data_at(new_maxtilex, new_mintiley)
-      top_right = @worldstate.terrain_map.data_at(new_maxtilex, new_maxtiley)
-      
-      unless tp[bottom_right] and tp[top_right]
-        undo_x = true
-      end
-    end
+  def clamp_to_tile_restrictions_on_y(tp, new_mintilex, new_mintiley, new_maxtilex, new_maxtiley)
+    rv = false
 
     if new_mintiley != @mintiley
       bottom_right = @worldstate.terrain_map.data_at(new_maxtilex, new_mintiley)
       bottom_left = @worldstate.terrain_map.data_at(new_mintilex, new_mintiley)
 
       unless tp[bottom_left] and tp[bottom_right]
-        undo_y = true
+        rv = true
       end
     end
     if new_maxtiley != @maxtiley
@@ -400,18 +250,193 @@ class Ship
       top_left = @worldstate.terrain_map.data_at(new_mintilex, new_maxtiley)
 
       unless tp[top_left] and tp[top_right]
-        undo_y = true
+        rv = true
       end
 
     end
+    rv
+  end
+  def clamp_to_tile_restrictions_on_x(tp, new_mintilex, new_mintiley, new_maxtilex, new_maxtiley)
+    rv = false
+    
+    if new_mintilex != @mintilex
+      bottom_left = @worldstate.terrain_map.data_at(new_mintilex, new_mintiley)
+      top_left = @worldstate.terrain_map.data_at(new_mintilex, new_maxtiley)
+      unless tp[bottom_left] and tp[top_left]
+        rv = true
+      end
+    end
 
-    @px -= dx if undo_x
-    @py -= dy if undo_y
+    if new_maxtilex != @maxtilex
+      bottom_right = @worldstate.terrain_map.data_at(new_maxtilex, new_mintiley)
+      top_right = @worldstate.terrain_map.data_at(new_maxtilex, new_maxtiley)
+
+      unless tp[bottom_right] and tp[top_right]
+        rv = true
+      end
+    end
+
+    rv
+  end
+
+  
+
+  def update_pos( dt )
+    dx = @vx * dt
+    dy = @vy * dt
+    @px += dx
+    @py += dy
+
+    clamp_to_world_dimensions
+
+    tp = @worldstate.terrain_pallette
+    new_mintilex = @worldstate.topo_map.x_offset_for_world(@px - x_ext)
+    new_maxtilex = @worldstate.topo_map.x_offset_for_world(@px + x_ext)
+    new_mintiley = @worldstate.topo_map.y_offset_for_world(@py - y_ext)
+    new_maxtiley = @worldstate.topo_map.y_offset_for_world(@py + y_ext)
+
+    @px -= dx if clamp_to_tile_restrictions_on_x(tp, new_mintilex, new_mintiley, new_maxtilex, new_maxtiley)
+    @py -= dy if clamp_to_tile_restrictions_on_y(tp, new_mintilex, new_mintiley, new_maxtilex, new_maxtiley)
 
     update_tile_coords
 
     # @rect.center = [@px, @py]
   end
+
+
+end
+# A class representing the player's ship moving in "space".
+class Ship
+  include Sprites::Sprite
+  include EventHandler::HasEventHandler
+  
+  attr_reader :inventory
+
+  def add_inventory(qty, item)
+    @inventory[item] += qty
+  end
+
+  def px
+    @coordinate_helper.px
+  end
+  def py
+    @coordinate_helper.py
+  end
+
+  def initialize( px, py,  worldstate)
+    @worldstate = worldstate
+
+
+    
+    @hero_x_dim = 48
+    @hero_y_dim = 64
+    @interaction_helper = InteractionHelper.new(self, worldstate)
+    @inventory = Hash.new(0)
+    @keys = KeyHolder.new
+    @coordinate_helper = CoordinateHelper.new(px, py, @keys, worldstate, @hero_x_dim, @hero_y_dim)
+    @animation_helper = AnimationHelper.new(@keys)
+    @coordinate_helper.update_tile_coords
+    # The ship's appearance. A white square for demonstration.
+    #@image = Surface.new([20,20])
+    #@image.fill(:white)
+    @all_char_postures = Surface.load("Charactern8.png")
+    @all_char_postures.colorkey = @all_char_postures.get_at(0,0)
+    #@all_char_postures.colorkey = [128,128,128]
+    @all_char_postures.alpha = 255
+    
+    @image = Surface.new([@hero_x_dim,@hero_y_dim])
+    @image.fill(@all_char_postures.colorkey)
+    @image.colorkey = @all_char_postures.colorkey
+    @image.alpha = 255
+    puts "screen color key #{@image.colorkey}"
+    
+    @all_char_postures.blit(@image, [0,0], Rect.new(0,0,@hero_x_dim,@hero_y_dim))
+    set_frame(0)
+
+    @rect = @image.make_rect
+    @rect.center = [px, py]
+
+    # Create event hooks in the easiest way.
+    make_magic_hooks(
+
+      # Send keyboard events to #key_pressed() or #key_released().
+      KeyPressed => :key_pressed,
+      KeyReleased => :key_released,
+
+      # Send ClockTicked events to #update()
+      ClockTicked => :update
+
+    )
+  end
+
+
+  def interact_with_facing
+    @interaction_helper.interact_with_facing( @coordinate_helper.px , @coordinate_helper.py)
+  end
+
+  private
+
+
+  def set_frame(last_dir=0)
+    @last_direction_offset = last_dir
+  end
+
+  def replace_avatar(animation_frame)
+    @image.fill(@all_char_postures.colorkey)
+    @all_char_postures.blit(@image, [0,0], Rect.new(animation_frame * @hero_x_dim, @last_direction_offset,@hero_x_dim, @hero_y_dim))
+  end
+
+
+
+  # Add it to the list of keys being pressed.
+  def key_pressed( event )
+    newkey = event.key
+    if [:down, :left,:up, :right].include?(newkey)
+      @interaction_helper.facing = newkey
+    end
+    
+    if event.key == :down
+      set_frame(0)
+    elsif event.key == :left
+      set_frame(@hero_y_dim)
+    elsif event.key == :right
+      set_frame(2 * @hero_y_dim)
+    elsif event.key == :up
+      set_frame(3 * @hero_y_dim)
+    end
+    replace_avatar(@animation_helper.current_frame)
+
+    @keys.add_key(event.key)
+  end
+
+
+  # Remove it from the list of keys being pressed.
+  def key_released( event )
+    @keys.delete_key(event.key)
+    
+  end
+
+  # Update the ship state. Called once per frame.
+  def update( event )
+    dt = event.seconds # Time since last update
+    @animation_helper.update_animation(dt) { |frame| replace_avatar(frame) }
+    @coordinate_helper.update_accel
+    @coordinate_helper.update_vel( dt )
+    @coordinate_helper.update_pos( dt )
+  end
+
+
+
+
+
+
+  def x_ext
+    @hero_x_dim/2
+  end
+  def y_ext
+    @hero_y_dim/2
+  end
+
 
 end
 
