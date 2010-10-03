@@ -72,7 +72,6 @@ class AnimationHelper
   end
   def update_animation(dt)
     @animation_counter += dt
-    puts "herro? frame ##{@animation_frame} #{@animation_counter}"
     if @animation_counter > @@FRAME_SWITCH_THRESHOLD
       @animation_counter = 0
       unless @key_holder.empty?
@@ -83,6 +82,59 @@ class AnimationHelper
 
   end
   
+end
+
+class InteractionHelper
+  @@INTERACTION_DISTANCE_THRESHOLD = 80 #XXX tweak this, currently set to 1/2 a tile
+
+  attr_accessor :facing
+  def initialize(player, worldstate)
+    @player = player
+    @worldstate = worldstate
+    @facing = :down
+  end
+
+  def interact_with_facing(px,py)
+    puts "you are facing #{@facing}"
+    tilex = @worldstate.topo_map.x_offset_for_world(px)
+    tiley = @worldstate.topo_map.y_offset_for_world(py)
+    this_tile_interacts = @worldstate.interaction_pallette[@worldstate.interaction_map.data_at(tilex,tiley)]
+    facing_tile_interacts = false
+
+    if this_tile_interacts
+      puts "you can interact with the current tile"
+    end
+
+    if @facing == :down
+      facing_tilex = tilex
+      facing_tiley = tiley + 1
+      facing_tile_dist = (@worldstate.interaction_map.top_side(tiley + 1) - py).abs
+    end
+    if @facing == :up
+      facing_tilex = tilex
+      facing_tiley = tiley - 1
+      facing_tile_dist = (@worldstate.interaction_map.bottom_side(tiley - 1) - py).abs
+    end
+    if @facing == :left
+      facing_tilex = tilex - 1
+      facing_tiley = tiley
+      facing_tile_dist = (@worldstate.interaction_map.right_side(tilex - 1) - px).abs
+    end
+    if @facing == :right
+      facing_tilex = tilex + 1
+      facing_tiley = tiley
+      facing_tile_dist = (@worldstate.interaction_map.left_side(tilex + 1) - px).abs
+    end
+
+    facing_tile_interacts = @worldstate.interaction_pallette[@worldstate.interaction_map.data_at(facing_tilex, facing_tiley)]
+    facing_tile_close_enough = facing_tile_dist < @@INTERACTION_DISTANCE_THRESHOLD
+
+    if facing_tile_close_enough and facing_tile_interacts
+      puts "you can interact with the facing tile in the #{@facing} direction, it is at #{facing_tilex} #{facing_tiley}"
+      facing_tile_interacts.activate(@player, @worldstate, facing_tilex, facing_tiley) #@interactionmap, facing_tilex, facing_tiley, @bgsurface, @topomap, @topo_pallette
+    end
+
+  end
 end
 
 # A class representing the player's ship moving in "space".
@@ -106,7 +158,7 @@ class Ship
     @ax, @ay = 0, 0 # Current Acceleration
     @hero_x_dim = 48
     @hero_y_dim = 64
-    @facing = :down
+    @interaction_helper = InteractionHelper.new(self, worldstate)
     @inventory = Hash.new(0)
     update_tile_coords
     @max_speed = 400.0 # Max speed on an axis
@@ -149,51 +201,9 @@ class Ship
     )
   end
 
-  @@INTERACTION_DISTANCE_THRESHOLD = 80 #XXX tweak this, currently set to 1/2 a tile
 
   def interact_with_facing
-
-
-    puts "you are facing #{@facing}"
-    tilex = @worldstate.topo_map.x_offset_for_world(@px)
-    tiley = @worldstate.topo_map.y_offset_for_world(@py)
-    this_tile_interacts = @worldstate.interaction_pallette[@worldstate.interaction_map.data_at(tilex,tiley)]
-    facing_tile_interacts = false
-    
-    if this_tile_interacts
-      puts "you can interact with the current tile"
-    end
-
-    if @facing == :down
-      facing_tilex = tilex
-      facing_tiley = tiley + 1
-      facing_tile_dist = (@worldstate.interaction_map.top_side(tiley + 1) - @py).abs
-    end
-    if @facing == :up
-      facing_tilex = tilex
-      facing_tiley = tiley - 1
-      facing_tile_dist = (@worldstate.interaction_map.bottom_side(tiley - 1) - @py).abs
-    end
-    if @facing == :left
-      facing_tilex = tilex - 1
-      facing_tiley = tiley
-      facing_tile_dist = (@worldstate.interaction_map.right_side(tilex - 1) - @px).abs
-    end
-    if @facing == :right
-      facing_tilex = tilex + 1
-      facing_tiley = tiley
-      facing_tile_dist = (@worldstate.interaction_map.left_side(tilex + 1) - @px).abs
-    end
-
-    facing_tile_interacts = @worldstate.interaction_pallette[@worldstate.interaction_map.data_at(facing_tilex, facing_tiley)]
-    facing_tile_close_enough = facing_tile_dist < @@INTERACTION_DISTANCE_THRESHOLD
-
-    if facing_tile_close_enough and facing_tile_interacts
-      puts "you can interact with the facing tile in the #{@facing} direction, it is at #{facing_tilex} #{facing_tiley}"
-      facing_tile_interacts.activate(self, @worldstate, facing_tilex, facing_tiley) #@interactionmap, facing_tilex, facing_tiley, @bgsurface, @topomap, @topo_pallette
-    end
-
-    
+    @interaction_helper.interact_with_facing(@px, @py)
   end
 
   private
@@ -214,7 +224,7 @@ class Ship
   def key_pressed( event )
     newkey = event.key
     if [:down, :left,:up, :right].include?(newkey)
-      @facing = newkey
+      @interaction_helper.facing = newkey
     end
     
     if event.key == :down
