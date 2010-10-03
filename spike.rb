@@ -83,6 +83,13 @@ class KeyHolder
   
 end
 
+class AlwaysDownMonsterKeyHolder < KeyHolder
+  @@DOWNKEY = :always_down
+  def initialize(key=@@DOWNKEY)
+    super()
+    add_key(key)
+  end
+end
 class AnimationHelper
   @@FRAME_SWITCH_THRESHOLD = 0.40
   @@ANIMATION_FRAMES = 4
@@ -91,17 +98,18 @@ class AnimationHelper
     @animation_frame
   end
 
-  def initialize(key_holder)
+  def initialize(key_holder, animation_frames=@@ANIMATION_FRAMES)
     @key_holder = key_holder
     @animation_counter = 0
     @animation_frame = 0
+    @animation_frames = animation_frames
   end
   def update_animation(dt)
     @animation_counter += dt
     if @animation_counter > @@FRAME_SWITCH_THRESHOLD
       @animation_counter = 0
       unless @key_holder.empty?
-        @animation_frame = (@animation_frame + 1) % @@ANIMATION_FRAMES
+        @animation_frame = (@animation_frame + 1) % @animation_frames
         yield @animation_frame
       end
     end
@@ -335,13 +343,15 @@ end
 # A class representing the player's ship moving in "space".
 
 class AnimatedSpriteHelper
-  attr_reader :image, :rect
+  attr_reader :image, :rect, :px, :py
 
   def initialize(filename, px, py, avatar_x_dim, avatar_y_dim)
     @all_char_postures = Surface.load(filename)
     @all_char_postures.colorkey = @all_char_postures.get_at(0,0)
     @all_char_postures.alpha = 255
 
+    @px = px
+    @py = py #XXX this might be a bug to use these, they should come from the coord helper?
     @avatar_x_dim = avatar_x_dim
     @avatar_y_dim = avatar_y_dim
 
@@ -397,9 +407,6 @@ class Ship
 
   def initialize( px, py,  universe)
     @universe = universe
-
-
-    
     @hero_x_dim = 48
     @hero_y_dim = 64
     @interaction_helper = InteractionHelper.new(self, @universe)
@@ -408,24 +415,13 @@ class Ship
     @coordinate_helper = CoordinateHelper.new(px, py, @keys, @universe, @hero_x_dim, @hero_y_dim)
     @animation_helper = AnimationHelper.new(@keys)
     @coordinate_helper.update_tile_coords
-    # The ship's appearance. A white square for demonstration.
-    #@image = Surface.new([20,20])
-    #@image.fill(:white)
-
     @animated_sprite_helper = AnimatedSpriteHelper.new("Charactern8.png", px, py, @hero_x_dim, @hero_y_dim)
-
     @animated_sprite_helper.set_frame(0)
 
-    # Create event hooks in the easiest way.
     make_magic_hooks(
-
-      # Send keyboard events to #key_pressed() or #key_released().
       KeyPressed => :key_pressed,
       KeyReleased => :key_released,
-
-      # Send ClockTicked events to #update()
       ClockTicked => :update
-
     )
   end
 
@@ -532,30 +528,38 @@ class WarpPoint
 end
 
 class Monster
+  @@MONSTER_X = 32
+  @@MONSTER_Y = 32
+
   include Sprites::Sprite
   include EventHandler::HasEventHandler
-  attr_accessor :px, :py
+  def px
+    @animated_sprite_helper.px
+  end
+  def py
+    @animated_sprite_helper.py
+  end
   def initialize(filename, px, py)
     super()
-    
-    @image = Surface.load filename
-    @rect  = @image.make_rect
-    @px = px
-    @py = py
-    @offset = [px,py]
+    @animated_sprite_helper = AnimatedSpriteHelper.new(filename, px, py, @@MONSTER_X, @@MONSTER_Y)
+    @animated_sprite_helper.set_frame(0)
+    @keys = AlwaysDownMonsterKeyHolder.new
+    @animation_helper = AnimationHelper.new(@keys, 3)
     make_magic_hooks(
       ClockTicked => :update
     )
   end
 
   def draw(surface,x,y,sx,sy)
-    tx = @px - x + sx/2
-    ty = @py - y + sy/2
-    @image.blit surface, [tx,ty,96,128]
+    tx = @animated_sprite_helper.px - x + sx/2
+    ty = @animated_sprite_helper.py - y + sy/2
+    @animated_sprite_helper.image.blit surface, [tx,ty,96,128]
   end
 
   def update(event)
-    puts "updated?"
+    dt = event.seconds # Time since last update
+    @animation_helper.update_animation(dt) { |frame| @animated_sprite_helper.replace_avatar(frame) }
+    
   end
 end
 
