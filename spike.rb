@@ -570,10 +570,10 @@ class Game
 
     bg_data = ['M','M','M','G','G','G','M','M',
                'M','G','G','T','T','T','G','M',
-               'M','G','G','G','G','G','G','M',
-               'M','G','G','G','G','G','G','M',
-               'M','G','G','G','G','G','W','M',
-               'M','M','M','M','M','M','M','M'
+               'M','G','G','G','G','G','G','w',
+               'M','G','G','G','G','G','G','w',
+               'M','G','G','G','G','G','W','w',
+               'M','M','M','M','w','w','w','w'
     ]
     terrain_data = [  '.','.','.','e','e','e','.','.',
                       '.','e','e','.','.','.','e','.',
@@ -780,6 +780,7 @@ class Game
     
     pal['O'] = Surface.load("open-treasure-on-grass-bg-160.png")
     pal['T'] = Surface.load("treasure-on-grass-bg-160.png")
+    pal['w'] = Surface.load("water-bg-160.png")
     pal['W'] = Surface.load("town-on-grass-bg-160.png")
     pal['M'] = Surface.load("mountain-bg-160.png")
     pal['G'] = Surface.load("grass-bg-160.png")
