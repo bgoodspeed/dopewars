@@ -21,6 +21,28 @@ include Rubygame::EventTriggers
 @@BGX = 1280
 @@BGY = 960
 
+class Universe
+  attr_reader :worlds, :current_world
+
+  def initialize(worlds)
+    raise "must have at least one world" if worlds.empty?
+    @current_world = worlds[0]
+    @worlds = worlds
+  end
+
+  def world_by_index(idx)
+    @worlds[idx]
+  end
+
+  def set_current_world(world)
+    @current_world = world
+  end
+
+  def set_current_world_by_index(idx)
+    set_current_world(world_by_index(idx))
+  end
+end
+
 
 class WorldState
   attr_reader :topo_map, :topo_pallette, :terrain_map, :terrain_pallette,
@@ -88,50 +110,51 @@ class InteractionHelper
   @@INTERACTION_DISTANCE_THRESHOLD = 80 #XXX tweak this, currently set to 1/2 a tile
 
   attr_accessor :facing
-  def initialize(player, worldstate)
+  def initialize(player, universe)
     @player = player
-    @worldstate = worldstate
+    @universe = universe
     @facing = :down
   end
 
   def interact_with_facing(px,py)
     puts "you are facing #{@facing}"
-    tilex = @worldstate.topo_map.x_offset_for_world(px)
-    tiley = @worldstate.topo_map.y_offset_for_world(py)
-    this_tile_interacts = @worldstate.interaction_pallette[@worldstate.interaction_map.data_at(tilex,tiley)]
+    tilex = @universe.current_world.topo_map.x_offset_for_world(px)
+    tiley = @universe.current_world.topo_map.y_offset_for_world(py)
+    this_tile_interacts = @universe.current_world.interaction_pallette[@universe.current_world.interaction_map.data_at(tilex,tiley)]
     facing_tile_interacts = false
 
     if this_tile_interacts
       puts "you can interact with the current tile"
+      this_tile_interacts.activate(@player, @universe.current_world, tilex, tiley)
     end
 
     if @facing == :down
       facing_tilex = tilex
       facing_tiley = tiley + 1
-      facing_tile_dist = (@worldstate.interaction_map.top_side(tiley + 1) - py).abs
+      facing_tile_dist = (@universe.current_world.interaction_map.top_side(tiley + 1) - py).abs
     end
     if @facing == :up
       facing_tilex = tilex
       facing_tiley = tiley - 1
-      facing_tile_dist = (@worldstate.interaction_map.bottom_side(tiley - 1) - py).abs
+      facing_tile_dist = (@universe.current_world.interaction_map.bottom_side(tiley - 1) - py).abs
     end
     if @facing == :left
       facing_tilex = tilex - 1
       facing_tiley = tiley
-      facing_tile_dist = (@worldstate.interaction_map.right_side(tilex - 1) - px).abs
+      facing_tile_dist = (@universe.current_world.interaction_map.right_side(tilex - 1) - px).abs
     end
     if @facing == :right
       facing_tilex = tilex + 1
       facing_tiley = tiley
-      facing_tile_dist = (@worldstate.interaction_map.left_side(tilex + 1) - px).abs
+      facing_tile_dist = (@universe.current_world.interaction_map.left_side(tilex + 1) - px).abs
     end
 
-    facing_tile_interacts = @worldstate.interaction_pallette[@worldstate.interaction_map.data_at(facing_tilex, facing_tiley)]
+    facing_tile_interacts = @universe.current_world.interaction_pallette[@universe.current_world.interaction_map.data_at(facing_tilex, facing_tiley)]
     facing_tile_close_enough = facing_tile_dist < @@INTERACTION_DISTANCE_THRESHOLD
 
     if facing_tile_close_enough and facing_tile_interacts
       puts "you can interact with the facing tile in the #{@facing} direction, it is at #{facing_tilex} #{facing_tiley}"
-      facing_tile_interacts.activate(@player, @worldstate, facing_tilex, facing_tiley) #@interactionmap, facing_tilex, facing_tiley, @bgsurface, @topomap, @topo_pallette
+      facing_tile_interacts.activate(@player, @universe.current_world, facing_tilex, facing_tiley) #@interactionmap, facing_tilex, facing_tiley, @bgsurface, @topomap, @topo_pallette
     end
 
   end
@@ -141,9 +164,9 @@ end
 class CoordinateHelper
   attr_accessor :px, :py
 
-  def initialize(px,py, key,worldstate, hero_x_dim, hero_y_dim)
+  def initialize(px,py, key,universe, hero_x_dim, hero_y_dim)
      @hero_x_dim, @hero_y_dim =  hero_x_dim, hero_y_dim
-    @worldstate = worldstate
+    @universe = universe
     @keys = key
     @px, @py = px, py # Current Position
     @vx, @vy = 0, 0 # Current Velocity
@@ -154,10 +177,10 @@ class CoordinateHelper
   end
 
   def update_tile_coords
-    @mintilex = @worldstate.topo_map.x_offset_for_world(@px - x_ext)
-    @maxtilex = @worldstate.topo_map.x_offset_for_world(@px + x_ext)
-    @mintiley = @worldstate.topo_map.y_offset_for_world(@py - y_ext)
-    @maxtiley = @worldstate.topo_map.y_offset_for_world(@py + y_ext)
+    @mintilex = @universe.current_world.topo_map.x_offset_for_world(@px - x_ext)
+    @maxtilex = @universe.current_world.topo_map.x_offset_for_world(@px + x_ext)
+    @mintiley = @universe.current_world.topo_map.y_offset_for_world(@py - y_ext)
+    @maxtiley = @universe.current_world.topo_map.y_offset_for_world(@py + y_ext)
   end
   def x_ext
     @hero_x_dim/2
@@ -237,8 +260,8 @@ class CoordinateHelper
     rv = false
 
     if new_mintiley != @mintiley
-      bottom_right = @worldstate.terrain_map.data_at(new_maxtilex, new_mintiley)
-      bottom_left = @worldstate.terrain_map.data_at(new_mintilex, new_mintiley)
+      bottom_right = @universe.current_world.terrain_map.data_at(new_maxtilex, new_mintiley)
+      bottom_left = @universe.current_world.terrain_map.data_at(new_mintilex, new_mintiley)
 
       unless tp[bottom_left] and tp[bottom_right]
         rv = true
@@ -246,8 +269,8 @@ class CoordinateHelper
     end
     if new_maxtiley != @maxtiley
 
-      top_right = @worldstate.terrain_map.data_at(new_maxtilex, new_maxtiley)
-      top_left = @worldstate.terrain_map.data_at(new_mintilex, new_maxtiley)
+      top_right = @universe.current_world.terrain_map.data_at(new_maxtilex, new_maxtiley)
+      top_left = @universe.current_world.terrain_map.data_at(new_mintilex, new_maxtiley)
 
       unless tp[top_left] and tp[top_right]
         rv = true
@@ -260,16 +283,16 @@ class CoordinateHelper
     rv = false
     
     if new_mintilex != @mintilex
-      bottom_left = @worldstate.terrain_map.data_at(new_mintilex, new_mintiley)
-      top_left = @worldstate.terrain_map.data_at(new_mintilex, new_maxtiley)
+      bottom_left = @universe.current_world.terrain_map.data_at(new_mintilex, new_mintiley)
+      top_left = @universe.current_world.terrain_map.data_at(new_mintilex, new_maxtiley)
       unless tp[bottom_left] and tp[top_left]
         rv = true
       end
     end
 
     if new_maxtilex != @maxtilex
-      bottom_right = @worldstate.terrain_map.data_at(new_maxtilex, new_mintiley)
-      top_right = @worldstate.terrain_map.data_at(new_maxtilex, new_maxtiley)
+      bottom_right = @universe.current_world.terrain_map.data_at(new_maxtilex, new_mintiley)
+      top_right = @universe.current_world.terrain_map.data_at(new_maxtilex, new_maxtiley)
 
       unless tp[bottom_right] and tp[top_right]
         rv = true
@@ -289,11 +312,11 @@ class CoordinateHelper
 
     clamp_to_world_dimensions
 
-    tp = @worldstate.terrain_pallette
-    new_mintilex = @worldstate.topo_map.x_offset_for_world(@px - x_ext)
-    new_maxtilex = @worldstate.topo_map.x_offset_for_world(@px + x_ext)
-    new_mintiley = @worldstate.topo_map.y_offset_for_world(@py - y_ext)
-    new_maxtiley = @worldstate.topo_map.y_offset_for_world(@py + y_ext)
+    tp = @universe.current_world.terrain_pallette
+    new_mintilex = @universe.current_world.topo_map.x_offset_for_world(@px - x_ext)
+    new_maxtilex = @universe.current_world.topo_map.x_offset_for_world(@px + x_ext)
+    new_mintiley = @universe.current_world.topo_map.y_offset_for_world(@py - y_ext)
+    new_maxtiley = @universe.current_world.topo_map.y_offset_for_world(@py + y_ext)
 
     @px -= dx if clamp_to_tile_restrictions_on_x(tp, new_mintilex, new_mintiley, new_maxtilex, new_maxtiley)
     @py -= dy if clamp_to_tile_restrictions_on_y(tp, new_mintilex, new_mintiley, new_maxtilex, new_maxtiley)
@@ -310,7 +333,7 @@ class Ship
   include Sprites::Sprite
   include EventHandler::HasEventHandler
   
-  attr_reader :inventory
+  attr_reader :inventory, :universe
 
   def add_inventory(qty, item)
     @inventory[item] += qty
@@ -323,17 +346,17 @@ class Ship
     @coordinate_helper.py
   end
 
-  def initialize( px, py,  worldstate)
-    @worldstate = worldstate
+  def initialize( px, py,  universe)
+    @universe = universe
 
 
     
     @hero_x_dim = 48
     @hero_y_dim = 64
-    @interaction_helper = InteractionHelper.new(self, worldstate)
+    @interaction_helper = InteractionHelper.new(self, @universe)
     @inventory = Hash.new(0)
     @keys = KeyHolder.new
-    @coordinate_helper = CoordinateHelper.new(px, py, @keys, worldstate, @hero_x_dim, @hero_y_dim)
+    @coordinate_helper = CoordinateHelper.new(px, py, @keys, @universe, @hero_x_dim, @hero_y_dim)
     @animation_helper = AnimationHelper.new(@keys)
     @coordinate_helper.update_tile_coords
     # The ship's appearance. A white square for demonstration.
@@ -461,17 +484,23 @@ class Treasure
 end
 
 class OpenTreasure < Treasure
-  def activate(player, worldstate, tilex, tiley)
+  def activate( player, worldstate, tilex, tiley)
     puts "Nothing to do, already opened"
   end
 end
 
 class WarpPoint
   attr_accessor :destination
-  def initialize(dest)
-    @destination = dest
+  def initialize(dest_index)
+    @destination = dest_index
   end
 
+  def activate(player, worldstate, tilex, tiley)
+    uni = player.universe
+    
+    puts "warp from  #{worldstate} to #{uni.world_by_index(@destination)}"
+    uni.set_current_world_by_index(@destination)
+  end
 end
 
 
@@ -491,7 +520,9 @@ class Game
     make_queue
     make_event_hooks
     
-    make_background
+    make_world1
+    make_world2
+    make_universe
     make_ship
     make_hud
 
@@ -502,7 +533,7 @@ class Game
   def make_hud
     @hud = Hud.new :screen => @screen, :player => @ship, :topomap => @topomap
   end
-  def make_background
+  def make_world1
 
     bg_data = ['M','M','M','M','M','M','M','M',
                'M','G','G','G','G','G','G','M',
@@ -534,6 +565,39 @@ class Game
     topomap.blit_to(pallette, bgsurface)
 
     @worldstate = WorldState.new(topomap, pallette, terrainmap, terrain_pallette, interactmap, interaction_pallette, bgsurface)
+  end
+  def make_world2
+
+    bg_data = ['M','M','M','G','G','G','M','M',
+               'M','G','G','T','T','T','G','M',
+               'M','G','G','G','G','G','G','M',
+               'M','G','G','G','G','G','G','M',
+               'M','G','G','G','G','G','W','M',
+               'M','M','M','M','M','M','M','M'
+    ]
+    terrain_data = [  '.','.','.','e','e','e','.','.',
+                      '.','e','e','.','.','.','e','.',
+                      '.','e','e','e','e','e','e','.',
+                      '.','e','e','e','e','e','e','.',
+                      '.','e','e','e','e','e','e','.',
+                      '.','.','.','.','.','.','.','.'
+    ]
+    interaction_data = [ '.','.','.','.','.','.','.','.',
+                         '.','.','.','1','2','3','.','.',
+                         '.','.','.','.','.','.','.','.',
+                         '.','.','.','.','.','.','.','.',
+                         '.','.','.','.','.','.','W','.',
+                         '.','.','.','.','.','.','.','.'
+    ]
+    terrainmap = TopoMap.new(8,6, @@BGX, @@BGY, terrain_data)
+    topomap = TopoMap.new(8,6, @@BGX,@@BGY, bg_data)
+    interactmap = TopoMap.new(8,6, @@BGX,@@BGY, interaction_data)
+
+
+    bgsurface = Surface.new([@@BGX,@@BGY])
+    topomap.blit_to(pallette, bgsurface)
+
+    @worldstate2 = WorldState.new(topomap, pallette, terrainmap, terrain_pallette, interactmap, interaction_pallette, bgsurface)
   end
 
   # The "main loop". Repeat the #step method
@@ -616,10 +680,13 @@ class Game
   end
 
 
+  def make_universe
+    @universe = Universe.new([@worldstate, @worldstate2])
+  end
   # Create the player ship in the middle of the screen
   def make_ship
     #@ship = Ship.new( @screen.w/2, @screen.h/2, @topomap, pallette, @terrainmap, terrain_pallette, @interactmap, interaction_pallette, @bgsurface )
-    @ship = Ship.new( @screen.w/2, @screen.h/2, @worldstate )
+    @ship = Ship.new( @screen.w/2, @screen.h/2, @universe )
 
     # Make event hook to pass all events to @ship#handle().
     make_magic_hooks_for( @ship, { YesTrigger.new() => :handle } )
@@ -644,7 +711,7 @@ class Game
     
     @sx = 640
     @sy = 480
-    @worldstate.background_surface.blit(@screen, [0,0], [ @ship.px - (@sx/2), @ship.py - (@sy/2), @sx, @sy])
+    @universe.current_world.background_surface.blit(@screen, [0,0], [ @ship.px - (@sx/2), @ship.py - (@sy/2), @sx, @sy])
     
     #@topomap.blit_with_pallette(pallette, @screen, @ship.px, @ship.py)
 #    puts "topomap should be in (#{@topomap.x_offset_for_world(@ship.px)},#{@topomap.y_offset_for_world(@ship.py)})"
@@ -679,7 +746,12 @@ class Game
     pal = Hash.new(false)
     pal['O'] = OpenTreasure.new("O")
     pal['T'] = Treasure.new("T")
-    pal['w'] = WarpPoint.new("Destination")
+    pal['1'] = Treasure.new("1")
+    pal['2'] = Treasure.new("2")
+    pal['3'] = Treasure.new("3")
+
+    pal['w'] = WarpPoint.new(1)
+    pal['W'] = WarpPoint.new(0)
     pal
   end
 
