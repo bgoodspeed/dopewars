@@ -46,9 +46,10 @@ end
 
 class WorldState
   attr_reader :topo_map, :topo_pallette, :terrain_map, :terrain_pallette,
-              :interaction_map, :interaction_pallette, :background_surface
+              :interaction_map, :interaction_pallette, :npcs,
+              :background_surface
             
-  def initialize(topomap, topopal, terrainmap, terrainpal, interactmap, interactpal, bgsurface)
+  def initialize(topomap, topopal, terrainmap, terrainpal, interactmap, interactpal, npcs, bgsurface)
     @topo_map = topomap
     @topo_pallette = topopal
     @terrain_map = terrainmap
@@ -56,7 +57,10 @@ class WorldState
     @interaction_map = interactmap
     @interaction_pallette = interactpal
     @background_surface = bgsurface
+    @npcs = npcs
   end
+
+
 end
 
 class KeyHolder
@@ -329,11 +333,56 @@ class CoordinateHelper
 
 end
 # A class representing the player's ship moving in "space".
+
+class AnimatedSpriteHelper
+  attr_reader :image, :rect
+
+  def initialize(filename, px, py, avatar_x_dim, avatar_y_dim)
+    @all_char_postures = Surface.load(filename)
+    @all_char_postures.colorkey = @all_char_postures.get_at(0,0)
+    @all_char_postures.alpha = 255
+
+    @avatar_x_dim = avatar_x_dim
+    @avatar_y_dim = avatar_y_dim
+
+
+    @image = Surface.new([@avatar_x_dim,@avatar_y_dim])
+    @image.fill(@all_char_postures.colorkey)
+    @image.colorkey = @all_char_postures.colorkey
+    @image.alpha = 255
+    @all_char_postures.blit(@image, [0,0], Rect.new(0,0,@avatar_x_dim,@avatar_y_dim))
+
+    @rect = @image.make_rect
+    @rect.center = [px, py]
+
+
+  end
+
+
+  def set_frame(last_dir=0)
+    @last_direction_offset = last_dir
+  end
+
+  def replace_avatar(animation_frame)
+    @image.fill(@all_char_postures.colorkey)
+    @all_char_postures.blit(@image, [0,0], Rect.new(animation_frame * @avatar_x_dim, @last_direction_offset,@avatar_x_dim, @avatar_y_dim))
+  end
+
+
+end
+
 class Ship
   include Sprites::Sprite
   include EventHandler::HasEventHandler
   
   attr_reader :inventory, :universe
+
+  def image
+    @animated_sprite_helper.image
+  end
+  def rect
+    @animated_sprite_helper.rect
+  end
 
   def add_inventory(qty, item)
     @inventory[item] += qty
@@ -362,22 +411,10 @@ class Ship
     # The ship's appearance. A white square for demonstration.
     #@image = Surface.new([20,20])
     #@image.fill(:white)
-    @all_char_postures = Surface.load("Charactern8.png")
-    @all_char_postures.colorkey = @all_char_postures.get_at(0,0)
-    #@all_char_postures.colorkey = [128,128,128]
-    @all_char_postures.alpha = 255
-    
-    @image = Surface.new([@hero_x_dim,@hero_y_dim])
-    @image.fill(@all_char_postures.colorkey)
-    @image.colorkey = @all_char_postures.colorkey
-    @image.alpha = 255
-    puts "screen color key #{@image.colorkey}"
-    
-    @all_char_postures.blit(@image, [0,0], Rect.new(0,0,@hero_x_dim,@hero_y_dim))
-    set_frame(0)
 
-    @rect = @image.make_rect
-    @rect.center = [px, py]
+    @animated_sprite_helper = AnimatedSpriteHelper.new("Charactern8.png", px, py, @hero_x_dim, @hero_y_dim)
+
+    @animated_sprite_helper.set_frame(0)
 
     # Create event hooks in the easiest way.
     make_magic_hooks(
@@ -400,15 +437,6 @@ class Ship
   private
 
 
-  def set_frame(last_dir=0)
-    @last_direction_offset = last_dir
-  end
-
-  def replace_avatar(animation_frame)
-    @image.fill(@all_char_postures.colorkey)
-    @all_char_postures.blit(@image, [0,0], Rect.new(animation_frame * @hero_x_dim, @last_direction_offset,@hero_x_dim, @hero_y_dim))
-  end
-
 
 
   # Add it to the list of keys being pressed.
@@ -419,15 +447,15 @@ class Ship
     end
     
     if event.key == :down
-      set_frame(0)
+      @animated_sprite_helper.set_frame(0)
     elsif event.key == :left
-      set_frame(@hero_y_dim)
+      @animated_sprite_helper.set_frame(@hero_y_dim)
     elsif event.key == :right
-      set_frame(2 * @hero_y_dim)
+      @animated_sprite_helper.set_frame(2 * @hero_y_dim)
     elsif event.key == :up
-      set_frame(3 * @hero_y_dim)
+      @animated_sprite_helper.set_frame(3 * @hero_y_dim)
     end
-    replace_avatar(@animation_helper.current_frame)
+    @animated_sprite_helper.replace_avatar(@animation_helper.current_frame)
 
     @keys.add_key(event.key)
   end
@@ -442,7 +470,7 @@ class Ship
   # Update the ship state. Called once per frame.
   def update( event )
     dt = event.seconds # Time since last update
-    @animation_helper.update_animation(dt) { |frame| replace_avatar(frame) }
+    @animation_helper.update_animation(dt) { |frame| @animated_sprite_helper.replace_avatar(frame) }
     @coordinate_helper.update_accel
     @coordinate_helper.update_vel( dt )
     @coordinate_helper.update_pos( dt )
@@ -503,7 +531,33 @@ class WarpPoint
   end
 end
 
+class Monster
+  include Sprites::Sprite
+  include EventHandler::HasEventHandler
+  attr_accessor :px, :py
+  def initialize(filename, px, py)
+    super()
+    
+    @image = Surface.load filename
+    @rect  = @image.make_rect
+    @px = px
+    @py = py
+    @offset = [px,py]
+    make_magic_hooks(
+      ClockTicked => :update
+    )
+  end
 
+  def draw(surface,x,y,sx,sy)
+    tx = @px - x + sx/2
+    ty = @py - y + sy/2
+    @image.blit surface, [tx,ty,96,128]
+  end
+
+  def update(event)
+    puts "updated?"
+  end
+end
 
 
 # The Game class helps organize thing. It takes events
@@ -556,15 +610,20 @@ class Game
                          '.','.','.','.','.','.','w','.',
                          '.','.','.','.','.','.','.','.'
     ]
+
     terrainmap = TopoMap.new(8,6, @@BGX, @@BGY, terrain_data)
     topomap = TopoMap.new(8,6, @@BGX,@@BGY, bg_data)
     interactmap = TopoMap.new(8,6, @@BGX,@@BGY, interaction_data)
 
-
     bgsurface = Surface.new([@@BGX,@@BGY])
     topomap.blit_to(pallette, bgsurface)
 
-    @worldstate = WorldState.new(topomap, pallette, terrainmap, terrain_pallette, interactmap, interaction_pallette, bgsurface)
+    npcs = [Monster.new("monster.png", 400,660)]
+    npcs.each {|npc|
+      make_magic_hooks_for( npc, { YesTrigger.new() => :handle } )
+    }
+
+    @worldstate = WorldState.new(topomap, pallette, terrainmap, terrain_pallette, interactmap, interaction_pallette, npcs, bgsurface)
   end
   def make_world2
 
@@ -576,7 +635,7 @@ class Game
                'M','M','M','M','w','w','w','w'
     ]
     terrain_data = [  '.','.','.','e','e','e','.','.',
-                      '.','e','e','.','.','.','e','.',
+                      '.','e','e','T','T','T','e','.',
                       '.','e','e','e','e','e','e','.',
                       '.','e','e','e','e','e','e','.',
                       '.','e','e','e','e','e','e','.',
@@ -589,15 +648,16 @@ class Game
                          '.','.','.','.','.','.','W','.',
                          '.','.','.','.','.','.','.','.'
     ]
+    
     terrainmap = TopoMap.new(8,6, @@BGX, @@BGY, terrain_data)
     topomap = TopoMap.new(8,6, @@BGX,@@BGY, bg_data)
     interactmap = TopoMap.new(8,6, @@BGX,@@BGY, interaction_data)
-
-
+ 
     bgsurface = Surface.new([@@BGX,@@BGY])
     topomap.blit_to(pallette, bgsurface)
-
-    @worldstate2 = WorldState.new(topomap, pallette, terrainmap, terrain_pallette, interactmap, interaction_pallette, bgsurface)
+    npcs = []
+    
+    @worldstate2 = WorldState.new(topomap, pallette, terrainmap, terrain_pallette, interactmap, interaction_pallette, npcs, bgsurface)
   end
 
   # The "main loop". Repeat the #step method
@@ -712,7 +772,18 @@ class Game
     @sx = 640
     @sy = 480
     @universe.current_world.background_surface.blit(@screen, [0,0], [ @ship.px - (@sx/2), @ship.py - (@sy/2), @sx, @sy])
-    
+
+    @universe.current_world.npcs.each {|npc|
+      npc_distance_x = (npc.px - @ship.px).abs
+      screen_ext_x = (@sx/2)
+      onx = npc_distance_x <= screen_ext_x
+
+      npc_distance_y = (npc.py - @ship.py).abs
+      screen_ext_y = (@sy/2)
+      ony = npc_distance_y <= screen_ext_y
+      npc.draw(@screen, @ship.px, @ship.py, @sx, @sy) if onx and ony
+
+    }
     #@topomap.blit_with_pallette(pallette, @screen, @ship.px, @ship.py)
 #    puts "topomap should be in (#{@topomap.x_offset_for_world(@ship.px)},#{@topomap.y_offset_for_world(@ship.py)})"
 
@@ -752,6 +823,7 @@ class Game
 
     pal['w'] = WarpPoint.new(1)
     pal['W'] = WarpPoint.new(0)
+
     pal
   end
 
@@ -762,6 +834,7 @@ class Game
     pal['e'] = true
     pal
   end
+  
 
   def pallette
     pal = Hash.new(tile(:blue))
