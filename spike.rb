@@ -130,6 +130,12 @@ class InteractionHelper
   end
 
   def interact_with_facing(px,py)
+    if @universe.dialog_layer.visible
+      puts "confirming/closing/paging dialog"
+      @universe.dialog_layer.displayed
+      return #XXX check this return policy (ie currently first matching action is the only one run
+    end
+
     puts "you are facing #{@facing}"
     tilex = @universe.current_world.topo_map.x_offset_for_world(px)
     tiley = @universe.current_world.topo_map.y_offset_for_world(py)
@@ -139,6 +145,7 @@ class InteractionHelper
     if this_tile_interacts
       puts "you can interact with the current tile"
       this_tile_interacts.activate(@player, @universe.current_world, tilex, tiley)
+      return
     end
 
     if @facing == :down
@@ -168,6 +175,14 @@ class InteractionHelper
     if facing_tile_close_enough and facing_tile_interacts
       puts "you can interact with the facing tile in the #{@facing} direction, it is at #{facing_tilex} #{facing_tiley}"
       facing_tile_interacts.activate(@player, @universe.current_world, facing_tilex, facing_tiley) #@interactionmap, facing_tilex, facing_tiley, @bgsurface, @topomap, @topo_pallette
+      return
+    end
+
+    interactable_npcs = @universe.current_world.npcs.select {|npc| npc.nearby?(px,py, @@INTERACTION_DISTANCE_THRESHOLD, @@INTERACTION_DISTANCE_THRESHOLD)  }
+    unless interactable_npcs.empty?
+      puts "you can interact with the npc: #{interactable_npcs[0]}"
+      npc = interactable_npcs[0] #TODO what if there are multiple npcs to interact w/? one at a time? all of them?
+      npc.interact(@universe, @player)
     end
 
   end
@@ -540,9 +555,11 @@ class Monster
   def py
     @animated_sprite_helper.py
   end
-  def initialize(filename, px, py)
+  def initialize(filename, px, py, npc_x = @@MONSTER_X, npc_y = @@MONSTER_Y)
     super()
-    @animated_sprite_helper = AnimatedSpriteHelper.new(filename, px, py, @@MONSTER_X, @@MONSTER_Y)
+    @npc_x = npc_x
+    @npc_y = npc_y
+    @animated_sprite_helper = AnimatedSpriteHelper.new(filename, px, py, @npc_x, @npc_y)
     @animated_sprite_helper.set_frame(0)
     @keys = AlwaysDownMonsterKeyHolder.new
     @animation_helper = AnimationHelper.new(@keys, 3)
@@ -562,6 +579,19 @@ class Monster
     @animation_helper.update_animation(dt) { |frame| @animated_sprite_helper.replace_avatar(frame) }
     
   end
+
+  def distance_to(x,y)
+    [(px - x).abs, (py - y).abs]
+  end
+
+  def nearby?(x,y, distx, disty)
+    dist = distance_to(x,y)
+    (dist[0] < distx) and (dist[1] < disty)
+  end
+
+  def interact(universe, player)
+    puts "start a fight with #{self}"
+  end
 end
 
 
@@ -574,7 +604,7 @@ end
 class DialogLayer
   @@LAYER_INSET = 25
   @@TEXT_INSET = 10
-  attr_reader :visible
+  attr_accessor :visible, :text
   include FontLoader #TODO unify resource loading
 
   def initialize(screen)
@@ -584,18 +614,39 @@ class DialogLayer
     @layer.fill(:red)
     @layer.alpha = 192
     @font = load_font("FreeSans.ttf")
+    @text = "UNSET"
   end
 
   def toggle_visibility
     @visible = !@visible
   end
 
-  def draw(text="monkeys")
-    text_surface = @font.render text.to_s, true, [16,222,16]
+  def draw
+    text_surface = @font.render @text.to_s, true, [16,222,16]
     text_surface.blit @layer, [@@TEXT_INSET,@@TEXT_INSET]
     @layer.blit(@screen, [@@LAYER_INSET,@@LAYER_INSET])
   end
+
+  def displayed
+    #TODO other logic like next page, gifts, etc goes here
+    @visible = false
+    puts "dialog done"
+  end
   
+end
+
+class TalkingNPC < Monster
+  def initialize(filename, px, py, npc_x, npc_y, text)
+    super(filename, px, py, npc_x, npc_y)
+    @text = text
+  end
+
+  def interact(universe, player)
+    puts "display dialog '#{@text}' from #{self}"
+    universe.dialog_layer.visible = true
+    universe.dialog_layer.text = @text
+  end
+
 end
 
 class Game
@@ -652,7 +703,7 @@ class Game
     bgsurface = Surface.new([@@BGX,@@BGY])
     topomap.blit_to(pallette, bgsurface)
 
-    npcs = [Monster.new("monster.png", 400,660)]
+    npcs = [TalkingNPC.new("gogo-npc.png", 600, 200,48,64, "i am an npc."), Monster.new("monster.png", 400,660)]
     npcs.each {|npc|
       make_magic_hooks_for( npc, { YesTrigger.new() => :handle } )
     }
@@ -814,14 +865,8 @@ class Game
     @universe.current_world.background_surface.blit(@screen, [0,0], [ @ship.px - (@sx/2), @ship.py - (@sy/2), @sx, @sy])
 
     @universe.current_world.npcs.each {|npc|
-      npc_distance_x = (npc.px - @ship.px).abs
-      screen_ext_x = (@sx/2)
-      onx = npc_distance_x <= screen_ext_x
 
-      npc_distance_y = (npc.py - @ship.py).abs
-      screen_ext_y = (@sy/2)
-      ony = npc_distance_y <= screen_ext_y
-      npc.draw(@screen, @ship.px, @ship.py, @sx, @sy) if onx and ony
+      npc.draw(@screen, @ship.px, @ship.py, @sx, @sy) if npc.nearby?(@ship.px, @ship.py, @sx/2, @sy/2)
 
     }
     
