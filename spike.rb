@@ -137,7 +137,7 @@ class InteractionHelper
     @facing = :down
   end
 
-  def interact_with_facing(px,py)
+  def interact_with_facing(game, px,py)
     if @universe.dialog_layer.active
       puts "confirming/closing/paging dialog"
       @universe.dialog_layer.toggle_activity
@@ -190,7 +190,7 @@ class InteractionHelper
     unless interactable_npcs.empty?
       puts "you can interact with the npc: #{interactable_npcs[0]}"
       npc = interactable_npcs[0] #TODO what if there are multiple npcs to interact w/? one at a time? all of them?
-      npc.interact(@universe, @player)
+      npc.interact(game, @universe, @player)
     end
 
   end
@@ -450,8 +450,8 @@ class Ship
   end
 
 
-  def interact_with_facing
-    @interaction_helper.interact_with_facing( @coordinate_helper.px , @coordinate_helper.py)
+  def interact_with_facing(game)
+    @interaction_helper.interact_with_facing( game, @coordinate_helper.px , @coordinate_helper.py)
   end
 
   private
@@ -588,8 +588,11 @@ class Monster
     (dist[0] < distx) and (dist[1] < disty)
   end
 
-  def interact(universe, player)
-    puts "start a fight with #{self}"
+  def interact(game, universe, player)
+    
+    
+    EventManager.new.swap_event_sets(game, universe.battle_layer.active?, game.non_battle_hooks, game.battle_hooks)
+    universe.battle_layer.active = true
   end
 end
 
@@ -743,7 +746,7 @@ class TalkingNPC < Monster
     @text = text
   end
 
-  def interact(universe, player)
+  def interact(game, universe, player)
     puts "display dialog '#{@text}' from #{self}"
     universe.dialog_layer.active = true
     universe.dialog_layer.text = @text
@@ -755,6 +758,31 @@ class BattleLayer < AbstractLayer
   def initialize(screen)
     super(screen, screen.w - 50, screen.h - 50)
     @layer.fill(:orange)
+  end
+
+  def draw
+    @layer.blit(@screen, [@@LAYER_INSET,@@LAYER_INSET])
+  end
+end
+
+class EventManager
+  def swap_event_sets(game, already_active, toggled_hooks, menu_active_hooks)
+    if already_active
+      toggled_hooks.each {|hook|
+        game.append_hook(hook)
+      }
+      menu_active_hooks.each {|hook|
+        game.remove_hook(hook)
+      }
+    else
+      toggled_hooks.each {|hook|
+        game.remove_hook(hook)
+      }
+      menu_active_hooks.each {|hook|
+        game.append_hook(hook)
+      }
+    end
+
   end
 end
 
@@ -873,6 +901,21 @@ class Game
     end
   end
 
+  def non_menu_hooks
+    (@npc_hooks + @player_hooks + @menu_killed_hooks).flatten
+  end
+
+  def menu_hooks
+    @menu_active_hooks
+  end
+
+  def battle_hooks
+    puts "define hooks just for battle mode"
+    []
+  end
+  def non_battle_hooks
+    non_menu_hooks
+  end
 
   private
 
@@ -913,30 +956,10 @@ class Game
 
   end
 
-  def toggle_menu
-    toggled_hooks = (@npc_hooks + @player_hooks + @menu_killed_hooks).flatten
 
-    if @menu_layer.active?
-      puts "pre ap turning off #{@event_handler.hooks.size}"
-      toggled_hooks.each {|hook|
-        append_hook(hook)
-      }
-      puts "post ap turning off #{@event_handler.hooks.size}"
-      @menu_active_hooks.each {|hook|
-        remove_hook(hook)
-      }
-      puts "post mah turning off #{@event_handler.hooks.size}"
-    else
-      puts "pre ap turning on #{@event_handler.hooks.size}"
-      toggled_hooks.each {|hook|
-        remove_hook(hook)
-      }
-      puts "post ap turning on #{@event_handler.hooks.size}"
-      @menu_active_hooks.each {|hook|
-        append_hook(hook)
-      }
-      puts "post mah turning on #{@event_handler.hooks.size}"
-    end
+  def toggle_menu
+    
+    EventManager.new.swap_event_sets(self, @menu_layer.active?, non_menu_hooks, @menu_active_hooks)
     
     @menu_layer.toggle_activity
   end
@@ -966,7 +989,7 @@ class Game
     @dialog_layer.toggle_visibility
   end
   def interact_with_facing(event)
-    @ship.interact_with_facing
+    @ship.interact_with_facing(self)
   end
 
   def capture_ss(event)
