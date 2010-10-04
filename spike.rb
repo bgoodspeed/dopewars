@@ -22,12 +22,13 @@ include Rubygame::EventTriggers
 @@BGY = 960
 
 class Universe
-  attr_reader :worlds, :current_world
+  attr_reader :worlds, :current_world, :dialog_layer
 
-  def initialize(worlds)
+  def initialize(worlds, dialog_layer)
     raise "must have at least one world" if worlds.empty?
     @current_world = worlds[0]
     @worlds = worlds
+    @dialog_layer = dialog_layer
   end
 
   def world_by_index(idx)
@@ -569,6 +570,34 @@ end
 # its own action (e.g. Escape key = quit), but also
 # passing the events to the pandas to handle.
 #
+
+class DialogLayer
+  @@LAYER_INSET = 25
+  @@TEXT_INSET = 10
+  attr_reader :visible
+  include FontLoader #TODO unify resource loading
+
+  def initialize(screen)
+    @screen = screen
+    @visible = false
+    @layer = Surface.new([(@screen.w/2) - @@LAYER_INSET, (@screen.h/2) - @@LAYER_INSET])
+    @layer.fill(:red)
+    @layer.alpha = 192
+    @font = load_font("FreeSans.ttf")
+  end
+
+  def toggle_visibility
+    @visible = !@visible
+  end
+
+  def draw(text="monkeys")
+    text_surface = @font.render text.to_s, true, [16,222,16]
+    text_surface.blit @layer, [@@TEXT_INSET,@@TEXT_INSET]
+    @layer.blit(@screen, [@@LAYER_INSET,@@LAYER_INSET])
+  end
+  
+end
+
 class Game
   include EventHandler::HasEventHandler
 
@@ -580,6 +609,7 @@ class Game
     
     make_world1
     make_world2
+    make_dialog_layer
     make_universe
     make_ship
     make_hud
@@ -696,12 +726,16 @@ class Game
       :q => :quit,
       QuitRequested => :quit,
       :c => :capture_ss,
-      :i => :interact_with_facing
+      :i => :interact_with_facing,
+      :d => :toggle_dialog_layer
     }
 
     make_magic_hooks( hooks )
   end
 
+  def toggle_dialog_layer
+    @dialog_layer.toggle_visibility
+  end
   def interact_with_facing(event)
     @ship.interact_with_facing
   end
@@ -743,9 +777,11 @@ class Game
     @screen.title = "Square! In! Space!"
   end
 
-
+  def make_dialog_layer
+    @dialog_layer = DialogLayer.new(@screen)
+  end
   def make_universe
-    @universe = Universe.new([@worldstate, @worldstate2])
+    @universe = Universe.new([@worldstate, @worldstate2], @dialog_layer)
   end
   # Create the player ship in the middle of the screen
   def make_ship
@@ -788,6 +824,7 @@ class Game
       npc.draw(@screen, @ship.px, @ship.py, @sx, @sy) if onx and ony
 
     }
+    
     #@topomap.blit_with_pallette(pallette, @screen, @ship.px, @ship.py)
 #    puts "topomap should be in (#{@topomap.x_offset_for_world(@ship.px)},#{@topomap.y_offset_for_world(@ship.py)})"
 
@@ -808,6 +845,9 @@ class Game
 
     @ship.draw(@screen)
     @hud.draw
+    if @universe.dialog_layer.visible
+      @universe.dialog_layer.draw
+    end
     # Refresh the screen.
     @screen.update()
   end
