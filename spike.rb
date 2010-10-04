@@ -627,6 +627,15 @@ class DialogLayer
   
 end
 
+class MenuSection
+
+  attr_reader :text, :content
+  def initialize(text, content)
+    @text = text
+    @content = content
+  end
+end
+
 class MenuLayer
   @@MENU_LAYER_INSET = 25
   @@MENU_TEXT_INSET = 10
@@ -645,10 +654,16 @@ class MenuLayer
     @layer.fill(:red)
     @layer.alpha = 192
     @font = load_font("FreeSans.ttf")
-    @text_lines = ["Status", "Inventory", "Equip", "Save"]
+    @menu_sections = [MenuSection.new("Status", ["status info line 1", "status info line 2"]),
+      MenuSection.new("Inventory", ["inventory contents:", "TODO real data"]),
+      MenuSection.new("Equip", ["head equipment:", "arm equipment: ", "etc"]),
+      MenuSection.new("Save", ["Choose save slot"])]
+    @text_lines = @menu_sections.collect{|ms|ms.text}
     @cursor_position = 0
+    @section_position = 0
     @cursor = Surface.new([@@MENU_LINE_SPACING,@@MENU_LINE_SPACING])
     @cursor.fill(:blue)
+    @show_section = false
   end
 
   def toggle_activity
@@ -661,16 +676,44 @@ class MenuLayer
       text_surface = @font.render text.to_s, true, [16,222,16]
       text_surface.blit @layer, [@@MENU_TEXT_INSET,@@MENU_TEXT_INSET + @@MENU_LINE_SPACING * index]
     end
-    @cursor.blit(@layer, [2 * @@MENU_TEXT_INSET + @@MENU_TEXT_WIDTH, @@MENU_TEXT_INSET + @@MENU_LINE_SPACING * (@cursor_position)])
-
+    
+    if @show_section
+      active_section.content.each_with_index do |text, index|
+        surf = @font.render text.to_s, true, [16,222,16]
+        surf.blit(@layer, [3 * @@MENU_TEXT_INSET + @@MENU_TEXT_WIDTH + @@MENU_LINE_SPACING, @@MENU_TEXT_INSET + @@MENU_LINE_SPACING * (index)])
+      end
+      @cursor.blit(@layer, [2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, @@MENU_TEXT_INSET + @@MENU_LINE_SPACING * (@section_position)])
+    else
+      @cursor.blit(@layer, [2 * @@MENU_TEXT_INSET + @@MENU_TEXT_WIDTH, @@MENU_TEXT_INSET + @@MENU_LINE_SPACING * (@cursor_position)])
+    end
     @layer.blit(@screen, [@@MENU_LAYER_INSET,@@MENU_LAYER_INSET])
   end
 
+  def active_section
+    @menu_sections[@cursor_position]
+  end
+
+  def enter_current_cursor_location
+    @show_section = true
+  end
   def move_cursor_down
-    @cursor_position = (@cursor_position - 1) % @text_lines.size
+    if @show_section
+      @section_position = (@section_position + 1) % active_section.content.size
+    else
+      @cursor_position = (@cursor_position + 1) % @text_lines.size
+    end
   end
   def move_cursor_up
-    @cursor_position = (@cursor_position + 1) % @text_lines.size
+    if @show_section
+      @section_position = (@section_position - 1) % active_section.content.size
+    else
+      @cursor_position = (@cursor_position - 1) % @text_lines.size
+    end
+  end
+
+  def cancel_action
+    @show_section = false
+    @section_position = 0
   end
 
 end
@@ -831,14 +874,12 @@ class Game
     menu_killed_hooks = { :i => :interact_with_facing }
     @menu_killed_hooks = make_magic_hooks( menu_killed_hooks )
     puts @menu_killed_hooks.size
-    menu_active_hooks = { :left => :menu_left, :right => :menu_right, :up => :menu_up, :down => :menu_down }
+    menu_active_hooks = { :left => :menu_left, :right => :menu_right, :up => :menu_up, :down => :menu_down, :i => :menu_enter, :b => :menu_cancel }
 
     @menu_active_hooks = make_magic_hooks(menu_active_hooks)
     @menu_active_hooks.each do |hook|
       remove_hook(hook)
     end
-
-
 
   end
 
@@ -863,6 +904,14 @@ class Game
     end
     
     @menu_layer.toggle_activity
+  end
+
+  def menu_enter
+    @menu_layer.enter_current_cursor_location
+  end
+
+  def menu_cancel
+    @menu_layer.cancel_action
   end
 
   def menu_up
