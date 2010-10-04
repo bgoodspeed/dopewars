@@ -28,14 +28,15 @@ include Rubygame::EventTriggers
 @@TEXT_INSET = 10
 
 class Universe
-  attr_reader :worlds, :current_world, :dialog_layer, :menu_layer
+  attr_reader :worlds, :current_world, :dialog_layer, :menu_layer, :battle_layer
 
-  def initialize(worlds, dialog_layer, menu_layer)
+  def initialize(worlds, dialog_layer, menu_layer, battle_layer)
     raise "must have at least one world" if worlds.empty?
     @current_world = worlds[0]
     @worlds = worlds
     @dialog_layer = dialog_layer
     @menu_layer = menu_layer
+    @battle_layer = battle_layer
   end
 
   def world_by_index(idx)
@@ -137,9 +138,9 @@ class InteractionHelper
   end
 
   def interact_with_facing(px,py)
-    if @universe.dialog_layer.visible
+    if @universe.dialog_layer.active
       puts "confirming/closing/paging dialog"
-      @universe.dialog_layer.displayed
+      @universe.dialog_layer.toggle_activity
       return #XXX check this return policy (ie currently first matching action is the only one run
     end
 
@@ -744,7 +745,7 @@ class TalkingNPC < Monster
 
   def interact(universe, player)
     puts "display dialog '#{@text}' from #{self}"
-    universe.dialog_layer.visible = true
+    universe.dialog_layer.active = true
     universe.dialog_layer.text = @text
   end
 
@@ -916,20 +917,25 @@ class Game
     toggled_hooks = (@npc_hooks + @player_hooks + @menu_killed_hooks).flatten
 
     if @menu_layer.active?
+      puts "pre ap turning off #{@event_handler.hooks.size}"
       toggled_hooks.each {|hook|
         append_hook(hook)
       }
+      puts "post ap turning off #{@event_handler.hooks.size}"
       @menu_active_hooks.each {|hook|
         remove_hook(hook)
       }
+      puts "post mah turning off #{@event_handler.hooks.size}"
     else
+      puts "pre ap turning on #{@event_handler.hooks.size}"
       toggled_hooks.each {|hook|
         remove_hook(hook)
       }
+      puts "post ap turning on #{@event_handler.hooks.size}"
       @menu_active_hooks.each {|hook|
         append_hook(hook)
       }
-
+      puts "post mah turning on #{@event_handler.hooks.size}"
     end
     
     @menu_layer.toggle_activity
@@ -1004,7 +1010,7 @@ class Game
     @dialog_layer = DialogLayer.new(@screen)
   end
   def make_universe
-    @universe = Universe.new([@worldstate, @worldstate2], @dialog_layer, @menu_layer)
+    @universe = Universe.new([@worldstate, @worldstate2], @dialog_layer, @menu_layer, @battle_layer)
   end
   # Create the player ship in the middle of the screen
   def make_ship
@@ -1063,11 +1069,14 @@ class Game
 
     @ship.draw(@screen)
     @hud.draw
-    if @universe.dialog_layer.visible
+    if @universe.dialog_layer.active?
       @universe.dialog_layer.draw
     end
     if @universe.menu_layer.active?
       @universe.menu_layer.draw
+    end
+    if @universe.battle_layer.active?
+      @universe.battle_layer.draw
     end
     # Refresh the screen.
     @screen.update()
