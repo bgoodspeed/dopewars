@@ -20,6 +20,12 @@ include Rubygame::EventTriggers
 
 @@BGX = 1280
 @@BGY = 960
+@@MENU_LAYER_INSET = 25
+@@MENU_TEXT_INSET = 10
+@@MENU_LINE_SPACING = 25
+@@MENU_TEXT_WIDTH = 100
+@@LAYER_INSET = 25
+@@TEXT_INSET = 10
 
 class Universe
   attr_reader :worlds, :current_world, :dialog_layer, :menu_layer
@@ -593,19 +599,39 @@ end
 # passing the events to the pandas to handle.
 #
 
-class DialogLayer
-  @@LAYER_INSET = 25
-  @@TEXT_INSET = 10
+
+class AbstractLayer
+
+  include FontLoader #TODO unify resource loading
+  attr_accessor :active
+
+  
+
+  def initialize(screen, layer_width, layer_height)
+    @screen = screen
+    @active = false
+    @layer = Surface.new([layer_width, layer_height])
+    @font = load_font("FreeSans.ttf")
+
+  end
+
+  def toggle_activity
+    @active = !@active
+  end
+
+  alias_method :active?, :active
+  alias_method :visible, :active
+  alias_method :toggle_visibility, :toggle_activity
+end
+
+class DialogLayer < AbstractLayer
   attr_accessor :visible, :text
   include FontLoader #TODO unify resource loading
 
   def initialize(screen)
-    @screen = screen
-    @visible = false
-    @layer = Surface.new([(@screen.w/2) - @@LAYER_INSET, (@screen.h/2) - @@LAYER_INSET])
+    super(screen, screen.w/2 - @@LAYER_INSET, screen.h/2 - @@LAYER_INSET)
     @layer.fill(:red)
     @layer.alpha = 192
-    @font = load_font("FreeSans.ttf")
     @text = "UNSET"
   end
 
@@ -621,7 +647,7 @@ class DialogLayer
 
   def displayed
     #TODO other logic like next page, gifts, etc goes here
-    @visible = false
+    @active = false
     puts "dialog done"
   end
   
@@ -636,24 +662,19 @@ class MenuSection
   end
 end
 
-class MenuLayer
-  @@MENU_LAYER_INSET = 25
-  @@MENU_TEXT_INSET = 10
-  @@MENU_LINE_SPACING = 25
-  @@MENU_TEXT_WIDTH = 100
+class MenuLayer < AbstractLayer
 
   include FontLoader #TODO unify resource loading
   attr_accessor :active
 
   alias_method :active?, :active
+  alias_method :visible, :active
+  alias_method :toggle_visibility, :toggle_activity
 
   def initialize(screen)
-    @screen = screen
-    @active = false
-    @layer = Surface.new([(@screen.w) - 2*@@MENU_LAYER_INSET, (@screen.h) - 2*@@MENU_LAYER_INSET])
+    super(screen, (screen.w) - 2*@@MENU_LAYER_INSET, (screen.h) - 2*@@MENU_LAYER_INSET)
     @layer.fill(:red)
     @layer.alpha = 192
-    @font = load_font("FreeSans.ttf")
     @menu_sections = [MenuSection.new("Status", ["status info line 1", "status info line 2"]),
       MenuSection.new("Inventory", ["inventory contents:", "TODO real data"]),
       MenuSection.new("Equip", ["head equipment:", "arm equipment: ", "etc"]),
@@ -666,9 +687,6 @@ class MenuLayer
     @show_section = false
   end
 
-  def toggle_activity
-    @active = !@active
-  end
 
   def draw
     @layer.fill(:red)
@@ -732,6 +750,13 @@ class TalkingNPC < Monster
 
 end
 
+class BattleLayer < AbstractLayer
+  def initialize(screen)
+    super(screen, screen.w - 50, screen.h - 50)
+    @layer.fill(:orange)
+  end
+end
+
 class Game
   include EventHandler::HasEventHandler
 
@@ -746,12 +771,16 @@ class Game
     make_dialog_layer
     @npc_hooks.flatten
     make_menu_layer
+    make_battle_layer
     make_universe
     make_ship
     make_hud
 
   end
 
+  def make_battle_layer
+    @battle_layer = BattleLayer.new(@screen)
+  end
   def make_menu_layer
     @menu_layer = MenuLayer.new(@screen)
   end
