@@ -449,9 +449,6 @@ class Ship
 
   private
 
-
-
-
   # Add it to the list of keys being pressed.
   def key_pressed( event )
     newkey = event.key
@@ -489,18 +486,12 @@ class Ship
     @coordinate_helper.update_pos( dt )
   end
 
-
-
-
-
-
   def x_ext
     @hero_x_dim/2
   end
   def y_ext
     @hero_y_dim/2
   end
-
 
 end
 
@@ -637,7 +628,12 @@ class DialogLayer
 end
 
 class MenuLayer
+  @@MENU_LAYER_INSET = 25
+  @@MENU_TEXT_INSET = 10
+  @@MENU_LINE_SPACING = 25
+  @@MENU_TEXT_WIDTH = 100
 
+  include FontLoader #TODO unify resource loading
   attr_accessor :active
 
   alias_method :active?, :active
@@ -645,11 +641,38 @@ class MenuLayer
   def initialize(screen)
     @screen = screen
     @active = false
+    @layer = Surface.new([(@screen.w) - 2*@@MENU_LAYER_INSET, (@screen.h) - 2*@@MENU_LAYER_INSET])
+    @layer.fill(:red)
+    @layer.alpha = 192
+    @font = load_font("FreeSans.ttf")
+    @text_lines = ["Status", "Inventory", "Equip", "Save"]
+    @cursor_position = 0
+    @cursor = Surface.new([@@MENU_LINE_SPACING,@@MENU_LINE_SPACING])
+    @cursor.fill(:blue)
   end
 
   def toggle_activity
     @active = !@active
   end
+
+  def draw
+    @layer.fill(:red)
+    @text_lines.each_with_index do |text, index|
+      text_surface = @font.render text.to_s, true, [16,222,16]
+      text_surface.blit @layer, [@@MENU_TEXT_INSET,@@MENU_TEXT_INSET + @@MENU_LINE_SPACING * index]
+    end
+    @cursor.blit(@layer, [2 * @@MENU_TEXT_INSET + @@MENU_TEXT_WIDTH, @@MENU_TEXT_INSET + @@MENU_LINE_SPACING * (@cursor_position)])
+
+    @layer.blit(@screen, [@@MENU_LAYER_INSET,@@MENU_LAYER_INSET])
+  end
+
+  def move_cursor_down
+    @cursor_position = (@cursor_position - 1) % @text_lines.size
+  end
+  def move_cursor_up
+    @cursor_position = (@cursor_position + 1) % @text_lines.size
+  end
+
 end
 
 class TalkingNPC < Monster
@@ -674,10 +697,11 @@ class Game
     make_clock
     make_queue
     make_event_hooks
-    
+    @npc_hooks = []
     make_world1
     make_world2
     make_dialog_layer
+    @npc_hooks.flatten
     make_menu_layer
     make_universe
     make_ship
@@ -723,9 +747,10 @@ class Game
     bgsurface = Surface.new([@@BGX,@@BGY])
     topomap.blit_to(pallette, bgsurface)
 
+
     npcs = [TalkingNPC.new("gogo-npc.png", 600, 200,48,64, "i am an npc."), Monster.new("monster.png", 400,660)]
     npcs.each {|npc|
-      make_magic_hooks_for( npc, { YesTrigger.new() => :handle } )
+      @npc_hooks << make_magic_hooks_for( npc, { YesTrigger.new() => :handle } )
     }
 
     @worldstate = WorldState.new(topomap, pallette, terrainmap, terrain_pallette, interactmap, interaction_pallette, npcs, bgsurface)
@@ -761,7 +786,7 @@ class Game
     bgsurface = Surface.new([@@BGX,@@BGY])
     topomap.blit_to(pallette, bgsurface)
     npcs = []
-    
+    @npcs_hooks # ....TODO
     @worldstate2 = WorldState.new(topomap, pallette, terrainmap, terrain_pallette, interactmap, interaction_pallette, npcs, bgsurface)
   end
 
@@ -805,21 +830,52 @@ class Game
 
     menu_killed_hooks = { :i => :interact_with_facing }
     @menu_killed_hooks = make_magic_hooks( menu_killed_hooks )
-    puts "mkh: #{@menu_killed_hooks[0]}"
+    puts @menu_killed_hooks.size
+    menu_active_hooks = { :left => :menu_left, :right => :menu_right, :up => :menu_up, :down => :menu_down }
+
+    @menu_active_hooks = make_magic_hooks(menu_active_hooks)
+    @menu_active_hooks.each do |hook|
+      remove_hook(hook)
+    end
+
+
+
   end
 
   def toggle_menu
-    puts "we have #{@event_handler.hooks.size} hooks set"
+    toggled_hooks = (@npc_hooks + @player_hooks + @menu_killed_hooks).flatten
+
     if @menu_layer.active?
-      append_hook(@player_hooks[0])
-      append_hook(@menu_killed_hooks[0])
-      puts "we have #{@event_handler.hooks.size} hooks set after adding"
+      toggled_hooks.each {|hook|
+        append_hook(hook)
+      }
+      @menu_active_hooks.each {|hook|
+        remove_hook(hook)
+      }
     else
-      remove_hook(@player_hooks[0])
-      remove_hook(@menu_killed_hooks[0])
-      puts "we have #{@event_handler.hooks.size} hooks set after removing"
+      toggled_hooks.each {|hook|
+        remove_hook(hook)
+      }
+      @menu_active_hooks.each {|hook|
+        append_hook(hook)
+      }
+
     end
+    
     @menu_layer.toggle_activity
+  end
+
+  def menu_up
+    @menu_layer.move_cursor_up
+  end
+  def menu_down
+    @menu_layer.move_cursor_down
+  end
+  def menu_left
+    @menu_layer.move_cursor_up
+  end
+  def menu_right
+    @menu_layer.move_cursor_down
   end
 
   def toggle_dialog_layer
@@ -931,6 +987,9 @@ class Game
     @hud.draw
     if @universe.dialog_layer.visible
       @universe.dialog_layer.draw
+    end
+    if @universe.menu_layer.active?
+      @universe.menu_layer.draw
     end
     # Refresh the screen.
     @screen.update()
