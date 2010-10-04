@@ -22,13 +22,14 @@ include Rubygame::EventTriggers
 @@BGY = 960
 
 class Universe
-  attr_reader :worlds, :current_world, :dialog_layer
+  attr_reader :worlds, :current_world, :dialog_layer, :menu_layer
 
-  def initialize(worlds, dialog_layer)
+  def initialize(worlds, dialog_layer, menu_layer)
     raise "must have at least one world" if worlds.empty?
     @current_world = worlds[0]
     @worlds = worlds
     @dialog_layer = dialog_layer
+    @menu_layer = menu_layer
   end
 
   def world_by_index(idx)
@@ -635,6 +636,22 @@ class DialogLayer
   
 end
 
+class MenuLayer
+
+  attr_accessor :active
+
+  alias_method :active?, :active
+
+  def initialize(screen)
+    @screen = screen
+    @active = false
+  end
+
+  def toggle_activity
+    @active = !@active
+  end
+end
+
 class TalkingNPC < Monster
   def initialize(filename, px, py, npc_x, npc_y, text)
     super(filename, px, py, npc_x, npc_y)
@@ -661,13 +678,16 @@ class Game
     make_world1
     make_world2
     make_dialog_layer
+    make_menu_layer
     make_universe
     make_ship
     make_hud
 
   end
 
-
+  def make_menu_layer
+    @menu_layer = MenuLayer.new(@screen)
+  end
 
   def make_hud
     @hud = Hud.new :screen => @screen, :player => @ship, :topomap => @topomap
@@ -772,16 +792,34 @@ class Game
   # Set up the event hooks to perform actions in
   # response to certain events.
   def make_event_hooks
-    hooks = {
+    always_on_hooks = {
       :escape => :quit,
       :q => :quit,
       QuitRequested => :quit,
       :c => :capture_ss,
-      :i => :interact_with_facing,
-      :d => :toggle_dialog_layer
+      :d => :toggle_dialog_layer,
+      :m => :toggle_menu
     }
 
-    make_magic_hooks( hooks )
+    make_magic_hooks( always_on_hooks )
+
+    menu_killed_hooks = { :i => :interact_with_facing }
+    @menu_killed_hooks = make_magic_hooks( menu_killed_hooks )
+    puts "mkh: #{@menu_killed_hooks[0]}"
+  end
+
+  def toggle_menu
+    puts "we have #{@event_handler.hooks.size} hooks set"
+    if @menu_layer.active?
+      append_hook(@player_hooks[0])
+      append_hook(@menu_killed_hooks[0])
+      puts "we have #{@event_handler.hooks.size} hooks set after adding"
+    else
+      remove_hook(@player_hooks[0])
+      remove_hook(@menu_killed_hooks[0])
+      puts "we have #{@event_handler.hooks.size} hooks set after removing"
+    end
+    @menu_layer.toggle_activity
   end
 
   def toggle_dialog_layer
@@ -832,7 +870,7 @@ class Game
     @dialog_layer = DialogLayer.new(@screen)
   end
   def make_universe
-    @universe = Universe.new([@worldstate, @worldstate2], @dialog_layer)
+    @universe = Universe.new([@worldstate, @worldstate2], @dialog_layer, @menu_layer)
   end
   # Create the player ship in the middle of the screen
   def make_ship
@@ -840,7 +878,8 @@ class Game
     @ship = Ship.new( @screen.w/2, @screen.h/2, @universe )
 
     # Make event hook to pass all events to @ship#handle().
-    make_magic_hooks_for( @ship, { YesTrigger.new() => :handle } )
+    @player_hooks = make_magic_hooks_for( @ship, { YesTrigger.new() => :handle } )
+    puts "player hooks: #{@player_hooks[0]}"
   end
 
 
