@@ -1,6 +1,6 @@
 # To change this template, choose Tools | Templates
 # and open the template in the editor.
-require 'inventory'
+require File.join(File.dirname(__FILE__),'inventory')
 class InsufficientMoneyException < Exception
   
 end

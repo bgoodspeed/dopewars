@@ -9,6 +9,8 @@ require 'rubygame'
 require 'lib/font_loader'
 require 'lib/topo_map'
 require 'lib/hud'
+require 'lib/inventory'
+require 'lib/hero'
 
 # Include these modules so we can type "Surface" instead of
 # "Rubygame::Surface", etc. Purely for convenience/readability.
@@ -573,6 +575,11 @@ class Monster
     @animated_sprite_helper.image.blit surface, [tx,ty,96,128]
   end
 
+  def draw_to(layer)
+    @animated_sprite_helper.image.blit layer, [0,0,96,128]
+
+  end
+
   def update(event)
     dt = event.seconds # Time since last update
     @animation_helper.update_animation(dt) { |frame| @animated_sprite_helper.replace_avatar(frame) }
@@ -592,7 +599,9 @@ class Monster
     
     
     EventManager.new.swap_event_sets(game, universe.battle_layer.active?, game.non_battle_hooks, game.battle_hooks)
-    universe.battle_layer.active = true
+    universe.battle_layer.start_battle(game, universe, player, self)
+    
+
   end
 end
 
@@ -664,6 +673,10 @@ class MenuSection
     @text = text
     @content = content
   end
+
+  def text_contents
+    @content.collect {|ma| ma.text}
+  end
 end
 
 class MenuHelper
@@ -684,7 +697,7 @@ class MenuHelper
     @menu_sections[@cursor_position]
   end
 
- def move_cursor_down
+  def move_cursor_down
     if @show_section
       @section_position = (@section_position + 1) % active_section.content.size
     else
@@ -699,7 +712,12 @@ class MenuHelper
     end
   end
   def enter_current_cursor_location
-    @show_section = true
+    if @show_section
+      active_section.content[@section_position].activate
+    else
+      @show_section = true
+    end
+
   end
   def cancel_action
     @show_section = false
@@ -710,7 +728,7 @@ class MenuHelper
     @text_rendering_helper.render_lines_to_layer( @text_lines, menu_layer_config.main_menu_text)
 
     if @show_section
-      @text_rendering_helper.render_lines_to_layer(active_section.content, menu_layer_config.section_menu_text)
+      @text_rendering_helper.render_lines_to_layer(active_section.text_contents, menu_layer_config.section_menu_text)
       conf = menu_layer_config.in_section_cursor
       @cursor.blit(@layer, [conf.xc + conf.xf * @section_position, conf.yc + conf.yf * @section_position])
     else
@@ -752,6 +770,32 @@ class MenuLayerConfig
   attr_accessor :main_menu_text, :section_menu_text, :in_section_cursor, :main_cursor, :layer_inset_on_screen
 end
 
+class MenuAction
+  attr_reader :text
+  def initialize(text)
+    @text = text
+  end
+
+  def activate
+    puts "This is a no-op action: #{@text}"
+  end
+end
+
+class AttackAction < MenuAction
+  def initialize(text, battle_layer)
+    super(text)
+    @battle_layer = battle_layer
+  end
+  def activate
+    battle = @battle_layer.battle
+    puts "attack #{battle.monster} from #{battle.player}"
+  end
+end
+
+class ItemAction < MenuAction
+  
+end
+
 class MenuLayer < AbstractLayer
 
   include FontLoader #TODO unify resource loading
@@ -766,10 +810,10 @@ class MenuLayer < AbstractLayer
     @layer.fill(:red)
     @layer.alpha = 192
     @text_rendering_helper = TextRenderingHelper.new(@layer, @font)
-    sections = [MenuSection.new("Status", ["status info line 1", "status info line 2"]),
-          MenuSection.new("Inventory", ["inventory contents:", "TODO real data"]),
-      MenuSection.new("Equip", ["head equipment:", "arm equipment: ", "etc"]),
-      MenuSection.new("Save", ["Choose save slot"])]
+    sections = [MenuSection.new("Status", [MenuAction.new("status info line 1"), MenuAction.new("status info line 2")]),
+          MenuSection.new("Inventory", [MenuAction.new("inventory contents:"), MenuAction.new("TODO real data")]),
+      MenuSection.new("Equip", [MenuAction.new("head equipment:"), MenuAction.new("arm equipment: "), MenuAction.new("etc")]),
+      MenuSection.new("Save", [MenuAction.new("Choose save slot")])]
     @menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
   end
  
@@ -820,17 +864,36 @@ class TalkingNPC < Monster
 
 end
 
+class Battle
+  attr_reader :monster, :player
+  def initialize(game, universe, player, monster, battle_layer)
+    @player = player
+    @monster = monster
+  end
+end
+
 class BattleLayer < AbstractLayer
+  attr_reader :battle
+  include EventHandler::HasEventHandler
   def initialize(screen)
     super(screen, screen.w - 50, screen.h - 50)
     @layer.fill(:orange)
     @text_rendering_helper = TextRenderingHelper.new(@layer, @font)
-    sections = [MenuSection.new("Player1", ["Attack", "Item"]),
-      MenuSection.new("Player2", ["Attack", "Item"])]
+    sections = [MenuSection.new("Player1", [AttackAction.new("Attack", self), ItemAction.new("Item")]),
+      MenuSection.new("Player2", [MenuAction.new("Attack"), MenuAction.new("Item")])]
     @menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
-
+    @battle = nil
+    make_magic_hooks({ClockTicked => :update})
   end
-
+  def update( event )
+    return unless @battle
+    dt = event.seconds # Time since last update
+    puts "update battle stuff"
+  end
+  def start_battle(game, universe, player, monster)
+    @active = true
+    @battle = Battle.new(game, universe, player, monster, self)
+  end
   def menu_layer_config
 
     mlc = MenuLayerConfig.new
@@ -844,10 +907,11 @@ class BattleLayer < AbstractLayer
 
   def draw()
     @layer.fill(:orange)
+    @battle.monster.draw_to(@layer)
     @menu_helper.draw(menu_layer_config)
   end
 
- def enter_current_cursor_location
+  def enter_current_cursor_location
     @menu_helper.enter_current_cursor_location
   end
   def move_cursor_down
@@ -907,6 +971,7 @@ class Game
 
   def make_battle_layer
     @battle_layer = BattleLayer.new(@screen)
+    @battle_layer_hooks = make_magic_hooks_for(@battle_layer, { YesTrigger.new() => :handle } )
   end
   def make_menu_layer
     @menu_layer = MenuLayer.new(@screen)
@@ -1059,6 +1124,8 @@ class Game
     @battle_active_hooks.each do |hook|
       remove_hook(hook)
     end
+
+    
   end
 
 
