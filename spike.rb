@@ -666,59 +666,25 @@ class MenuSection
   end
 end
 
-class MenuLayer < AbstractLayer
-
-  include FontLoader #TODO unify resource loading
-  attr_accessor :active
-
-  alias_method :active?, :active
-  alias_method :visible, :active
-  alias_method :toggle_visibility, :toggle_activity
-
-  def initialize(screen)
-    super(screen, (screen.w) - 2*@@MENU_LAYER_INSET, (screen.h) - 2*@@MENU_LAYER_INSET)
-    @layer.fill(:red)
-    @layer.alpha = 192
-    @menu_sections = [MenuSection.new("Status", ["status info line 1", "status info line 2"]),
-      MenuSection.new("Inventory", ["inventory contents:", "TODO real data"]),
-      MenuSection.new("Equip", ["head equipment:", "arm equipment: ", "etc"]),
-      MenuSection.new("Save", ["Choose save slot"])]
+class MenuHelper
+  def initialize(screen, layer,text_helper, sections, cursor_x, cursor_y)
+    @layer = layer
+    @text_rendering_helper = text_helper
+    @menu_sections = sections
     @text_lines = @menu_sections.collect{|ms|ms.text}
     @cursor_position = 0
     @section_position = 0
-    @cursor = Surface.new([@@MENU_LINE_SPACING,@@MENU_LINE_SPACING])
+    @cursor = Surface.new([cursor_x, cursor_y])
     @cursor.fill(:blue)
     @show_section = false
-  end
-
-
-  def draw
-    @layer.fill(:red)
-    @text_lines.each_with_index do |text, index|
-      text_surface = @font.render text.to_s, true, [16,222,16]
-      text_surface.blit @layer, [@@MENU_TEXT_INSET,@@MENU_TEXT_INSET + @@MENU_LINE_SPACING * index]
-    end
-    
-    if @show_section
-      active_section.content.each_with_index do |text, index|
-        surf = @font.render text.to_s, true, [16,222,16]
-        surf.blit(@layer, [3 * @@MENU_TEXT_INSET + @@MENU_TEXT_WIDTH + @@MENU_LINE_SPACING, @@MENU_TEXT_INSET + @@MENU_LINE_SPACING * (index)])
-      end
-      @cursor.blit(@layer, [2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, @@MENU_TEXT_INSET + @@MENU_LINE_SPACING * (@section_position)])
-    else
-      @cursor.blit(@layer, [2 * @@MENU_TEXT_INSET + @@MENU_TEXT_WIDTH, @@MENU_TEXT_INSET + @@MENU_LINE_SPACING * (@cursor_position)])
-    end
-    @layer.blit(@screen, [@@MENU_LAYER_INSET,@@MENU_LAYER_INSET])
+    @screen = screen
   end
 
   def active_section
     @menu_sections[@cursor_position]
   end
 
-  def enter_current_cursor_location
-    @show_section = true
-  end
-  def move_cursor_down
+ def move_cursor_down
     if @show_section
       @section_position = (@section_position + 1) % active_section.content.size
     else
@@ -732,10 +698,110 @@ class MenuLayer < AbstractLayer
       @cursor_position = (@cursor_position - 1) % @text_lines.size
     end
   end
-
+  def enter_current_cursor_location
+    @show_section = true
+  end
   def cancel_action
     @show_section = false
     @section_position = 0
+  end
+
+  def draw(menu_layer_config)
+    @text_rendering_helper.render_lines_to_layer( @text_lines, menu_layer_config.main_menu_text)
+
+    if @show_section
+      @text_rendering_helper.render_lines_to_layer(active_section.content, menu_layer_config.section_menu_text)
+      conf = menu_layer_config.in_section_cursor
+      @cursor.blit(@layer, [conf.xc + conf.xf * @section_position, conf.yc + conf.yf * @section_position])
+    else
+      conf = menu_layer_config.main_cursor
+      @cursor.blit(@layer, [conf.xc + conf.xf * @cursor_position, conf.yc + conf.yf * @cursor_position])
+    end
+    @layer.blit(
+      @screen, menu_layer_config.layer_inset_on_screen)
+
+  end
+end
+
+class TextRenderingHelper
+  def initialize(layer, font)
+    @layer = layer
+    @font = font
+  end
+  def render_lines_to_layer(text_lines, conf)
+    text_lines.each_with_index do |text, index|
+      text_surface = @font.render text.to_s, true, [16,222,16]
+      text_surface.blit @layer, [conf.xc + conf.xf * index,conf.yc + conf.yf * index]
+    end
+
+  end
+
+end
+
+class TextRenderingConfig
+  attr_reader :xc,:xf,:yc,:yf
+  def initialize(xc,xf,yc,yf)
+    @xc = xc
+    @xf = xf
+    @yc = yc
+    @yf = yf
+  end
+end
+
+class MenuLayerConfig
+  attr_accessor :main_menu_text, :section_menu_text, :in_section_cursor, :main_cursor, :layer_inset_on_screen
+end
+
+class MenuLayer < AbstractLayer
+
+  include FontLoader #TODO unify resource loading
+  attr_accessor :active
+
+  alias_method :active?, :active
+  alias_method :visible, :active
+  alias_method :toggle_visibility, :toggle_activity
+
+  def initialize(screen)
+    super(screen, (screen.w) - 2*@@MENU_LAYER_INSET, (screen.h) - 2*@@MENU_LAYER_INSET)
+    @layer.fill(:red)
+    @layer.alpha = 192
+    @text_rendering_helper = TextRenderingHelper.new(@layer, @font)
+    sections = [MenuSection.new("Status", ["status info line 1", "status info line 2"]),
+          MenuSection.new("Inventory", ["inventory contents:", "TODO real data"]),
+      MenuSection.new("Equip", ["head equipment:", "arm equipment: ", "etc"]),
+      MenuSection.new("Save", ["Choose save slot"])]
+    @menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
+  end
+ 
+
+  def menu_layer_config
+
+    mlc = MenuLayerConfig.new
+    mlc.main_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
+    mlc.section_menu_text = TextRenderingConfig.new(3 * @@MENU_TEXT_INSET + @@MENU_TEXT_WIDTH + @@MENU_LINE_SPACING, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
+    mlc.in_section_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
+    mlc.main_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + @@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
+    mlc.layer_inset_on_screen = [@@MENU_LAYER_INSET,@@MENU_LAYER_INSET]
+    mlc
+  end
+
+  def draw()
+    @layer.fill(:red)
+    @menu_helper.draw(menu_layer_config)
+  end
+
+  def enter_current_cursor_location
+    @menu_helper.enter_current_cursor_location
+  end
+  def move_cursor_down
+    @menu_helper.move_cursor_down
+  end
+  def move_cursor_up
+    @menu_helper.move_cursor_up
+  end
+
+  def cancel_action
+    @menu_helper.cancel_action
   end
 
 end
@@ -758,11 +824,43 @@ class BattleLayer < AbstractLayer
   def initialize(screen)
     super(screen, screen.w - 50, screen.h - 50)
     @layer.fill(:orange)
+    @text_rendering_helper = TextRenderingHelper.new(@layer, @font)
+    sections = [MenuSection.new("Player1", ["Attack", "Item"]),
+      MenuSection.new("Player2", ["Attack", "Item"])]
+    @menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
+
   end
 
-  def draw
-    @layer.blit(@screen, [@@LAYER_INSET,@@LAYER_INSET])
+  def menu_layer_config
+
+    mlc = MenuLayerConfig.new
+    mlc.main_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, @layer.h - 50, 0)
+    mlc.section_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, @layer.h - 150, 0)
+    mlc.in_section_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH, @layer.h - 200, 0)
+    mlc.main_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH, @layer.h - 100, 0)
+    mlc.layer_inset_on_screen = [@@LAYER_INSET,@@LAYER_INSET]
+    mlc
   end
+
+  def draw()
+    @layer.fill(:orange)
+    @menu_helper.draw(menu_layer_config)
+  end
+
+ def enter_current_cursor_location
+    @menu_helper.enter_current_cursor_location
+  end
+  def move_cursor_down
+    @menu_helper.move_cursor_down
+  end
+  def move_cursor_up
+    @menu_helper.move_cursor_up
+  end
+
+  def cancel_action
+    @menu_helper.cancel_action
+  end
+
 end
 
 class EventManager
@@ -910,8 +1008,7 @@ class Game
   end
 
   def battle_hooks
-    puts "define hooks just for battle mode"
-    []
+    @battle_active_hooks
   end
   def non_battle_hooks
     non_menu_hooks
@@ -954,6 +1051,14 @@ class Game
       remove_hook(hook)
     end
 
+    battle_hooks = {
+      :left => :battle_left, :right => :battle_right, :up => :battle_up, :down => :battle_down,
+      :i => :battle_confirm, :b => :battle_cancel
+    }
+    @battle_active_hooks = make_magic_hooks(battle_hooks)
+    @battle_active_hooks.each do |hook|
+      remove_hook(hook)
+    end
   end
 
 
@@ -979,10 +1084,31 @@ class Game
     @menu_layer.move_cursor_down
   end
   def menu_left
-    @menu_layer.move_cursor_up
+    @menu_layer.cancel_action
   end
   def menu_right
-    @menu_layer.move_cursor_down
+    @menu_layer.enter_current_cursor_location
+  end
+
+  
+  def battle_up
+    @battle_layer.enter_current_cursor_location
+  end
+  def battle_down
+    @battle_layer.cancel_action
+  end
+  def battle_left
+    @battle_layer.move_cursor_up
+  end
+  def battle_right
+    @battle_layer.move_cursor_down
+  end
+  def battle_confirm
+    @battle_layer.enter_current_cursor_location
+  end
+
+  def battle_cancel
+    @battle_layer.cancel_action
   end
 
   def toggle_dialog_layer
