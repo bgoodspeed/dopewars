@@ -466,9 +466,9 @@ class MenuHelper
       @cursor_position = (@cursor_position - 1) % @text_lines.size
     end
   end
-  def enter_current_cursor_location
+  def enter_current_cursor_location(game)
     if @show_section
-      active_section.content[@section_position].activate(@cursor_position)
+      active_section.content[@section_position].activate(@cursor_position, game)
     else
       @show_section = true
     end
@@ -512,8 +512,8 @@ class BattleMenuHelper < MenuHelper
       @cursor_inactive_color
     end
   end
-  def enter_current_cursor_location
-    super() if current_cursor_member_ready?
+  def enter_current_cursor_location(game)
+    super(game) if current_cursor_member_ready?
   end
 
 
@@ -767,7 +767,7 @@ class MenuLayer < AbstractLayer
     sections = [MenuSection.new("Status", [MenuAction.new("status info line 1"), MenuAction.new("status info line 2")]),
           MenuSection.new("Inventory", [MenuAction.new("inventory contents:"), MenuAction.new("TODO real data")]),
       MenuSection.new("Equip", [MenuAction.new("head equipment:"), MenuAction.new("arm equipment: "), MenuAction.new("etc")]),
-      MenuSection.new("Save", [MenuAction.new("Choose save slot")])]
+      MenuSection.new("Save", [SaveAction.new("Slot 1")])]
     @menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
   end
 
@@ -788,8 +788,8 @@ class MenuLayer < AbstractLayer
     @menu_helper.draw(menu_layer_config)
   end
 
-  def enter_current_cursor_location
-    @menu_helper.enter_current_cursor_location
+  def enter_current_cursor_location(game)
+    @menu_helper.enter_current_cursor_location(game)
   end
   def move_cursor_down
     @menu_helper.move_cursor_down
@@ -863,11 +863,11 @@ class BattleLayer < AbstractLayer
     end
   end
 
-  def enter_current_cursor_location
+  def enter_current_cursor_location(game)
     if @battle.over?
-      @end_of_battle_menu_helper.enter_current_cursor_location
+      @end_of_battle_menu_helper.enter_current_cursor_location(game)
     else
-      @menu_helper.enter_current_cursor_location
+      @menu_helper.enter_current_cursor_location(game)
     end
 
   end
@@ -938,7 +938,7 @@ class MenuAction
     @action_cost = action_cost
   end
 
-  def activate(party_member_idx)
+  def activate(party_member_idx, game)
     puts "This is a no-op action: #{@text}"
   end
 end
@@ -948,7 +948,7 @@ class AttackAction < MenuAction
     @battle_layer = battle_layer
 
   end
-  def activate(party_member_index)
+  def activate(party_member_index, game)
     battle = @battle_layer.battle
     
     hero = battle.player.party.members[party_member_index]
@@ -959,7 +959,7 @@ class AttackAction < MenuAction
   end
 end
 class ItemAction < MenuAction
-  def activate(party_member_index)
+  def activate(party_member_index, game)
     battle = @battle_layer.battle
     puts "TODO itemaction"
 
@@ -973,12 +973,16 @@ class EndBattleAction < MenuAction
     @battle_layer = battle_layer
   end
 
-  def activate(menu_idx)
+  def activate(menu_idx, game)
     puts "ending battle from menu #{menu_idx}"
     @battle_layer.end_battle
   end
 end
-
+class SaveAction < MenuAction
+  def activate(menu_idx, game)
+    puts "saving to slot #{menu_idx}"
+  end
+end
 class Monster
   @@MONSTER_X = 32
   @@MONSTER_Y = 32
@@ -1339,7 +1343,7 @@ class Game
   end
 
   def menu_enter
-    @menu_layer.enter_current_cursor_location
+    @menu_layer.enter_current_cursor_location(self)
   end
 
   def menu_cancel
@@ -1356,12 +1360,12 @@ class Game
     @menu_layer.cancel_action
   end
   def menu_right
-    @menu_layer.enter_current_cursor_location
+    @menu_layer.enter_current_cursor_location(self)
   end
 
   
   def battle_up
-    @battle_layer.enter_current_cursor_location
+    @battle_layer.enter_current_cursor_location(self)
   end
   def battle_down
     @battle_layer.cancel_action
@@ -1373,7 +1377,7 @@ class Game
     @battle_layer.move_cursor_down
   end
   def battle_confirm
-    @battle_layer.enter_current_cursor_location
+    @battle_layer.enter_current_cursor_location(self)
   end
 
   def battle_cancel
