@@ -106,7 +106,6 @@ class KeyHolder
   end
   
 end
-
 class AlwaysDownMonsterKeyHolder < KeyHolder
   @@DOWNKEY = :always_down
   def initialize(key=@@DOWNKEY)
@@ -114,6 +113,7 @@ class AlwaysDownMonsterKeyHolder < KeyHolder
     add_key(key)
   end
 end
+
 class AnimationHelper
   @@FRAME_SWITCH_THRESHOLD = 0.40
   @@ANIMATION_FRAMES = 4
@@ -210,7 +210,6 @@ class InteractionHelper
 
   end
 end
-
 
 class CoordinateHelper
   attr_accessor :px, :py
@@ -549,9 +548,6 @@ class Player
 
 end
 
-
-
-
 class Treasure
   attr_accessor :name
   def initialize(name)
@@ -686,7 +682,6 @@ class AbstractLayer
   alias_method :visible, :active
   alias_method :toggle_visibility, :toggle_activity
 end
-
 class DialogLayer < AbstractLayer
   attr_accessor :visible, :text
   include FontLoader #TODO unify resource loading
@@ -715,7 +710,59 @@ class DialogLayer < AbstractLayer
   end
   
 end
+class MenuLayer < AbstractLayer
 
+  include FontLoader #TODO unify resource loading
+  attr_accessor :active
+
+  alias_method :active?, :active
+  alias_method :visible, :active
+  alias_method :toggle_visibility, :toggle_activity
+
+  def initialize(screen)
+    super(screen, (screen.w) - 2*@@MENU_LAYER_INSET, (screen.h) - 2*@@MENU_LAYER_INSET)
+    @layer.fill(:red)
+    @layer.alpha = 192
+    @text_rendering_helper = TextRenderingHelper.new(@layer, @font)
+    sections = [MenuSection.new("Status", [MenuAction.new("status info line 1"), MenuAction.new("status info line 2")]),
+          MenuSection.new("Inventory", [MenuAction.new("inventory contents:"), MenuAction.new("TODO real data")]),
+      MenuSection.new("Equip", [MenuAction.new("head equipment:"), MenuAction.new("arm equipment: "), MenuAction.new("etc")]),
+      MenuSection.new("Save", [MenuAction.new("Choose save slot")])]
+    @menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
+  end
+
+
+  def menu_layer_config
+
+    mlc = MenuLayerConfig.new
+    mlc.main_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
+    mlc.section_menu_text = TextRenderingConfig.new(3 * @@MENU_TEXT_INSET + @@MENU_TEXT_WIDTH + @@MENU_LINE_SPACING, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
+    mlc.in_section_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
+    mlc.main_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + @@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
+    mlc.layer_inset_on_screen = [@@MENU_LAYER_INSET,@@MENU_LAYER_INSET]
+    mlc
+  end
+
+  def draw()
+    @layer.fill(:red)
+    @menu_helper.draw(menu_layer_config)
+  end
+
+  def enter_current_cursor_location
+    @menu_helper.enter_current_cursor_location
+  end
+  def move_cursor_down
+    @menu_helper.move_cursor_down
+  end
+  def move_cursor_up
+    @menu_helper.move_cursor_up
+  end
+
+  def cancel_action
+    @menu_helper.cancel_action
+  end
+
+end
 class MenuSection
 
   attr_reader :text, :content
@@ -728,7 +775,6 @@ class MenuSection
     @content.collect {|ma| ma.text}
   end
 end
-
 class HeroMenuSection < MenuSection
   def initialize(hero, content)
     super(hero.name, content)
@@ -804,7 +850,6 @@ class MenuHelper
 
   end
 end
-
 class BattleMenuHelper < MenuHelper
   def initialize(battle, screen, layer,text_helper, sections, cursor_x, cursor_y, cursor_main_color=:blue, cursor_inactive_color=:white)
     super(screen, layer,text_helper, sections, cursor_x, cursor_y, cursor_main_color, cursor_inactive_color)
@@ -853,7 +898,6 @@ class TextRenderingConfig
     @yf = yf
   end
 end
-
 class MenuLayerConfig
   attr_accessor :main_menu_text, :section_menu_text, :in_section_cursor, :main_cursor, :layer_inset_on_screen
 end
@@ -869,7 +913,6 @@ class MenuAction
     puts "This is a no-op action: #{@text}"
   end
 end
-
 class AttackAction < MenuAction
   def initialize(text, battle_layer)
     super(text, @@ATTACK_ACTION_COST)
@@ -886,7 +929,6 @@ class AttackAction < MenuAction
     puts "hero #{hero} killed #{battle.monster}" if battle.monster.dead?
   end
 end
-
 class ItemAction < MenuAction
   def activate(party_member_index)
     battle = @battle_layer.battle
@@ -907,59 +949,7 @@ class EndBattleAction < MenuAction
     @battle_layer.end_battle
   end
 end
-class MenuLayer < AbstractLayer
 
-  include FontLoader #TODO unify resource loading
-  attr_accessor :active
-
-  alias_method :active?, :active
-  alias_method :visible, :active
-  alias_method :toggle_visibility, :toggle_activity
-
-  def initialize(screen)
-    super(screen, (screen.w) - 2*@@MENU_LAYER_INSET, (screen.h) - 2*@@MENU_LAYER_INSET)
-    @layer.fill(:red)
-    @layer.alpha = 192
-    @text_rendering_helper = TextRenderingHelper.new(@layer, @font)
-    sections = [MenuSection.new("Status", [MenuAction.new("status info line 1"), MenuAction.new("status info line 2")]),
-          MenuSection.new("Inventory", [MenuAction.new("inventory contents:"), MenuAction.new("TODO real data")]),
-      MenuSection.new("Equip", [MenuAction.new("head equipment:"), MenuAction.new("arm equipment: "), MenuAction.new("etc")]),
-      MenuSection.new("Save", [MenuAction.new("Choose save slot")])]
-    @menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
-  end
- 
-
-  def menu_layer_config
-
-    mlc = MenuLayerConfig.new
-    mlc.main_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
-    mlc.section_menu_text = TextRenderingConfig.new(3 * @@MENU_TEXT_INSET + @@MENU_TEXT_WIDTH + @@MENU_LINE_SPACING, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
-    mlc.in_section_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
-    mlc.main_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + @@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
-    mlc.layer_inset_on_screen = [@@MENU_LAYER_INSET,@@MENU_LAYER_INSET]
-    mlc
-  end
-
-  def draw()
-    @layer.fill(:red)
-    @menu_helper.draw(menu_layer_config)
-  end
-
-  def enter_current_cursor_location
-    @menu_helper.enter_current_cursor_location
-  end
-  def move_cursor_down
-    @menu_helper.move_cursor_down
-  end
-  def move_cursor_up
-    @menu_helper.move_cursor_up
-  end
-
-  def cancel_action
-    @menu_helper.cancel_action
-  end
-
-end
 
 class TalkingNPC < Monster
   def initialize(filename, px, py, npc_x, npc_y, text)
