@@ -36,6 +36,13 @@ class Inventory
     end
   end
 
+  def gain_inventory(inventory)
+    inventory.keys.each do |key|
+      puts "key: #{key}"
+      add_item(inventory.quantity_of(key), key)
+    end
+  end
+
   def remove_item(quantity, item)
     raise InsufficientItemsToRemoveException unless quantity_of(item) >= quantity
     @items[item].quantity -= quantity

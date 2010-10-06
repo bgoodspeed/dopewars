@@ -141,7 +141,6 @@ class AnimationHelper
   end
   
 end
-
 class InteractionHelper
   @@INTERACTION_DISTANCE_THRESHOLD = 80 #XXX tweak this, currently set to 1/2 a tile
 
@@ -210,7 +209,6 @@ class InteractionHelper
 
   end
 end
-
 class CoordinateHelper
   attr_accessor :px, :py
 
@@ -378,7 +376,6 @@ class CoordinateHelper
 
 
 end
-
 class AnimatedSpriteHelper
   attr_reader :image, :rect, :px, :py
 
@@ -417,6 +414,110 @@ class AnimatedSpriteHelper
 
 
 end
+class TextRenderingHelper
+  def initialize(layer, font)
+    @layer = layer
+    @font = font
+  end
+  def render_lines_to_layer(text_lines, conf)
+    text_lines.each_with_index do |text, index|
+      text_surface = @font.render text.to_s, true, [16,222,16]
+      text_surface.blit @layer, [conf.xc + conf.xf * index,conf.yc + conf.yf * index]
+    end
+
+  end
+
+end
+class MenuHelper
+  def initialize(screen, layer,text_helper, sections, cursor_x, cursor_y, cursor_main_color=:blue, cursor_inactive_color=:white)
+    @layer = layer
+    @text_rendering_helper = text_helper
+    @menu_sections = sections
+    @text_lines = @menu_sections.collect{|ms|ms.text}
+    @cursor_position = 0
+    @section_position = 0
+    @cursor = Surface.new([cursor_x, cursor_y])
+    @cursor_main_color = cursor_main_color
+    @cursor_inactive_color = cursor_inactive_color
+    @cursor.fill(@cursor_inactive_color)
+    @show_section = false
+    @screen = screen
+  end
+
+  def color_for_current_section_cursor
+    @cursor_main_color
+  end
+
+  def active_section
+    @menu_sections[@cursor_position]
+  end
+
+  def move_cursor_down
+    if @show_section
+      @section_position = (@section_position + 1) % active_section.content.size
+    else
+      @cursor_position = (@cursor_position + 1) % @text_lines.size
+    end
+  end
+  def move_cursor_up
+    if @show_section
+      @section_position = (@section_position - 1) % active_section.content.size
+    else
+      @cursor_position = (@cursor_position - 1) % @text_lines.size
+    end
+  end
+  def enter_current_cursor_location
+    if @show_section
+      active_section.content[@section_position].activate(@cursor_position)
+    else
+      @show_section = true
+    end
+
+  end
+  def cancel_action
+    @show_section = false
+    @section_position = 0
+  end
+
+  def draw(menu_layer_config)
+    @text_rendering_helper.render_lines_to_layer( @text_lines, menu_layer_config.main_menu_text)
+    @cursor.fill(color_for_current_section_cursor)
+    if @show_section
+      @text_rendering_helper.render_lines_to_layer(active_section.text_contents, menu_layer_config.section_menu_text)
+      conf = menu_layer_config.in_section_cursor
+      @cursor.blit(@layer, [conf.xc + conf.xf * @section_position, conf.yc + conf.yf * @section_position])
+    else
+      conf = menu_layer_config.main_cursor
+      @cursor.blit(@layer, [conf.xc + conf.xf * @cursor_position, conf.yc + conf.yf * @cursor_position])
+    end
+    @layer.blit(
+      @screen, menu_layer_config.layer_inset_on_screen)
+
+  end
+end
+class BattleMenuHelper < MenuHelper
+  def initialize(battle, screen, layer,text_helper, sections, cursor_x, cursor_y, cursor_main_color=:blue, cursor_inactive_color=:white)
+    super(screen, layer,text_helper, sections, cursor_x, cursor_y, cursor_main_color, cursor_inactive_color)
+    @battle = battle
+  end
+
+  def current_cursor_member_ready?
+    @battle.party.members[@cursor_position].ready?
+  end
+
+  def color_for_current_section_cursor
+    if current_cursor_member_ready?
+      @cursor_main_color
+    else
+      @cursor_inactive_color
+    end
+  end
+  def enter_current_cursor_location
+    super() if current_cursor_member_ready?
+  end
+
+
+end
 
 class Party
   attr_reader :members, :inventory
@@ -424,8 +525,8 @@ class Party
     @members = members
     @inventory = Inventory.new(255) #TODO revisit inventory -- should it have a maximum? probably should not be stored on hero as well...
   end
-  def add_item(item, qty)
-    @inventory.add_item(item, qty)
+  def add_item(qty, item)
+    @inventory.add_item(qty, item)
   end
 
   def collect
@@ -434,6 +535,13 @@ class Party
 
   def add_readiness(pts)
     @members.each {|member| member.add_readiness(pts) }
+  end
+  def gain_experience(pts)
+    @members.each {|member| member.gain_experience(pts) }
+  end
+
+  def gain_inventory(inventory)
+    @inventory.gain_inventory(inventory)
   end
 end
 
@@ -454,12 +562,19 @@ class Player
     @party.inventory
   end
 
+  def gain_inventory(inventory)
+    @party.gain_inventory(inventory)
+  end
+  def gain_experience(pts)
+    @party.gain_experience(pts)
+  end
+
   def add_readiness(pts)
     @party.add_readiness(pts)
   end
 
   def add_inventory(qty, item)
-    @party.add_item(item, qty)
+    @party.add_item(qty, item)
   end
 
   def px
@@ -564,7 +679,6 @@ class Treasure
     player.add_inventory(1, @name)
   end
 end
-
 class OpenTreasure < Treasure
   def activate( player, worldstate, tilex, tiley)
     puts "Nothing to do, already opened"
@@ -582,80 +696,6 @@ class WarpPoint
     
     puts "warp from  #{worldstate} to #{uni.world_by_index(@destination)}"
     uni.set_current_world_by_index(@destination)
-  end
-end
-
-class Monster
-  @@MONSTER_X = 32
-  @@MONSTER_Y = 32
-
-  include Sprites::Sprite
-  include EventHandler::HasEventHandler
-  def px
-    @animated_sprite_helper.px
-  end
-  def py
-    @animated_sprite_helper.py
-  end
-
-  def add_readiness(pts)
-    @readiness_helper.add_readiness(pts)
-  end
-
-  def initialize(filename, px, py, npc_x = @@MONSTER_X, npc_y = @@MONSTER_Y)
-    super()
-    @npc_x = npc_x
-    @npc_y = npc_y
-    @animated_sprite_helper = AnimatedSpriteHelper.new(filename, px, py, @npc_x, @npc_y)
-    @animated_sprite_helper.set_frame(0)
-    @keys = AlwaysDownMonsterKeyHolder.new
-    @animation_helper = AnimationHelper.new(@keys, 3)
-    @readiness_helper = BattleReadinessHelper.new(@@MONSTER_START_BATTLE_PTS, @@MONSTER_BATTLE_PTS_RATE)
-    @hp = 3
-    make_magic_hooks(
-      ClockTicked => :update
-    )
-  end
-
-  def dead?
-    @hp <= 0
-  end
-
-
-
-  def take_damage(damage)
-    @hp -= damage
-  end
-
-  def draw(surface,x,y,sx,sy)
-    tx = @animated_sprite_helper.px - x + sx/2
-    ty = @animated_sprite_helper.py - y + sy/2
-    @animated_sprite_helper.image.blit surface, [tx,ty,96,128]
-  end
-
-  def draw_to(layer)
-    @animated_sprite_helper.image.blit layer, [0,0,96,128]
-
-  end
-
-  def update(event)
-    dt = event.seconds # Time since last update
-    @animation_helper.update_animation(dt) { |frame| @animated_sprite_helper.replace_avatar(frame) }
-    
-  end
-
-  def distance_to(x,y)
-    [(px - x).abs, (py - y).abs]
-  end
-
-  def nearby?(x,y, distx, disty)
-    dist = distance_to(x,y)
-    (dist[0] < distx) and (dist[1] < disty)
-  end
-
-  def interact(game, universe, player)
-    game.battle_begun(universe,player)
-    universe.battle_layer.start_battle(game, universe, player, self)
   end
 end
 
@@ -763,261 +803,6 @@ class MenuLayer < AbstractLayer
   end
 
 end
-class MenuSection
-
-  attr_reader :text, :content
-  def initialize(text, content)
-    @text = text
-    @content = content
-  end
-
-  def text_contents
-    @content.collect {|ma| ma.text}
-  end
-end
-class HeroMenuSection < MenuSection
-  def initialize(hero, content)
-    super(hero.name, content)
-    @hero = hero
-  end
-
-end
-
-class MenuHelper
-  def initialize(screen, layer,text_helper, sections, cursor_x, cursor_y, cursor_main_color=:blue, cursor_inactive_color=:white)
-    @layer = layer
-    @text_rendering_helper = text_helper
-    @menu_sections = sections
-    @text_lines = @menu_sections.collect{|ms|ms.text}
-    @cursor_position = 0
-    @section_position = 0
-    @cursor = Surface.new([cursor_x, cursor_y])
-    @cursor_main_color = cursor_main_color
-    @cursor_inactive_color = cursor_inactive_color
-    @cursor.fill(@cursor_inactive_color)
-    @show_section = false
-    @screen = screen
-  end
-
-  def color_for_current_section_cursor
-    @cursor_main_color
-  end
-
-  def active_section
-    @menu_sections[@cursor_position]
-  end
-
-  def move_cursor_down
-    if @show_section
-      @section_position = (@section_position + 1) % active_section.content.size
-    else
-      @cursor_position = (@cursor_position + 1) % @text_lines.size
-    end
-  end
-  def move_cursor_up
-    if @show_section
-      @section_position = (@section_position - 1) % active_section.content.size
-    else
-      @cursor_position = (@cursor_position - 1) % @text_lines.size
-    end
-  end
-  def enter_current_cursor_location
-    if @show_section
-      active_section.content[@section_position].activate(@cursor_position)
-    else
-      @show_section = true
-    end
-
-  end
-  def cancel_action
-    @show_section = false
-    @section_position = 0
-  end
-
-  def draw(menu_layer_config)
-    @text_rendering_helper.render_lines_to_layer( @text_lines, menu_layer_config.main_menu_text)
-    @cursor.fill(color_for_current_section_cursor)
-    if @show_section
-      @text_rendering_helper.render_lines_to_layer(active_section.text_contents, menu_layer_config.section_menu_text)
-      conf = menu_layer_config.in_section_cursor
-      @cursor.blit(@layer, [conf.xc + conf.xf * @section_position, conf.yc + conf.yf * @section_position])
-    else
-      conf = menu_layer_config.main_cursor
-      @cursor.blit(@layer, [conf.xc + conf.xf * @cursor_position, conf.yc + conf.yf * @cursor_position])
-    end
-    @layer.blit(
-      @screen, menu_layer_config.layer_inset_on_screen)
-
-  end
-end
-class BattleMenuHelper < MenuHelper
-  def initialize(battle, screen, layer,text_helper, sections, cursor_x, cursor_y, cursor_main_color=:blue, cursor_inactive_color=:white)
-    super(screen, layer,text_helper, sections, cursor_x, cursor_y, cursor_main_color, cursor_inactive_color)
-    @battle = battle
-  end
-
-  def current_cursor_member_ready?
-    @battle.party.members[@cursor_position].ready?
-  end
-
-  def color_for_current_section_cursor
-    if current_cursor_member_ready?
-      @cursor_main_color
-    else
-      @cursor_inactive_color
-    end
-  end
-  def enter_current_cursor_location
-    super() if current_cursor_member_ready?
-  end
-
-
-end
-
-class TextRenderingHelper
-  def initialize(layer, font)
-    @layer = layer
-    @font = font
-  end
-  def render_lines_to_layer(text_lines, conf)
-    text_lines.each_with_index do |text, index|
-      text_surface = @font.render text.to_s, true, [16,222,16]
-      text_surface.blit @layer, [conf.xc + conf.xf * index,conf.yc + conf.yf * index]
-    end
-
-  end
-
-end
-
-class TextRenderingConfig
-  attr_reader :xc,:xf,:yc,:yf
-  def initialize(xc,xf,yc,yf)
-    @xc = xc
-    @xf = xf
-    @yc = yc
-    @yf = yf
-  end
-end
-class MenuLayerConfig
-  attr_accessor :main_menu_text, :section_menu_text, :in_section_cursor, :main_cursor, :layer_inset_on_screen
-end
-
-class MenuAction
-  attr_reader :text
-  def initialize(text, action_cost=@@DEFAULT_ACTION_COST)
-    @text = text
-    @action_cost = action_cost
-  end
-
-  def activate(party_member_idx)
-    puts "This is a no-op action: #{@text}"
-  end
-end
-class AttackAction < MenuAction
-  def initialize(text, battle_layer)
-    super(text, @@ATTACK_ACTION_COST)
-    @battle_layer = battle_layer
-
-  end
-  def activate(party_member_index)
-    battle = @battle_layer.battle
-    
-    hero = battle.player.party.members[party_member_index]
-    battle.monster.take_damage(hero.damage)
-    hero.consume_readiness(@action_cost)
-    puts "hero #{hero} hit #{battle.monster} for #{hero.damage}"
-    puts "hero #{hero} killed #{battle.monster}" if battle.monster.dead?
-  end
-end
-class ItemAction < MenuAction
-  def activate(party_member_index)
-    battle = @battle_layer.battle
-    puts "TODO itemaction"
-
-
-  end
-
-end
-class EndBattleAction < MenuAction
-  def initialize(text, battle_layer)
-    super(text)
-    @battle_layer = battle_layer
-  end
-
-  def activate(menu_idx)
-    puts "ending battle from menu #{menu_idx}"
-    @battle_layer.end_battle
-  end
-end
-
-
-class TalkingNPC < Monster
-  def initialize(filename, px, py, npc_x, npc_y, text)
-    super(filename, px, py, npc_x, npc_y)
-    @text = text
-  end
-
-  def interact(game, universe, player)
-    puts "display dialog '#{@text}' from #{self}"
-    universe.dialog_layer.active = true
-    universe.dialog_layer.text = @text
-  end
-
-end
-
-class BattleReadinessHelper
-  attr_reader :points
-  def initialize(starting_points, growth_rate)
-    @points = starting_points
-    @growth_rate = growth_rate
-    @points_needed_for_ready = @@READINESS_POINTS_NEEDED_TO_ACT
-  end
-
-  def add_readiness(points)
-    @points += points * @growth_rate
-  end
-
-  def consume_readiness(pts)
-    @points -= pts
-  end
-
-  def ready?
-    @points >= @points_needed_for_ready
-  end
-
-end
-
-class Battle
-  
-  attr_reader :monster, :player
-  def initialize(game, universe, player, monster, battle_layer)
-    @game = game
-    @player = player
-    @monster = monster
-    @universe = universe
-  end
-
-  def accumulate_readiness(dt)
-    points = dt * @@READINESS_POINTS_PER_SECOND
-    @player.add_readiness(points)
-    @monster.add_readiness(points)
-  end
-  def party
-    @player.party
-  end
-
-  def over?
-    @monster.dead?
-  end
-
-  def end_battle
-    @game.battle_completed
-    @universe.current_world.delete_monster(@monster)
-  end
-
-
-end
-
 class BattleLayer < AbstractLayer
   attr_reader :battle
   include EventHandler::HasEventHandler
@@ -1084,7 +869,7 @@ class BattleLayer < AbstractLayer
     else
       @menu_helper.enter_current_cursor_location
     end
-    
+
   end
   def move_cursor_down
     if @battle.over?
@@ -1092,7 +877,7 @@ class BattleLayer < AbstractLayer
     else
       @menu_helper.move_cursor_down
     end
-    
+
   end
   def move_cursor_up
     if @battle.over?
@@ -1111,6 +896,236 @@ class BattleLayer < AbstractLayer
   end
 
 end
+
+class MenuSection
+
+  attr_reader :text, :content
+  def initialize(text, content)
+    @text = text
+    @content = content
+  end
+
+  def text_contents
+    @content.collect {|ma| ma.text}
+  end
+end
+class HeroMenuSection < MenuSection
+  def initialize(hero, content)
+    super(hero.name, content)
+    @hero = hero
+  end
+
+end
+
+
+class TextRenderingConfig
+  attr_reader :xc,:xf,:yc,:yf
+  def initialize(xc,xf,yc,yf)
+    @xc = xc
+    @xf = xf
+    @yc = yc
+    @yf = yf
+  end
+end
+class MenuLayerConfig
+  attr_accessor :main_menu_text, :section_menu_text, :in_section_cursor, :main_cursor, :layer_inset_on_screen
+end
+
+class MenuAction
+  attr_reader :text
+  def initialize(text, action_cost=@@DEFAULT_ACTION_COST)
+    @text = text
+    @action_cost = action_cost
+  end
+
+  def activate(party_member_idx)
+    puts "This is a no-op action: #{@text}"
+  end
+end
+class AttackAction < MenuAction
+  def initialize(text, battle_layer)
+    super(text, @@ATTACK_ACTION_COST)
+    @battle_layer = battle_layer
+
+  end
+  def activate(party_member_index)
+    battle = @battle_layer.battle
+    
+    hero = battle.player.party.members[party_member_index]
+    battle.monster.take_damage(hero.damage)
+    hero.consume_readiness(@action_cost)
+    puts "hero #{hero} hit #{battle.monster} for #{hero.damage}"
+    puts "hero #{hero} killed #{battle.monster}" if battle.monster.dead?
+  end
+end
+class ItemAction < MenuAction
+  def activate(party_member_index)
+    battle = @battle_layer.battle
+    puts "TODO itemaction"
+
+
+  end
+
+end
+class EndBattleAction < MenuAction
+  def initialize(text, battle_layer)
+    super(text)
+    @battle_layer = battle_layer
+  end
+
+  def activate(menu_idx)
+    puts "ending battle from menu #{menu_idx}"
+    @battle_layer.end_battle
+  end
+end
+
+class Monster
+  @@MONSTER_X = 32
+  @@MONSTER_Y = 32
+
+  include Sprites::Sprite
+  include EventHandler::HasEventHandler
+  def px
+    @animated_sprite_helper.px
+  end
+  def py
+    @animated_sprite_helper.py
+  end
+
+  def add_readiness(pts)
+    @readiness_helper.add_readiness(pts)
+  end
+  attr_reader :experience, :inventory
+  def initialize(filename, px, py, npc_x = @@MONSTER_X, npc_y = @@MONSTER_Y)
+    super()
+    @npc_x = npc_x
+    @npc_y = npc_y
+    @animated_sprite_helper = AnimatedSpriteHelper.new(filename, px, py, @npc_x, @npc_y)
+    @animated_sprite_helper.set_frame(0)
+    @keys = AlwaysDownMonsterKeyHolder.new
+    @animation_helper = AnimationHelper.new(@keys, 3)
+    @readiness_helper = BattleReadinessHelper.new(@@MONSTER_START_BATTLE_PTS, @@MONSTER_BATTLE_PTS_RATE)
+    @hp = 3
+    @experience = 10
+    @inventory = Inventory.new(255)
+    @inventory.add_item(1, "potion")
+    make_magic_hooks(
+      ClockTicked => :update
+    )
+  end
+
+  def dead?
+    @hp <= 0
+  end
+
+
+
+  def take_damage(damage)
+    @hp -= damage
+  end
+
+  def draw(surface,x,y,sx,sy)
+    tx = @animated_sprite_helper.px - x + sx/2
+    ty = @animated_sprite_helper.py - y + sy/2
+    @animated_sprite_helper.image.blit surface, [tx,ty,96,128]
+  end
+
+  def draw_to(layer)
+    @animated_sprite_helper.image.blit layer, [0,0,96,128]
+
+  end
+
+  def update(event)
+    dt = event.seconds # Time since last update
+    @animation_helper.update_animation(dt) { |frame| @animated_sprite_helper.replace_avatar(frame) }
+
+  end
+
+  def distance_to(x,y)
+    [(px - x).abs, (py - y).abs]
+  end
+
+  def nearby?(x,y, distx, disty)
+    dist = distance_to(x,y)
+    (dist[0] < distx) and (dist[1] < disty)
+  end
+
+  def interact(game, universe, player)
+    game.battle_begun(universe,player)
+    universe.battle_layer.start_battle(game, universe, player, self)
+  end
+end
+class TalkingNPC < Monster
+  def initialize(filename, px, py, npc_x, npc_y, text)
+    super(filename, px, py, npc_x, npc_y)
+    @text = text
+  end
+
+  def interact(game, universe, player)
+    puts "display dialog '#{@text}' from #{self}"
+    universe.dialog_layer.active = true
+    universe.dialog_layer.text = @text
+  end
+
+end
+
+class BattleReadinessHelper
+  attr_reader :points
+  def initialize(starting_points, growth_rate)
+    @points = starting_points
+    @growth_rate = growth_rate
+    @points_needed_for_ready = @@READINESS_POINTS_NEEDED_TO_ACT
+  end
+
+  def add_readiness(points)
+    @points += points * @growth_rate
+  end
+
+  def consume_readiness(pts)
+    @points -= pts
+  end
+
+  def ready?
+    @points >= @points_needed_for_ready
+  end
+
+end
+
+class Battle
+  
+  attr_reader :monster, :player
+  def initialize(game, universe, player, monster, battle_layer)
+    @game = game
+    @player = player
+    @monster = monster
+    @universe = universe
+  end
+
+  def accumulate_readiness(dt)
+    points = dt * @@READINESS_POINTS_PER_SECOND
+    @player.add_readiness(points)
+    @monster.add_readiness(points)
+  end
+  def party
+    @player.party
+  end
+
+  def over?
+    @monster.dead?
+  end
+
+  def end_battle
+    @game.battle_completed
+    @player.gain_experience(@monster.experience)
+    puts "monster had #{@monster.inventory.keys.size} items"
+    @player.gain_inventory(@monster.inventory)
+    @universe.current_world.delete_monster(@monster)
+  end
+
+
+end
+
+
 
 class EventManager
   def swap_event_sets(game, already_active, toggled_hooks, menu_active_hooks)

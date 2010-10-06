@@ -14,8 +14,12 @@ class Hero
     @money = 0
     @readiness_helper = readiness_helper
     @damage = 1
+    @experience = 0
   end
 
+  def gain_experience(pts)
+    @experience += pts
+  end
 
   def consume_readiness(pts)
     @readiness_helper.consume_readiness(pts)
