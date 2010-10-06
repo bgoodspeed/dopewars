@@ -20,6 +20,10 @@ class Inventory
     
   end
 
+  def keys
+    @items.keys
+  end
+
   def free_slots
     @max_slots - @items.keys.size
   end

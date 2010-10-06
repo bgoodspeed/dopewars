@@ -28,6 +28,15 @@ include Rubygame::EventTriggers
 @@MENU_TEXT_WIDTH = 100
 @@LAYER_INSET = 25
 @@TEXT_INSET = 10
+@@HERO_START_BATTLE_PTS = 1000
+@@HERO_BATTLE_PTS_RATE = 1.1
+@@MONSTER_START_BATTLE_PTS = 800
+@@MONSTER_BATTLE_PTS_RATE = 1.0
+@@READINESS_POINTS_PER_SECOND = 1000
+@@READINESS_POINTS_NEEDED_TO_ACT = 3000
+@@DEFAULT_ACTION_COST = 2500
+@@ATTACK_ACTION_COST = 2000
+@@OPEN_TREASURE = 'O'
 
 class Universe
   attr_reader :worlds, :current_world, :dialog_layer, :menu_layer, :battle_layer
@@ -69,6 +78,10 @@ class WorldState
     @interaction_pallette = interactpal
     @background_surface = bgsurface
     @npcs = npcs
+  end
+
+  def delete_monster(monster)
+    @npcs -= [monster]
   end
 
 
@@ -366,7 +379,6 @@ class CoordinateHelper
 
 
 end
-# A class representing the player's ship moving in "space".
 
 class AnimatedSpriteHelper
   attr_reader :image, :rect, :px, :py
@@ -407,11 +419,30 @@ class AnimatedSpriteHelper
 
 end
 
-class Ship
+class Party
+  attr_reader :members, :inventory
+  def initialize(members)
+    @members = members
+    @inventory = Inventory.new(255) #TODO revisit inventory -- should it have a maximum? probably should not be stored on hero as well...
+  end
+  def add_item(item, qty)
+    @inventory.add_item(item, qty)
+  end
+
+  def collect
+    @members.collect {|member| yield member}
+  end
+
+  def add_readiness(pts)
+    @members.each {|member| member.add_readiness(pts) }
+  end
+end
+
+class Player
   include Sprites::Sprite
   include EventHandler::HasEventHandler
   
-  attr_reader :inventory, :universe
+  attr_reader :universe
 
   def image
     @animated_sprite_helper.image
@@ -420,8 +451,16 @@ class Ship
     @animated_sprite_helper.rect
   end
 
+  def inventory
+    @party.inventory
+  end
+
+  def add_readiness(pts)
+    @party.add_readiness(pts)
+  end
+
   def add_inventory(qty, item)
-    @inventory[item] += qty
+    @party.add_item(item, qty)
   end
 
   def px
@@ -431,6 +470,8 @@ class Ship
     @coordinate_helper.py
   end
 
+
+  attr_reader :party
   def initialize( px, py,  universe)
     @universe = universe
     @hero_x_dim = 48
@@ -443,6 +484,10 @@ class Ship
     @coordinate_helper.update_tile_coords
     @animated_sprite_helper = AnimatedSpriteHelper.new("Charactern8.png", px, py, @hero_x_dim, @hero_y_dim)
     @animated_sprite_helper.set_frame(0)
+    @hero = Hero.new("hero",BattleReadinessHelper.new( @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE))
+    @hero2 = Hero.new("cohort", BattleReadinessHelper.new( @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE))
+    @party = Party.new([@hero, @hero2])
+    
 
     make_magic_hooks(
       KeyPressed => :key_pressed,
@@ -505,7 +550,7 @@ class Ship
 end
 
 
-@@OPEN_TREASURE = 'O'
+
 
 class Treasure
   attr_accessor :name
@@ -556,6 +601,11 @@ class Monster
   def py
     @animated_sprite_helper.py
   end
+
+  def add_readiness(pts)
+    @readiness_helper.add_readiness(pts)
+  end
+
   def initialize(filename, px, py, npc_x = @@MONSTER_X, npc_y = @@MONSTER_Y)
     super()
     @npc_x = npc_x
@@ -564,9 +614,21 @@ class Monster
     @animated_sprite_helper.set_frame(0)
     @keys = AlwaysDownMonsterKeyHolder.new
     @animation_helper = AnimationHelper.new(@keys, 3)
+    @readiness_helper = BattleReadinessHelper.new(@@MONSTER_START_BATTLE_PTS, @@MONSTER_BATTLE_PTS_RATE)
+    @hp = 3
     make_magic_hooks(
       ClockTicked => :update
     )
+  end
+
+  def dead?
+    @hp <= 0
+  end
+
+
+
+  def take_damage(damage)
+    @hp -= damage
   end
 
   def draw(surface,x,y,sx,sy)
@@ -596,22 +658,10 @@ class Monster
   end
 
   def interact(game, universe, player)
-    
-    
-    EventManager.new.swap_event_sets(game, universe.battle_layer.active?, game.non_battle_hooks, game.battle_hooks)
+    game.battle_begun(universe,player)
     universe.battle_layer.start_battle(game, universe, player, self)
-    
-
   end
 end
-
-
-# The Game class helps organize thing. It takes events
-# from the queue and handles them, sometimes performing
-# its own action (e.g. Escape key = quit), but also
-# passing the events to the pandas to handle.
-#
-
 
 class AbstractLayer
 
@@ -679,8 +729,16 @@ class MenuSection
   end
 end
 
+class HeroMenuSection < MenuSection
+  def initialize(hero, content)
+    super(hero.name, content)
+    @hero = hero
+  end
+
+end
+
 class MenuHelper
-  def initialize(screen, layer,text_helper, sections, cursor_x, cursor_y)
+  def initialize(screen, layer,text_helper, sections, cursor_x, cursor_y, cursor_main_color=:blue, cursor_inactive_color=:white)
     @layer = layer
     @text_rendering_helper = text_helper
     @menu_sections = sections
@@ -688,9 +746,15 @@ class MenuHelper
     @cursor_position = 0
     @section_position = 0
     @cursor = Surface.new([cursor_x, cursor_y])
-    @cursor.fill(:blue)
+    @cursor_main_color = cursor_main_color
+    @cursor_inactive_color = cursor_inactive_color
+    @cursor.fill(@cursor_inactive_color)
     @show_section = false
     @screen = screen
+  end
+
+  def color_for_current_section_cursor
+    @cursor_main_color
   end
 
   def active_section
@@ -713,7 +777,7 @@ class MenuHelper
   end
   def enter_current_cursor_location
     if @show_section
-      active_section.content[@section_position].activate
+      active_section.content[@section_position].activate(@cursor_position)
     else
       @show_section = true
     end
@@ -726,7 +790,7 @@ class MenuHelper
 
   def draw(menu_layer_config)
     @text_rendering_helper.render_lines_to_layer( @text_lines, menu_layer_config.main_menu_text)
-
+    @cursor.fill(color_for_current_section_cursor)
     if @show_section
       @text_rendering_helper.render_lines_to_layer(active_section.text_contents, menu_layer_config.section_menu_text)
       conf = menu_layer_config.in_section_cursor
@@ -739,6 +803,30 @@ class MenuHelper
       @screen, menu_layer_config.layer_inset_on_screen)
 
   end
+end
+
+class BattleMenuHelper < MenuHelper
+  def initialize(battle, screen, layer,text_helper, sections, cursor_x, cursor_y, cursor_main_color=:blue, cursor_inactive_color=:white)
+    super(screen, layer,text_helper, sections, cursor_x, cursor_y, cursor_main_color, cursor_inactive_color)
+    @battle = battle
+  end
+
+  def current_cursor_member_ready?
+    @battle.party.members[@cursor_position].ready?
+  end
+
+  def color_for_current_section_cursor
+    if current_cursor_member_ready?
+      @cursor_main_color
+    else
+      @cursor_inactive_color
+    end
+  end
+  def enter_current_cursor_location
+    super() if current_cursor_member_ready?
+  end
+
+
 end
 
 class TextRenderingHelper
@@ -772,30 +860,53 @@ end
 
 class MenuAction
   attr_reader :text
-  def initialize(text)
+  def initialize(text, action_cost=@@DEFAULT_ACTION_COST)
     @text = text
+    @action_cost = action_cost
   end
 
-  def activate
+  def activate(party_member_idx)
     puts "This is a no-op action: #{@text}"
   end
 end
 
 class AttackAction < MenuAction
   def initialize(text, battle_layer)
-    super(text)
+    super(text, @@ATTACK_ACTION_COST)
     @battle_layer = battle_layer
+
   end
-  def activate
+  def activate(party_member_index)
     battle = @battle_layer.battle
-    puts "attack #{battle.monster} from #{battle.player}"
+    
+    hero = battle.player.party.members[party_member_index]
+    battle.monster.take_damage(hero.damage)
+    hero.consume_readiness(@action_cost)
+    puts "hero #{hero} hit #{battle.monster} for #{hero.damage}"
+    puts "hero #{hero} killed #{battle.monster}" if battle.monster.dead?
   end
 end
 
 class ItemAction < MenuAction
-  
-end
+  def activate(party_member_index)
+    battle = @battle_layer.battle
+    puts "TODO itemaction"
 
+
+  end
+
+end
+class EndBattleAction < MenuAction
+  def initialize(text, battle_layer)
+    super(text)
+    @battle_layer = battle_layer
+  end
+
+  def activate(menu_idx)
+    puts "ending battle from menu #{menu_idx}"
+    @battle_layer.end_battle
+  end
+end
 class MenuLayer < AbstractLayer
 
   include FontLoader #TODO unify resource loading
@@ -864,12 +975,57 @@ class TalkingNPC < Monster
 
 end
 
+class BattleReadinessHelper
+  attr_reader :points
+  def initialize(starting_points, growth_rate)
+    @points = starting_points
+    @growth_rate = growth_rate
+    @points_needed_for_ready = @@READINESS_POINTS_NEEDED_TO_ACT
+  end
+
+  def add_readiness(points)
+    @points += points * @growth_rate
+  end
+
+  def consume_readiness(pts)
+    @points -= pts
+  end
+
+  def ready?
+    @points >= @points_needed_for_ready
+  end
+
+end
+
 class Battle
+  
   attr_reader :monster, :player
   def initialize(game, universe, player, monster, battle_layer)
+    @game = game
     @player = player
     @monster = monster
+    @universe = universe
   end
+
+  def accumulate_readiness(dt)
+    points = dt * @@READINESS_POINTS_PER_SECOND
+    @player.add_readiness(points)
+    @monster.add_readiness(points)
+  end
+  def party
+    @player.party
+  end
+
+  def over?
+    @monster.dead?
+  end
+
+  def end_battle
+    @game.battle_completed
+    @universe.current_world.delete_monster(@monster)
+  end
+
+
 end
 
 class BattleLayer < AbstractLayer
@@ -879,20 +1035,28 @@ class BattleLayer < AbstractLayer
     super(screen, screen.w - 50, screen.h - 50)
     @layer.fill(:orange)
     @text_rendering_helper = TextRenderingHelper.new(@layer, @font)
-    sections = [MenuSection.new("Player1", [AttackAction.new("Attack", self), ItemAction.new("Item")]),
-      MenuSection.new("Player2", [MenuAction.new("Attack"), MenuAction.new("Item")])]
-    @menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
     @battle = nil
+    @menu_helper = nil
+    sections = [MenuSection.new("Exp",[EndBattleAction.new("Confirm", self)]),
+                MenuSection.new("Items", [EndBattleAction.new("Confirm", self)])]
+    @end_of_battle_menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
     make_magic_hooks({ClockTicked => :update})
   end
   def update( event )
     return unless @battle
     dt = event.seconds # Time since last update
-    puts "update battle stuff"
+    @battle.accumulate_readiness(dt)
   end
   def start_battle(game, universe, player, monster)
     @active = true
+    puts "starting battle, bound field value is #{self.active?}"
     @battle = Battle.new(game, universe, player, monster, self)
+    sections = player.party.collect {|hero|  HeroMenuSection.new(hero, [AttackAction.new("Attack", self), ItemAction.new("Item")])}
+    @menu_helper = BattleMenuHelper.new(@battle, @screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
+  end
+  def end_battle
+    @active = false
+    @battle.end_battle
   end
   def menu_layer_config
 
@@ -904,25 +1068,56 @@ class BattleLayer < AbstractLayer
     mlc.layer_inset_on_screen = [@@LAYER_INSET,@@LAYER_INSET]
     mlc
   end
+  def end_battle_menu_layer_config
 
+    mlc = MenuLayerConfig.new
+    mlc.main_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, 50, 0)
+    mlc.section_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, 150, 0)
+    mlc.in_section_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH,200, 0)
+    mlc.main_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH,100, 0)
+    mlc.layer_inset_on_screen = [@@LAYER_INSET,@@LAYER_INSET]
+    mlc
+  end
   def draw()
     @layer.fill(:orange)
-    @battle.monster.draw_to(@layer)
-    @menu_helper.draw(menu_layer_config)
+    if @battle.over?
+      @end_of_battle_menu_helper.draw(end_battle_menu_layer_config)
+    else
+      @battle.monster.draw_to(@layer)
+      @menu_helper.draw(menu_layer_config)
+    end
   end
 
   def enter_current_cursor_location
-    @menu_helper.enter_current_cursor_location
+    if @battle.over?
+      @end_of_battle_menu_helper.enter_current_cursor_location
+    else
+      @menu_helper.enter_current_cursor_location
+    end
+    
   end
   def move_cursor_down
-    @menu_helper.move_cursor_down
+    if @battle.over?
+      @end_of_battle_menu_helper.move_cursor_down
+    else
+      @menu_helper.move_cursor_down
+    end
+    
   end
   def move_cursor_up
-    @menu_helper.move_cursor_up
+    if @battle.over?
+      @end_of_battle_menu_helper.move_cursor_up
+    else
+      @menu_helper.move_cursor_up
+    end
   end
 
   def cancel_action
-    @menu_helper.cancel_action
+    if @battle.over?
+      @end_of_battle_menu_helper.cancel_action
+    else
+      @menu_helper.cancel_action
+    end
   end
 
 end
@@ -930,11 +1125,11 @@ end
 class EventManager
   def swap_event_sets(game, already_active, toggled_hooks, menu_active_hooks)
     if already_active
-      toggled_hooks.each {|hook|
-        game.append_hook(hook)
-      }
       menu_active_hooks.each {|hook|
         game.remove_hook(hook)
+      }
+      toggled_hooks.each {|hook|
+        game.append_hook(hook)
       }
     else
       toggled_hooks.each {|hook|
@@ -964,7 +1159,7 @@ class Game
     make_menu_layer
     make_battle_layer
     make_universe
-    make_ship
+    make_player
     make_hud
 
   end
@@ -978,7 +1173,7 @@ class Game
   end
 
   def make_hud
-    @hud = Hud.new :screen => @screen, :player => @ship, :topomap => @topomap
+    @hud = Hud.new :screen => @screen, :player => @player, :topomap => @topomap
   end
   def make_world1
 
@@ -1078,12 +1273,16 @@ class Game
   def non_battle_hooks
     non_menu_hooks
   end
+  def battle_begun(universe, player)
+    toggle_battle_hooks(false)
+  end
+  def battle_completed
+    toggle_battle_hooks(true)
+  end
 
   private
 
 
-  # Create a new Clock to manage the game framerate
-  # so it doesn't use 100% of the CPU
   def make_clock
     @clock = Clock.new()
     @clock.target_framerate = 50
@@ -1091,9 +1290,6 @@ class Game
     @clock.enable_tick_events
   end
 
-
-  # Set up the event hooks to perform actions in
-  # response to certain events.
   def make_event_hooks
     always_on_hooks = {
       :escape => :quit,
@@ -1128,11 +1324,12 @@ class Game
     
   end
 
+  def toggle_battle_hooks(in_battle=false)
+    EventManager.new.swap_event_sets(self, in_battle, non_battle_hooks, battle_hooks)
+  end
 
   def toggle_menu
-    
     EventManager.new.swap_event_sets(self, @menu_layer.active?, non_menu_hooks, @menu_active_hooks)
-    
     @menu_layer.toggle_activity
   end
 
@@ -1182,7 +1379,7 @@ class Game
     @dialog_layer.toggle_visibility
   end
   def interact_with_facing(event)
-    @ship.interact_with_facing(self)
+    @player.interact_with_facing(self)
   end
 
   def capture_ss(event)
@@ -1229,12 +1426,12 @@ class Game
     @universe = Universe.new([@worldstate, @worldstate2], @dialog_layer, @menu_layer, @battle_layer)
   end
   # Create the player ship in the middle of the screen
-  def make_ship
-    #@ship = Ship.new( @screen.w/2, @screen.h/2, @topomap, pallette, @terrainmap, terrain_pallette, @interactmap, interaction_pallette, @bgsurface )
-    @ship = Ship.new( @screen.w/2, @screen.h/2, @universe )
+  def make_player
+    #@player = Ship.new( @screen.w/2, @screen.h/2, @topomap, pallette, @terrainmap, terrain_pallette, @interactmap, interaction_pallette, @bgsurface )
+    @player = Player.new( @screen.w/2, @screen.h/2, @universe )
 
-    # Make event hook to pass all events to @ship#handle().
-    @player_hooks = make_magic_hooks_for( @ship, { YesTrigger.new() => :handle } )
+    # Make event hook to pass all events to @player#handle().
+    @player_hooks = make_magic_hooks_for( @player, { YesTrigger.new() => :handle } )
     puts "player hooks: #{@player_hooks[0]}"
   end
 
@@ -1250,23 +1447,23 @@ class Game
   def step
     # Clear the screen.
     @screen.fill( :black )
-#    puts "ship is at #{@ship.px}, #{@ship.py}"
-#    puts "ship rect is #{@ship.rect}"
+#    puts "ship is at #{@player.px}, #{@player.py}"
+#    puts "ship rect is #{@player.rect}"
 #    puts "bg is #{@bgimage.size}"
     
     
     @sx = 640
     @sy = 480
-    @universe.current_world.background_surface.blit(@screen, [0,0], [ @ship.px - (@sx/2), @ship.py - (@sy/2), @sx, @sy])
+    @universe.current_world.background_surface.blit(@screen, [0,0], [ @player.px - (@sx/2), @player.py - (@sy/2), @sx, @sy])
 
     @universe.current_world.npcs.each {|npc|
 
-      npc.draw(@screen, @ship.px, @ship.py, @sx, @sy) if npc.nearby?(@ship.px, @ship.py, @sx/2, @sy/2)
+      npc.draw(@screen, @player.px, @player.py, @sx, @sy) if npc.nearby?(@player.px, @player.py, @sx/2, @sy/2)
 
     }
     
-    #@topomap.blit_with_pallette(pallette, @screen, @ship.px, @ship.py)
-#    puts "topomap should be in (#{@topomap.x_offset_for_world(@ship.px)},#{@topomap.y_offset_for_world(@ship.py)})"
+    #@topomap.blit_with_pallette(pallette, @screen, @player.px, @player.py)
+#    puts "topomap should be in (#{@topomap.x_offset_for_world(@player.px)},#{@topomap.y_offset_for_world(@player.py)})"
 
 
     # Fetch input events, etc. from SDL, and add them to the queue.
@@ -1283,7 +1480,7 @@ class Game
 
     # Draw the ship in its new position.
 
-    @ship.draw(@screen)
+    @player.draw(@screen)
     @hud.draw
     if @universe.dialog_layer.active?
       @universe.dialog_layer.draw
