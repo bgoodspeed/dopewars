@@ -349,26 +349,25 @@ class CoordinateHelper
     @py = @@BGY - y_ext if maxy > @@BGY
   end
 
+  def check_corners(tp, x1, y1, x2, y2)
+      c1 = @universe.current_world.terrain_map.data_at(x1,y1)
+      c2 = @universe.current_world.terrain_map.data_at(x2,y2)
+
+      unless tp[c2] and tp[c1]
+        return true
+      end
+      false
+  end
+
+
   def clamp_to_tile_restrictions_on_y(tp, new_mintilex, new_mintiley, new_maxtilex, new_maxtiley)
     rv = false
 
     if new_mintiley != @mintiley
-      bottom_right = @universe.current_world.terrain_map.data_at(new_maxtilex, new_mintiley)
-      bottom_left = @universe.current_world.terrain_map.data_at(new_mintilex, new_mintiley)
-
-      unless tp[bottom_left] and tp[bottom_right]
-        rv = true
-      end
+      rv = true if check_corners(tp, new_maxtilex, new_mintiley, new_mintilex, new_mintiley)
     end
     if new_maxtiley != @maxtiley
-
-      top_right = @universe.current_world.terrain_map.data_at(new_maxtilex, new_maxtiley)
-      top_left = @universe.current_world.terrain_map.data_at(new_mintilex, new_maxtiley)
-
-      unless tp[top_left] and tp[top_right]
-        rv = true
-      end
-
+      rv = true if check_corners(tp, new_maxtilex, new_maxtiley, new_mintilex, new_maxtiley)
     end
     rv
   end
@@ -376,20 +375,11 @@ class CoordinateHelper
     rv = false
     
     if new_mintilex != @mintilex
-      bottom_left = @universe.current_world.terrain_map.data_at(new_mintilex, new_mintiley)
-      top_left = @universe.current_world.terrain_map.data_at(new_mintilex, new_maxtiley)
-      unless tp[bottom_left] and tp[top_left]
-        rv = true
-      end
+      rv = true if check_corners(tp, new_mintilex, new_mintiley, new_mintilex, new_maxtiley)
     end
 
     if new_maxtilex != @maxtilex
-      bottom_right = @universe.current_world.terrain_map.data_at(new_maxtilex, new_mintiley)
-      top_right = @universe.current_world.terrain_map.data_at(new_maxtilex, new_maxtiley)
-
-      unless tp[bottom_right] and tp[top_right]
-        rv = true
-      end
+      rv = true if check_corners(tp, new_maxtilex, new_mintiley, new_maxtilex, new_maxtiley)
     end
 
     rv
@@ -1358,6 +1348,33 @@ class JsonLoadableSurface
 
 end
 
+
+class TopoMapFactory
+  def self.build_map(filename,bgx, bgy)
+    lines = IO.readlines(filename)
+    data = []
+    lines.each {|line| data += line.strip.split(//)}
+
+    chrs = lines[0].strip.split(//)
+    x = chrs.size
+    y = lines.size
+
+    puts "x,y = #{x},#{y}"
+    TopoMap.new(x,y,bgx, bgy, data)
+
+  end
+end
+
+class WorldStateFactory
+  def self.build_world_state(bg_file, ter_file, int_file, pallette, terrain_pallette, interaction_pallette, bgx, bgy, npcs)
+    terrainmap = TopoMapFactory.build_map(ter_file, bgx, bgy)
+    topomap = TopoMapFactory.build_map(bg_file, bgx, bgy)
+    interactmap = TopoMapFactory.build_map(int_file, bgx, bgy)
+    bgsurface = JsonSurface.new([bgx,bgy])
+    WorldState.new(topomap, pallette, terrainmap, terrain_pallette, interactmap, interaction_pallette, npcs, bgsurface)
+  end
+end
+
 class Game
   include EventHandler::HasEventHandler
 
@@ -1392,77 +1409,14 @@ class Game
     @hud = Hud.new :screen => @screen, :player => @player, :topomap => @topomap
   end
   def make_world1
-
-    bg_data = ['M','M','M','M','M','M','M','M',
-               'M','G','G','G','G','G','G','M',
-               'M','G','T','G','G','G','G','M',
-               'M','G','G','G','G','G','G','M',
-               'M','G','G','G','G','G','W','M',
-               'M','M','M','M','M','M','M','M'
-    ]
-    terrain_data = [ '.','.','.','.','.','.','.','.',
-                      '.','e','e','e','e','e','e','.',
-                      '.','e','T','e','e','e','e','.',
-                      '.','e','e','e','e','e','e','.',
-                      '.','e','e','e','e','e','e','.',
-                      '.','.','.','.','.','.','.','.'
-    ]
-    interaction_data = [ '.','.','.','.','.','.','.','.',
-                         '.','.','.','.','.','.','.','.',
-                         '.','.','T','.','.','.','.','.',
-                         '.','.','.','.','.','.','.','.',
-                         '.','.','.','.','.','.','w','.',
-                         '.','.','.','.','.','.','.','.'
-    ]
-
-    terrainmap = TopoMap.new(8,6, @@BGX, @@BGY, terrain_data)
-    topomap = TopoMap.new(8,6, @@BGX,@@BGY, bg_data)
-    interactmap = TopoMap.new(8,6, @@BGX,@@BGY, interaction_data)
-
-    bgsurface = JsonSurface.new([@@BGX,@@BGY])
-    
-
-
     monster_inv = Inventory.new(255)
     monster_inv.add_item(1, "potion")
     @npcs = [TalkingNPC.new("i am an npc", "gogo-npc.png", 600, 200,48,64), Monster.new("monster.png", 400,660, @@MONSTER_X, @@MONSTER_Y, monster_inv)]
 
-    @worldstate = WorldState.new(topomap, pallette, terrainmap, terrain_pallette, interactmap, interaction_pallette, @npcs, bgsurface)
+    @worldstate = WorldStateFactory.build_world_state("world1_bg","world1_terrain","world1_interaction", pallette, terrain_pallette, interaction_pallette, @@BGX, @@BGY, @npcs)
   end
   def make_world2
-
-    bg_data = ['M','M','M','G','G','G','M','M',
-               'M','G','G','T','T','T','G','M',
-               'M','G','G','G','G','G','G','w',
-               'M','G','G','G','G','G','G','w',
-               'M','G','G','G','G','G','W','w',
-               'M','M','M','M','w','w','w','w'
-    ]
-    terrain_data = [  '.','.','.','e','e','e','.','.',
-                      '.','e','e','T','T','T','e','.',
-                      '.','e','e','e','e','e','e','.',
-                      '.','e','e','e','e','e','e','.',
-                      '.','e','e','e','e','e','e','.',
-                      '.','.','.','.','.','.','.','.'
-    ]
-    interaction_data = [ '.','.','.','.','.','.','.','.',
-                         '.','.','.','1','2','3','.','.',
-                         '.','.','.','.','.','.','.','.',
-                         '.','.','.','.','.','.','.','.',
-                         '.','.','.','.','.','.','W','.',
-                         '.','.','.','.','.','.','.','.'
-    ]
-    
-    terrainmap = TopoMap.new(8,6, @@BGX, @@BGY, terrain_data)
-    topomap = TopoMap.new(8,6, @@BGX,@@BGY, bg_data)
-    interactmap = TopoMap.new(8,6, @@BGX,@@BGY, interaction_data)
- 
-    bgsurface = JsonSurface.new([@@BGX,@@BGY])
-
-    topomap.blit_to(pallette, bgsurface)
-    npcs = []
-    @npcs_hooks # ....TODO
-    @worldstate2 = WorldState.new(topomap, pallette, terrainmap, terrain_pallette, interactmap, interaction_pallette, npcs, bgsurface)
+    @worldstate2 = WorldStateFactory.build_world_state("world2_bg","world2_terrain","world2_interaction", pallette, terrain_pallette, interaction_pallette, @@BGX, @@BGY, [])
   end
 
   # The "main loop". Repeat the #step method
