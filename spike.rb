@@ -1104,6 +1104,10 @@ class ReloaderHelper
 
     game.universe = universe
     game.player = player
+    game.remove_all_hooks
+    game.make_event_hooks
+    game.universe.menu_layer.toggle_activity
+    game.make_hud
   end
 end
 
@@ -1115,9 +1119,6 @@ class LoadAction < SaveLoadAction
     rebuilt = JSON.parse(data.join(" "))
     puts "got rebuilt: #{rebuilt.class} "
     ReloaderHelper.new.replace(game, rebuilt)
-    game.remove_all_hooks
-    game.make_event_hooks
-    game.universe.menu_layer.toggle_activity
   end
 end
 class Monster
