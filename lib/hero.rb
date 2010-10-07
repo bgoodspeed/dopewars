@@ -8,13 +8,13 @@ end
 class Hero
 
   attr_reader :money, :inventory, :name, :damage
-  def initialize(name="MAIN DUDE", readiness_helper=nil)
+  def initialize(name="MAIN DUDE", helper_start=1, helper_rate=1, exp=0, dam=1, mon=0, inventory=Inventory.new(20))
     @name = name
-    @inventory = Inventory.new(20)
-    @money = 0
-    @readiness_helper = readiness_helper
-    @damage = 1
-    @experience = 0
+    @inventory = inventory
+    @money = mon
+    @readiness_helper = BattleReadinessHelper.new(helper_start, helper_rate)
+    @damage = dam
+    @experience = exp
   end
 
   def gain_experience(pts)
@@ -64,8 +64,10 @@ class Hero
   def to_json(*a)
      {
       'json_class' => self.class.name,
-      'data' => [ @name, @damage, @experience, @money, @inventory ]
+      'data' => [ @name, @readiness_helper.starting_points, @readiness_helper.growth_rate, @experience, @damage, @money, @inventory ]
     }.to_json(*a)
   end
-
+  def self.json_create(o)
+    new(*o['data'])
+  end
 end

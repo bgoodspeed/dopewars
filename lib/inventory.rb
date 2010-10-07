@@ -19,12 +19,16 @@ class InventoryItem
     }.to_json(*a)
 
   end
+  def self.json_create(o)
+    new(*o['data'])
+  end
+
 end
 
 class Inventory
-  def initialize(max_slots)
+  def initialize(max_slots, items={})
     @max_slots = max_slots
-    @items = {}
+    @items = items
     
   end
 
@@ -71,6 +75,10 @@ class Inventory
       'data' => [ @max_slots, @items ]
     }.to_json(*a)
 
+  end
+
+  def self.json_create(o)
+    new(*o['data'])
   end
 
 end

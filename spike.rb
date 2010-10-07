@@ -22,6 +22,8 @@ include Rubygame::Events
 include Rubygame::EventActions
 include Rubygame::EventTriggers
 
+@@SCREEN_X = 640
+@@SCREEN_Y = 480
 @@BGX = 1280
 @@BGY = 960
 @@MENU_LAYER_INSET = 25
@@ -39,17 +41,21 @@ include Rubygame::EventTriggers
 @@DEFAULT_ACTION_COST = 2500
 @@ATTACK_ACTION_COST = 2000
 @@OPEN_TREASURE = 'O'
+@@MONSTER_X = 32
+@@MONSTER_Y = 32
 
 class Universe
-  attr_reader :worlds, :current_world, :dialog_layer, :menu_layer, :battle_layer
+  attr_reader :worlds, :current_world, :dialog_layer, :menu_layer, :battle_layer, :current_world_idx
 
-  def initialize(worlds, dialog_layer, menu_layer, battle_layer)
+  def initialize(current_world_idx, worlds, dialog_layer=nil, menu_layer=nil, battle_layer=nil)
     raise "must have at least one world" if worlds.empty?
-    @current_world = worlds[0]
+    @current_world = worlds[current_world_idx]
+    @current_world_idx = current_world_idx
     @worlds = worlds
     @dialog_layer = dialog_layer
     @menu_layer = menu_layer
     @battle_layer = battle_layer
+    
   end
 
   def world_by_index(idx)
@@ -64,11 +70,19 @@ class Universe
     set_current_world(world_by_index(idx))
   end
 
+  def reblit_backgrounds
+    @worlds.each {|world| world.reblit_background}
+  end
+
+
   def to_json(*a)
     {
       'json_class' => self.class.name,
-      'data' => [ @current_world, @worlds]
+      'data' => [ @current_world_idx, @worlds]
     }.to_json(*a)
+  end
+  def self.json_create(o)
+    new(*o['data'])
   end
 
 end
@@ -86,8 +100,17 @@ class WorldState
     @terrain_pallette = terrainpal
     @interaction_map = interactmap
     @interaction_pallette = interactpal
-    @background_surface = bgsurface
     @npcs = npcs
+    @background_surface = bgsurface
+    
+    raise "topomap" if @topo_map.nil?
+    raise "topopal" if @topo_pallette.nil?
+    raise "bg surf" if @background_surface.nil?
+    topomap.blit_to(topopal, bgsurface)
+  end
+
+  def reblit_background
+    @topo_map.blit_to(@topo_pallette, @background_surface)
   end
 
   def delete_monster(monster)
@@ -97,9 +120,15 @@ class WorldState
   def to_json(*a)
     {
       'json_class' => self.class.name,
-      'data' => [ @npcs] #TODO reconsider terrain/etc loading
+      'data' => [ @topo_map, @topo_pallette, @terrain_map, @terrain_pallette,
+            @interaction_map, @interaction_pallette, @npcs, @background_surface] #TODO reconsider terrain/etc loading
     }.to_json(*a)
   end
+  def self.json_create(o)
+    new(*o['data'])
+  end
+
+
 
 end
 
@@ -415,7 +444,7 @@ class AnimatedSpriteHelper
     @rect = @image.make_rect
     @rect.center = [px, py]
 
-
+    set_frame(0)
   end
 
 
@@ -537,9 +566,9 @@ end
 
 class Party
   attr_reader :members, :inventory
-  def initialize(members)
+  def initialize(members, inventory)
     @members = members
-    @inventory = Inventory.new(255) #TODO revisit inventory -- should it have a maximum? probably should not be stored on hero as well...
+    @inventory = inventory
   end
   def add_item(qty, item)
     @inventory.add_item(qty, item)
@@ -566,6 +595,9 @@ class Party
       'data' => [ @members, @inventory]
     }.to_json(*a)
   end
+  def self.json_create(o)
+    new(*o['data'])
+  end
 
 
 end
@@ -574,15 +606,18 @@ class Player
   include Sprites::Sprite
   include EventHandler::HasEventHandler
   
-  attr_reader :universe, :party
+  attr_accessor :universe, :party
 
   def to_json(*a)
+    puts "px,py: #{px},#{py}"
     {
       'json_class' => self.class.name,
-      'data' => [ party, universe]
+      'data' => [ @coordinate_helper.px, @coordinate_helper.py, @universe, @party, @filename,@hero_x_dim, @hero_y_dim, @animated_sprite_helper.px, @animated_sprite_helper.py]
     }.to_json(*a)
   end
-
+  def self.json_create(o)
+    new(*o['data'])
+  end
 
   def image
     @animated_sprite_helper.image
@@ -618,23 +653,19 @@ class Player
   end
 
 
-  attr_reader :party
-  def initialize( px, py,  universe)
+  attr_reader :party, :universe, :filename, :hero_x_dim, :hero_y_dim
+  def initialize( px, py,  universe, party, filename, hx, hy, sx, sy)
     @universe = universe
-    @hero_x_dim = 48
-    @hero_y_dim = 64
+    @filename = filename
+    @hero_x_dim = hx
+    @hero_y_dim = hy
     @interaction_helper = InteractionHelper.new(self, @universe)
-    @inventory = Hash.new(0)
     @keys = KeyHolder.new
     @coordinate_helper = CoordinateHelper.new(px, py, @keys, @universe, @hero_x_dim, @hero_y_dim)
     @animation_helper = AnimationHelper.new(@keys)
     @coordinate_helper.update_tile_coords
-    @animated_sprite_helper = AnimatedSpriteHelper.new("Charactern8.png", px, py, @hero_x_dim, @hero_y_dim)
-    @animated_sprite_helper.set_frame(0)
-    @hero = Hero.new("hero",BattleReadinessHelper.new( @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE))
-    @hero2 = Hero.new("cohort", BattleReadinessHelper.new( @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE))
-    @party = Party.new([@hero, @hero2])
-    
+    @animated_sprite_helper = AnimatedSpriteHelper.new(filename, sx, sy, @hero_x_dim, @hero_y_dim)
+    @party = party
 
     make_magic_hooks(
       KeyPressed => :key_pressed,
@@ -707,10 +738,23 @@ class Treasure
     #XXX this is not graceful, don't have to reblit the whole thing
 
     worldstate.topo_map.update(tilex, tiley, @@OPEN_TREASURE)
-    worldstate.topo_map.blit_to(worldstate.topo_pallette, worldstate.background_surface)
+    worldstate.reblit_background
+    
     puts "also, give it to the player"
     player.add_inventory(1, @name)
   end
+
+  def to_json(*a)
+    {
+      'json_class' => self.class.name,
+      'data' => [ @name] #TODO reconsider terrain/etc loading
+    }.to_json(*a)
+  end
+
+  def self.json_create(o)
+    new(*o['data'])
+  end
+
 end
 class OpenTreasure < Treasure
   def activate( player, worldstate, tilex, tiley)
@@ -730,6 +774,19 @@ class WarpPoint
     puts "warp from  #{worldstate} to #{uni.world_by_index(@destination)}"
     uni.set_current_world_by_index(@destination)
   end
+
+  def to_json(*a)
+    {
+      'json_class' => self.class.name,
+      'data' => [ @destination] #TODO reconsider terrain/etc loading
+    }.to_json(*a)
+  end
+  def self.json_create(o)
+    new(*o['data'])
+  end
+
+
+
 end
 
 class AbstractLayer
@@ -1028,7 +1085,25 @@ class SaveAction < SaveLoadAction
     save_file.puts json
     save_file.close
     puts "saving to slot #{submenu_idx}, json data is: "
+    puts "player was at #{game.player.px} and #{game.player.py} at save time"
     puts json
+  end
+end
+
+
+class ReloaderHelper
+  def replace(game, json_player)
+    puts "player is at #{game.player.px} and #{game.player.py} at load time"
+    uni = json_player.universe
+    orig_uni = game.universe
+    universe = Universe.new(uni.current_world_idx, uni.worlds, orig_uni.dialog_layer, orig_uni.menu_layer, orig_uni.battle_layer )
+
+    puts "universe has current world: #{universe.current_world_idx}"
+    universe.reblit_backgrounds
+    player = Player.new(json_player.px, json_player.py,  universe, json_player.party, json_player.filename, json_player.hero_x_dim, json_player.hero_y_dim, game.screen.w/2, game.screen.h/2)
+
+    game.universe = universe
+    game.player = player
   end
 end
 
@@ -1038,12 +1113,14 @@ class LoadAction < SaveLoadAction
     puts "load from #{save_slot(submenu_idx)}"
     data = IO.readlines(save_slot(submenu_idx))
     rebuilt = JSON.parse(data.join(" "))
-    puts "got rebuilt: #{rebuilt.class}, #{rebuilt['json_class']} "
+    puts "got rebuilt: #{rebuilt.class} "
+    ReloaderHelper.new.replace(game, rebuilt)
+    game.remove_all_hooks
+    game.make_event_hooks
+    game.universe.menu_layer.toggle_activity
   end
 end
 class Monster
-  @@MONSTER_X = 32
-  @@MONSTER_Y = 32
 
   include Sprites::Sprite
   include EventHandler::HasEventHandler
@@ -1058,20 +1135,18 @@ class Monster
     @readiness_helper.add_readiness(pts)
   end
   attr_reader :experience, :inventory
-  def initialize(filename, px, py, npc_x = @@MONSTER_X, npc_y = @@MONSTER_Y)
+  def initialize(filename, px, py, npc_x = @@MONSTER_X, npc_y = @@MONSTER_Y, inventory=Inventory.new(255), hp=3, exp=10)
     super()
     @npc_x = npc_x
     @npc_y = npc_y
     @filename = filename
     @animated_sprite_helper = AnimatedSpriteHelper.new(filename, px, py, @npc_x, @npc_y)
-    @animated_sprite_helper.set_frame(0)
     @keys = AlwaysDownMonsterKeyHolder.new
     @animation_helper = AnimationHelper.new(@keys, 3)
     @readiness_helper = BattleReadinessHelper.new(@@MONSTER_START_BATTLE_PTS, @@MONSTER_BATTLE_PTS_RATE)
-    @hp = 3
-    @experience = 10
-    @inventory = Inventory.new(255)
-    @inventory.add_item(1, "potion")
+    @hp = hp
+    @experience = exp
+    @inventory = inventory
     make_magic_hooks(
       ClockTicked => :update
     )
@@ -1119,17 +1194,23 @@ class Monster
   end
 
   def to_json(*a)
+    params = [ @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @hp, @experience]
     {
       'json_class' => self.class.name,
-      'data' => [ @filename, @npc_x, @npc_y, @hp, @experience, @inventory]
+      'data' => params
     }.to_json(*a)
   end
-  
+
+  def self.json_create(o)
+    new(*o['data'])
+  end
+
+
 
 end
 class TalkingNPC < Monster
-  def initialize(filename, px, py, npc_x, npc_y, text)
-    super(filename, px, py, npc_x, npc_y)
+  def initialize(text, filename, px, py, npc_x, npc_y, inv=nil, hp=0, exp=0)
+    super(filename, px, py, npc_x, npc_y, inv, hp, exp)
     @text = text
   end
 
@@ -1138,12 +1219,25 @@ class TalkingNPC < Monster
     universe.dialog_layer.active = true
     universe.dialog_layer.text = @text
   end
+  def to_json(*a)
+    params = [ @text, @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @hp, @experience]
+    {
+      'json_class' => self.class.name,
+      'data' => params
+    }.to_json(*a)
+  end
+
+  def self.json_create(o)
+    new(*o['data'])
+  end
 
 end
 
 class BattleReadinessHelper
-  attr_reader :points
+  attr_reader :points, :starting_points, :growth_rate
+
   def initialize(starting_points, growth_rate)
+    @starting_points = starting_points
     @points = starting_points
     @growth_rate = growth_rate
     @points_needed_for_ready = @@READINESS_POINTS_NEEDED_TO_ACT
@@ -1220,15 +1314,58 @@ class EventManager
   end
 end
 
+class JsonSurface < Surface
+  def initialize(size)
+    super(size)
+    @size = size
+  end
+
+
+  def to_json(*a)
+    {
+      'json_class' => self.class.name,
+      'data' => [ @size] #TODO reconsider terrain/etc loading
+    }.to_json(*a)
+  end
+
+  def self.json_create(o)
+    new(*o['data'])
+  end
+
+end
+
+class JsonLoadableSurface 
+  def initialize(filename)
+    @filename = filename
+    @surface = Surface.load(filename)
+  end
+
+  def blit(layer, offset)
+    @surface.blit(layer, offset)
+  end
+
+  def to_json(*a)
+    {
+      'json_class' => self.class.name,
+      'data' => [ @filename] #TODO reconsider terrain/etc loading
+    }.to_json(*a)
+  end
+
+  def self.json_create(o)
+    new(*o['data'])
+  end
+
+end
+
 class Game
   include EventHandler::HasEventHandler
 
-  attr_reader :player
+  attr_accessor :player, :universe, :screen
   def initialize()
     make_screen
     make_clock
     make_queue
-    make_event_hooks
+    
     @npc_hooks = []
     make_world1
     make_world2
@@ -1239,12 +1376,12 @@ class Game
     make_universe
     make_player
     make_hud
-
+    make_event_hooks
   end
 
   def make_battle_layer
     @battle_layer = BattleLayer.new(@screen)
-    @battle_layer_hooks = make_magic_hooks_for(@battle_layer, { YesTrigger.new() => :handle } )
+    
   end
   def make_menu_layer
     @menu_layer = MenuLayer.new(@screen)
@@ -1281,16 +1418,15 @@ class Game
     topomap = TopoMap.new(8,6, @@BGX,@@BGY, bg_data)
     interactmap = TopoMap.new(8,6, @@BGX,@@BGY, interaction_data)
 
-    bgsurface = Surface.new([@@BGX,@@BGY])
-    topomap.blit_to(pallette, bgsurface)
+    bgsurface = JsonSurface.new([@@BGX,@@BGY])
+    
 
 
-    npcs = [TalkingNPC.new("gogo-npc.png", 600, 200,48,64, "i am an npc."), Monster.new("monster.png", 400,660)]
-    npcs.each {|npc|
-      @npc_hooks << make_magic_hooks_for( npc, { YesTrigger.new() => :handle } )
-    }
+    monster_inv = Inventory.new(255)
+    monster_inv.add_item(1, "potion")
+    @npcs = [TalkingNPC.new("i am an npc", "gogo-npc.png", 600, 200,48,64), Monster.new("monster.png", 400,660, @@MONSTER_X, @@MONSTER_Y, monster_inv)]
 
-    @worldstate = WorldState.new(topomap, pallette, terrainmap, terrain_pallette, interactmap, interaction_pallette, npcs, bgsurface)
+    @worldstate = WorldState.new(topomap, pallette, terrainmap, terrain_pallette, interactmap, interaction_pallette, @npcs, bgsurface)
   end
   def make_world2
 
@@ -1320,7 +1456,8 @@ class Game
     topomap = TopoMap.new(8,6, @@BGX,@@BGY, bg_data)
     interactmap = TopoMap.new(8,6, @@BGX,@@BGY, interaction_data)
  
-    bgsurface = Surface.new([@@BGX,@@BGY])
+    bgsurface = JsonSurface.new([@@BGX,@@BGY])
+
     topomap.blit_to(pallette, bgsurface)
     npcs = []
     @npcs_hooks # ....TODO
@@ -1358,7 +1495,7 @@ class Game
     toggle_battle_hooks(true)
   end
 
-  private
+  
 
 
   def make_clock
@@ -1366,6 +1503,18 @@ class Game
     @clock.target_framerate = 50
     @clock.calibrate
     @clock.enable_tick_events
+  end
+
+  def all_hooks
+    @event_handler.hooks.flatten
+  end
+
+  def remove_all_hooks
+    puts "pre hook count: #{all_hooks.size}"
+    all_hooks.each {|hook|
+      remove_hook(hook)
+    }
+    puts "post hook count: #{all_hooks.size}"
   end
 
   def make_event_hooks
@@ -1378,7 +1527,7 @@ class Game
       :m => :toggle_menu
     }
 
-    make_magic_hooks( always_on_hooks )
+    @always_on_hooks = make_magic_hooks( always_on_hooks )
 
     menu_killed_hooks = { :i => :interact_with_facing }
     @menu_killed_hooks = make_magic_hooks( menu_killed_hooks )
@@ -1398,8 +1547,13 @@ class Game
     @battle_active_hooks.each do |hook|
       remove_hook(hook)
     end
+    @battle_layer_hooks = make_magic_hooks_for(@battle_layer, { YesTrigger.new() => :handle } )
+    @npcs.each {|npc|
+      @npc_hooks << make_magic_hooks_for( npc, { YesTrigger.new() => :handle } )
+    }
+    @player_hooks = make_magic_hooks_for( @player, { YesTrigger.new() => :handle } )
+    puts "player hooks: #{@player_hooks[0]}"
 
-    
   end
 
   def toggle_battle_hooks(in_battle=false)
@@ -1410,8 +1564,8 @@ class Game
     EventManager.new.swap_event_sets(self, @menu_layer.active?, non_menu_hooks, @menu_active_hooks)
     @menu_layer.toggle_activity
   end
-
-  def menu_enter
+private
+  def menu_enter(event)
     @menu_layer.enter_current_cursor_location(self)
   end
 
@@ -1428,7 +1582,7 @@ class Game
   def menu_left
     @menu_layer.cancel_action
   end
-  def menu_right
+  def menu_right(event)
     @menu_layer.enter_current_cursor_location(self)
   end
 
@@ -1493,7 +1647,8 @@ class Game
 
   # Create the Rubygame window.
   def make_screen
-    @screen = Screen.open( [640, 480] )
+    #@screen = Screen.open( [640, 480] )
+    @screen = Screen.new([@@SCREEN_X, @@SCREEN_Y])
     @screen.title = "Square! In! Space!"
   end
 
@@ -1501,16 +1656,23 @@ class Game
     @dialog_layer = DialogLayer.new(@screen)
   end
   def make_universe
-    @universe = Universe.new([@worldstate, @worldstate2], @dialog_layer, @menu_layer, @battle_layer)
+    @universe = Universe.new(0, [@worldstate, @worldstate2], @dialog_layer, @menu_layer, @battle_layer)
   end
   # Create the player ship in the middle of the screen
   def make_player
     #@player = Ship.new( @screen.w/2, @screen.h/2, @topomap, pallette, @terrainmap, terrain_pallette, @interactmap, interaction_pallette, @bgsurface )
-    @player = Player.new( @screen.w/2, @screen.h/2, @universe )
+    @hero = Hero.new("hero",  @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE)
+    @hero2 = Hero.new("cohort", @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE)
+    @party_inventory = Inventory.new(255) #TODO revisit inventory -- should it have a maximum? probably should not be stored on hero as well...
+    @party = Party.new([@hero, @hero2], @party_inventory)
+    @hero_x_dim = 48
+    @hero_y_dim = 64
+    @player_file = "Charactern8.png"
+    @ssx = @screen.w/2
+    @ssy = @screen.h/2
+    @player = Player.new(@ssx, @ssy , @universe, @party, @player_file, @hero_x_dim, @hero_y_dim , @ssx, @ssy )
 
     # Make event hook to pass all events to @player#handle().
-    @player_hooks = make_magic_hooks_for( @player, { YesTrigger.new() => :handle } )
-    puts "player hooks: #{@player_hooks[0]}"
   end
 
 
@@ -1603,25 +1765,13 @@ class Game
 
   def pallette
     pal = Hash.new(tile(:blue))
-    pal['a'] = tile(:yellow)
-    pal['b'] = tile(:yellow)
-    pal['c'] = tile(:red)
-    pal['d'] = tile(:red)
-    pal['e'] = tile(:green)
-    pal['f'] = tile(:green)
-    pal['g'] = tile(:white)
-    pal['h'] = tile(:white)
-    pal['i'] = tile(:brown)
-    pal['j'] = tile(:brown)
-    pal['k'] = tile(:magenta)
-    pal['l'] = tile(:magenta)
     
-    pal['O'] = Surface.load("open-treasure-on-grass-bg-160.png")
-    pal['T'] = Surface.load("treasure-on-grass-bg-160.png")
-    pal['w'] = Surface.load("water-bg-160.png")
-    pal['W'] = Surface.load("town-on-grass-bg-160.png")
-    pal['M'] = Surface.load("mountain-bg-160.png")
-    pal['G'] = Surface.load("grass-bg-160.png")
+    pal['O'] = JsonLoadableSurface.new("open-treasure-on-grass-bg-160.png")
+    pal['T'] = JsonLoadableSurface.new("treasure-on-grass-bg-160.png")
+    pal['w'] = JsonLoadableSurface.new("water-bg-160.png")
+    pal['W'] = JsonLoadableSurface.new("town-on-grass-bg-160.png")
+    pal['M'] = JsonLoadableSurface.new("mountain-bg-160.png")
+    pal['G'] = JsonLoadableSurface.new("grass-bg-160.png")
     pal
   end
 

@@ -51,12 +51,12 @@ class TopoMap
     (wy / @ysize).to_i
   end
   def blit_to(palette, target)
-    0.upto(@y) do |yi|
-      0.upto(@x) do |xi|
-        palette[data_at(xi,yi)].blit(target, [xi*@xsize, yi*@ysize])
+    0.upto(@y-1) do |yi|
+      0.upto(@x-1) do |xi|
+        datum = palette[data_at(xi,yi)]
+        datum.blit(target, [xi*@xsize, yi*@ysize])
       end
     end
-
   end
 
   def blit_with_pallette(palette, target, wmx, wmy)
@@ -69,4 +69,16 @@ class TopoMap
     end
     
   end
+
+
+  def to_json(*a)
+    {
+      'json_class' => self.class.name,
+      'data' => [  @x, @y, @world_x, @world_y, @data]
+    }.to_json(*a)
+  end
+  def self.json_create(o)
+    new(*o['data'])
+  end
+
 end
