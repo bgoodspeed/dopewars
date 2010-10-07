@@ -61,4 +61,11 @@ class Hero
 
   alias_method :add_item, :acquire_drug
 
+  def to_json(*a)
+     {
+      'json_class' => self.class.name,
+      'data' => [ @name, @damage, @experience, @money, @inventory ]
+    }.to_json(*a)
+  end
+
 end

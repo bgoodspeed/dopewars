@@ -4,7 +4,9 @@
 # make user input affect acceleration, not velocity.
 
 require 'rubygems'
+
 require 'rubygame'
+require 'json'
 
 require 'lib/font_loader'
 require 'lib/topo_map'
@@ -61,6 +63,14 @@ class Universe
   def set_current_world_by_index(idx)
     set_current_world(world_by_index(idx))
   end
+
+  def to_json(*a)
+    {
+      'json_class' => self.class.name,
+      'data' => [ @current_world, @worlds]
+    }.to_json(*a)
+  end
+
 end
 
 
@@ -84,6 +94,12 @@ class WorldState
     @npcs -= [monster]
   end
 
+  def to_json(*a)
+    {
+      'json_class' => self.class.name,
+      'data' => [ @npcs] #TODO reconsider terrain/etc loading
+    }.to_json(*a)
+  end
 
 end
 
@@ -468,7 +484,7 @@ class MenuHelper
   end
   def enter_current_cursor_location(game)
     if @show_section
-      active_section.content[@section_position].activate(@cursor_position, game)
+      active_section.content[@section_position].activate(@cursor_position, game, @section_position)
     else
       @show_section = true
     end
@@ -543,13 +559,30 @@ class Party
   def gain_inventory(inventory)
     @inventory.gain_inventory(inventory)
   end
+
+  def to_json(*a)
+    {
+      'json_class' => self.class.name,
+      'data' => [ @members, @inventory]
+    }.to_json(*a)
+  end
+
+
 end
 
 class Player
   include Sprites::Sprite
   include EventHandler::HasEventHandler
   
-  attr_reader :universe
+  attr_reader :universe, :party
+
+  def to_json(*a)
+    {
+      'json_class' => self.class.name,
+      'data' => [ party, universe]
+    }.to_json(*a)
+  end
+
 
   def image
     @animated_sprite_helper.image
@@ -767,7 +800,9 @@ class MenuLayer < AbstractLayer
     sections = [MenuSection.new("Status", [MenuAction.new("status info line 1"), MenuAction.new("status info line 2")]),
           MenuSection.new("Inventory", [MenuAction.new("inventory contents:"), MenuAction.new("TODO real data")]),
       MenuSection.new("Equip", [MenuAction.new("head equipment:"), MenuAction.new("arm equipment: "), MenuAction.new("etc")]),
-      MenuSection.new("Save", [SaveAction.new("Slot 1")])]
+      MenuSection.new("Save", [SaveAction.new("Slot 1")]),
+      MenuSection.new("Load", [LoadAction.new("Slot 1")])
+      ]
     @menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
   end
 
@@ -938,7 +973,7 @@ class MenuAction
     @action_cost = action_cost
   end
 
-  def activate(party_member_idx, game)
+  def activate(main_menu_idx, game, submenu_idx)
     puts "This is a no-op action: #{@text}"
   end
 end
@@ -948,7 +983,7 @@ class AttackAction < MenuAction
     @battle_layer = battle_layer
 
   end
-  def activate(party_member_index, game)
+  def activate(party_member_index, game, submenu_idx)
     battle = @battle_layer.battle
     
     hero = battle.player.party.members[party_member_index]
@@ -959,7 +994,7 @@ class AttackAction < MenuAction
   end
 end
 class ItemAction < MenuAction
-  def activate(party_member_index, game)
+  def activate(party_member_index, game, submenu_idx)
     battle = @battle_layer.battle
     puts "TODO itemaction"
 
@@ -973,14 +1008,37 @@ class EndBattleAction < MenuAction
     @battle_layer = battle_layer
   end
 
-  def activate(menu_idx, game)
+  def activate(menu_idx, game, submenu_idx)
     puts "ending battle from menu #{menu_idx}"
     @battle_layer.end_battle
   end
 end
-class SaveAction < MenuAction
-  def activate(menu_idx, game)
-    puts "saving to slot #{menu_idx}"
+
+class SaveLoadAction < MenuAction
+  def save_slot(idx)
+    "save-slot-#{idx}.json"
+  end
+end
+
+class SaveAction < SaveLoadAction
+  def activate(menu_idx, game, submenu_idx)
+    json = JSON.generate(game.player)
+
+    save_file = File.open(save_slot(submenu_idx), "w")
+    save_file.puts json
+    save_file.close
+    puts "saving to slot #{submenu_idx}, json data is: "
+    puts json
+  end
+end
+
+class LoadAction < SaveLoadAction
+  def activate(menu_idx, game, submenu_idx)
+
+    puts "load from #{save_slot(submenu_idx)}"
+    data = IO.readlines(save_slot(submenu_idx))
+    rebuilt = JSON.parse(data.join(" "))
+    puts "got rebuilt: #{rebuilt.class}, #{rebuilt['json_class']} "
   end
 end
 class Monster
@@ -1004,6 +1062,7 @@ class Monster
     super()
     @npc_x = npc_x
     @npc_y = npc_y
+    @filename = filename
     @animated_sprite_helper = AnimatedSpriteHelper.new(filename, px, py, @npc_x, @npc_y)
     @animated_sprite_helper.set_frame(0)
     @keys = AlwaysDownMonsterKeyHolder.new
@@ -1058,6 +1117,15 @@ class Monster
     game.battle_begun(universe,player)
     universe.battle_layer.start_battle(game, universe, player, self)
   end
+
+  def to_json(*a)
+    {
+      'json_class' => self.class.name,
+      'data' => [ @filename, @npc_x, @npc_y, @hp, @experience, @inventory]
+    }.to_json(*a)
+  end
+  
+
 end
 class TalkingNPC < Monster
   def initialize(filename, px, py, npc_x, npc_y, text)
@@ -1155,6 +1223,7 @@ end
 class Game
   include EventHandler::HasEventHandler
 
+  attr_reader :player
   def initialize()
     make_screen
     make_clock
@@ -1555,6 +1624,8 @@ class Game
     pal['G'] = Surface.load("grass-bg-160.png")
     pal
   end
+
+
 
 end
 

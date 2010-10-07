@@ -11,6 +11,14 @@ class InventoryItem
     @quantity = quantity
     @item = item
   end
+
+  def to_json(*a)
+   {
+      'json_class' => self.class.name,
+      'data' => [ @quantity, @item ]
+    }.to_json(*a)
+
+  end
 end
 
 class Inventory
@@ -56,4 +64,13 @@ class Inventory
     return 0 unless has_item?(item)
     @items[item].quantity
   end
+
+  def to_json(*a)
+   {
+      'json_class' => self.class.name,
+      'data' => [ @max_slots, @items ]
+    }.to_json(*a)
+
+  end
+
 end
