@@ -2,14 +2,4 @@
 <project-private xmlns="http://www.netbeans.org/ns/project-private/1">
     <coverage xmlns="http://www.netbeans.org/ns/code-coverage/1" aggregating="true"/>
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/1"/>
-    <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/1">
-        <file>file:/home/bg/NetBeansProjects/dopewars/spike.rb</file>
-        <file>file:/home/bg/NetBeansProjects/dopewars/lib/main.rb</file>
-        <file>file:/home/bg/NetBeansProjects/dopewars/Rakefile</file>
-        <file>file:/home/bg/NetBeansProjects/dopewars/lib/game.rb</file>
-        <file>file:/home/bg/NetBeansProjects/dopewars/lib/font_loader.rb</file>
-        <file>file:/home/bg/NetBeansProjects/dopewars/lib/demo_rubygame.rb</file>
-        <file>file:/home/bg/NetBeansProjects/dopewars/lib/ship.rb</file>
-        <file>file:/home/bg/NetBeansProjects/dopewars/lib/world.rb</file>
-    </open-files>
 </project-private>

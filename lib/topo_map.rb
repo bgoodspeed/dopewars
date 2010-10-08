@@ -53,6 +53,7 @@ class TopoMap
   def blit_to(palette, target)
     0.upto(@y-1) do |yi|
       0.upto(@x-1) do |xi|
+        
         datum = palette[data_at(xi,yi)]
         datum.blit(target, [xi*@xsize, yi*@ysize])
       end

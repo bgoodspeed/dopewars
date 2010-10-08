@@ -58,6 +58,9 @@ class Universe
     
   end
 
+  def interpret(x,y)
+    @current_world.interpret(x,y)
+  end
   def world_by_index(idx)
     @worlds[idx]
   end
@@ -89,28 +92,41 @@ end
 
 
 class WorldState
-  attr_reader :topo_map, :topo_pallette, :terrain_map, :terrain_pallette,
-              :interaction_map, :interaction_pallette, :npcs,
-              :background_surface
+  attr_reader :topo_interpreter, :terrain_interpreter,:interaction_interpreter,
+            :npcs, :background_surface
             
-  def initialize(topomap, topopal, terrainmap, terrainpal, interactmap, interactpal, npcs, bgsurface)
-    @topo_map = topomap
-    @topo_pallette = topopal
-    @terrain_map = terrainmap
-    @terrain_pallette = terrainpal
-    @interaction_map = interactmap
-    @interaction_pallette = interactpal
+  def initialize(topointerp, terrinterp, interinterp, npcs, bgsurface)
+
+    @topo_interpreter = topointerp
+    @terrain_interpreter = terrinterp
+    @interaction_interpreter = interinterp
     @npcs = npcs
     @background_surface = bgsurface
     
-    raise "topomap" if @topo_map.nil?
-    raise "topopal" if @topo_pallette.nil?
-    raise "bg surf" if @background_surface.nil?
-    topomap.blit_to(topopal, bgsurface)
+    reblit_background
+  end
+
+
+  def update_interaction_map(x,y, value)
+    @interaction_interpreter.update(x,y,value)
+  end
+  def update_topo_map(x,y,value)
+    @topo_interpreter.update(x,y,value)
+  end
+  def terrain_pallette
+    @terrain_interpreter.pallette
+  end
+
+  def x_offset_for_world(x)
+    @topo_interpreter.x_offset_for_world(x)
+  end
+  def y_offset_for_world(y)
+    @topo_interpreter.y_offset_for_world(y)
   end
 
   def reblit_background
-    @topo_map.blit_to(@topo_pallette, @background_surface)
+    @topo_interpreter.blit_to(@background_surface)
+    
   end
 
   def delete_monster(monster)
@@ -120,8 +136,8 @@ class WorldState
   def to_json(*a)
     {
       'json_class' => self.class.name,
-      'data' => [ @topo_map, @topo_pallette, @terrain_map, @terrain_pallette,
-            @interaction_map, @interaction_pallette, @npcs, @background_surface] #TODO reconsider terrain/etc loading
+      'data' => [ @topo_interpreter, @terrain_interpreter, @interaction_interpreter,
+         @npcs, @background_surface] #TODO reconsider terrain/etc loading
     }.to_json(*a)
   end
   def self.json_create(o)
@@ -204,9 +220,9 @@ class InteractionHelper
     end
 
     puts "you are facing #{@facing}"
-    tilex = @universe.current_world.topo_map.x_offset_for_world(px)
-    tiley = @universe.current_world.topo_map.y_offset_for_world(py)
-    this_tile_interacts = @universe.current_world.interaction_pallette[@universe.current_world.interaction_map.data_at(tilex,tiley)]
+    tilex = @universe.current_world.x_offset_for_world(px)
+    tiley = @universe.current_world.y_offset_for_world(py)
+    this_tile_interacts = @universe.current_world.interaction_interpreter.interpret(tilex, tiley)
     facing_tile_interacts = false
 
     if this_tile_interacts
@@ -218,25 +234,25 @@ class InteractionHelper
     if @facing == :down
       facing_tilex = tilex
       facing_tiley = tiley + 1
-      facing_tile_dist = (@universe.current_world.interaction_map.top_side(tiley + 1) - py).abs
+      facing_tile_dist = (@universe.current_world.interaction_interpreter.top_side(tiley + 1) - py).abs
     end
     if @facing == :up
       facing_tilex = tilex
       facing_tiley = tiley - 1
-      facing_tile_dist = (@universe.current_world.interaction_map.bottom_side(tiley - 1) - py).abs
+      facing_tile_dist = (@universe.current_world.interaction_interpreter.bottom_side(tiley - 1) - py).abs
     end
     if @facing == :left
       facing_tilex = tilex - 1
       facing_tiley = tiley
-      facing_tile_dist = (@universe.current_world.interaction_map.right_side(tilex - 1) - px).abs
+      facing_tile_dist = (@universe.current_world.interaction_interpreter.right_side(tilex - 1) - px).abs
     end
     if @facing == :right
       facing_tilex = tilex + 1
       facing_tiley = tiley
-      facing_tile_dist = (@universe.current_world.interaction_map.left_side(tilex + 1) - px).abs
+      facing_tile_dist = (@universe.current_world.interaction_interpreter.left_side(tilex + 1) - px).abs
     end
 
-    facing_tile_interacts = @universe.current_world.interaction_pallette[@universe.current_world.interaction_map.data_at(facing_tilex, facing_tiley)]
+    facing_tile_interacts = @universe.current_world.interaction_interpreter.interpret(facing_tilex, facing_tiley)
     facing_tile_close_enough = facing_tile_dist < @@INTERACTION_DISTANCE_THRESHOLD
 
     if facing_tile_close_enough and facing_tile_interacts
@@ -270,10 +286,10 @@ class CoordinateHelper
   end
 
   def update_tile_coords
-    @mintilex = @universe.current_world.topo_map.x_offset_for_world(@px - x_ext)
-    @maxtilex = @universe.current_world.topo_map.x_offset_for_world(@px + x_ext)
-    @mintiley = @universe.current_world.topo_map.y_offset_for_world(@py - y_ext)
-    @maxtiley = @universe.current_world.topo_map.y_offset_for_world(@py + y_ext)
+    @mintilex = @universe.current_world.x_offset_for_world(@px - x_ext)
+    @maxtilex = @universe.current_world.x_offset_for_world(@px + x_ext)
+    @mintiley = @universe.current_world.y_offset_for_world(@py - y_ext)
+    @maxtiley = @universe.current_world.y_offset_for_world(@py + y_ext)
   end
   def x_ext
     @hero_x_dim/2
@@ -350,8 +366,8 @@ class CoordinateHelper
   end
 
   def check_corners(tp, x1, y1, x2, y2)
-      c1 = @universe.current_world.terrain_map.data_at(x1,y1)
-      c2 = @universe.current_world.terrain_map.data_at(x2,y2)
+      c1 = tp.data_at(x1,y1)
+      c2 = tp.data_at(x2,y2)
 
       unless tp[c2] and tp[c1]
         return true
@@ -395,11 +411,11 @@ class CoordinateHelper
 
     clamp_to_world_dimensions
 
-    tp = @universe.current_world.terrain_pallette
-    new_mintilex = @universe.current_world.topo_map.x_offset_for_world(@px - x_ext)
-    new_maxtilex = @universe.current_world.topo_map.x_offset_for_world(@px + x_ext)
-    new_mintiley = @universe.current_world.topo_map.y_offset_for_world(@py - y_ext)
-    new_maxtiley = @universe.current_world.topo_map.y_offset_for_world(@py + y_ext)
+    tp = @universe.current_world.terrain_interpreter
+    new_mintilex = @universe.current_world.x_offset_for_world(@px - x_ext)
+    new_maxtilex = @universe.current_world.x_offset_for_world(@px + x_ext)
+    new_mintiley = @universe.current_world.y_offset_for_world(@py - y_ext)
+    new_maxtiley = @universe.current_world.y_offset_for_world(@py + y_ext)
 
     @px -= dx if clamp_to_tile_restrictions_on_x(tp, new_mintilex, new_mintiley, new_maxtilex, new_maxtiley)
     @py -= dy if clamp_to_tile_restrictions_on_y(tp, new_mintilex, new_mintiley, new_maxtilex, new_maxtiley)
@@ -668,6 +684,11 @@ class Player
   def interact_with_facing(game)
     @interaction_helper.interact_with_facing( game, @coordinate_helper.px , @coordinate_helper.py)
   end
+  def set_position(px, py)
+    @coordinate_helper.px = px
+    @coordinate_helper.py = py
+
+  end
 
   private
 
@@ -724,10 +745,10 @@ class Treasure
   end
 
   def activate(player, worldstate, tilex, tiley)
-    worldstate.interaction_map.update(tilex, tiley, @@OPEN_TREASURE)
+    worldstate.update_interaction_map(tilex, tiley, @@OPEN_TREASURE)
     #XXX this is not graceful, don't have to reblit the whole thing
 
-    worldstate.topo_map.update(tilex, tiley, @@OPEN_TREASURE)
+    worldstate.update_topo_map(tilex, tiley, @@OPEN_TREASURE)
     worldstate.reblit_background
     
     puts "also, give it to the player"
@@ -754,13 +775,16 @@ end
 
 class WarpPoint
   attr_accessor :destination
-  def initialize(dest_index)
+  def initialize(dest_index, dest_x=nil, dest_y=nil)
     @destination = dest_index
+    @destination_x = dest_x
+    @destination_y = dest_y
   end
 
   def activate(player, worldstate, tilex, tiley)
     uni = player.universe
-    
+    puts "player was at #{player.px},#{player.py}"
+    player.set_position(@destination_x, @destination_y)
     puts "warp from  #{worldstate} to #{uni.world_by_index(@destination)}"
     uni.set_current_world_by_index(@destination)
   end
@@ -1365,16 +1389,103 @@ class TopoMapFactory
   end
 end
 
-class WorldStateFactory
-  def self.build_world_state(bg_file, ter_file, int_file, pallette, terrain_pallette, interaction_pallette, bgx, bgy, npcs)
-    terrainmap = TopoMapFactory.build_map(ter_file, bgx, bgy)
-    topomap = TopoMapFactory.build_map(bg_file, bgx, bgy)
-    interactmap = TopoMapFactory.build_map(int_file, bgx, bgy)
-    bgsurface = JsonSurface.new([bgx,bgy])
-    WorldState.new(topomap, pallette, terrainmap, terrain_pallette, interactmap, interaction_pallette, npcs, bgsurface)
+
+class InterpretedMap
+
+  attr_reader :topo_map, :pallette
+  def initialize(topo_map, pallette)
+    @topo_map = topo_map
+    @pallette = pallette
+  end
+
+  def blit_to(surface)
+    @topo_map.blit_to(@pallette, surface)
+  end
+
+  def x_offset_for_world(x)
+    @topo_map.x_offset_for_world(x)
+  end
+  def y_offset_for_world(y)
+    @topo_map.y_offset_for_world(y)
+  end
+
+  def data_at(x,y)
+    @topo_map.data_at(x,y)
+  end
+  def [](key)
+    @pallette[key]
+  end
+  
+  def interpret(tilex, tiley)
+    self[data_at(tilex,tiley)]
+  end
+
+  def bottom_side(y)
+    @topo_map.bottom_side(y)
+  end
+  def top_side(y)
+    @topo_map.top_side(y)
+  end
+  def left_side(x)
+    @topo_map.left_side(x)
+  end
+  def right_side(x)
+    @topo_map.right_side(x)
+  end
+
+  def update(x,y,value)
+    @topo_map.update(x,y,value)
   end
 end
 
+class WorldStateFactory
+  def self.build_world_state(bg_file, ter_file, int_file, pallette, terrain_pallette, interaction_pallette, bgx, bgy, npcs)
+    bgsurface = JsonSurface.new([bgx,bgy])
+    bg = InterpretedMap.new(TopoMapFactory.build_map(bg_file, bgx, bgy), pallette)
+    inter = InterpretedMap.new(TopoMapFactory.build_map(int_file, bgx, bgy), interaction_pallette)
+    terr = InterpretedMap.new(TopoMapFactory.build_map(ter_file, bgx, bgy), terrain_pallette)
+    WorldState.new(bg, terr, inter, npcs, bgsurface)
+  end
+end
+
+class Pallette
+  def initialize(default_value)
+    @pal = Hash.new(default_value)
+    
+  end
+
+  def []=(key,value)
+    @pal[key] = value
+  end
+  def [](key)
+    @pal[key]
+  end
+
+  def blit(target, xi, yi, datum, xsize, ysize)
+    datum.blit(target, [xi*xsize, yi * ysize])
+  end
+
+end
+
+class SurfaceBackedPallette < Pallette
+  def initialize(filename, x, y)
+    super(nil)
+    @surface = Surface.load(filename)
+    @tile_x = x
+    @tile_y = y
+  end
+
+  def [](key)
+    offsets = super(key)
+    puts "hi: offsets are #{offsets} key is #{key}"
+    offset_x = offsets[0]
+    offset_y = offsets[1]
+    s = Surface.new([@tile_x, @tile_y])
+    @surface.blit(s,[0,0], [offset_x * @tile_x, offset_y * @tile_y, @tile_x, @tile_y]  )
+    s
+  end
+  
+end
 class Game
   include EventHandler::HasEventHandler
 
@@ -1416,7 +1527,7 @@ class Game
     @worldstate = WorldStateFactory.build_world_state("world1_bg","world1_terrain","world1_interaction", pallette, terrain_pallette, interaction_pallette, @@BGX, @@BGY, @npcs)
   end
   def make_world2
-    @worldstate2 = WorldStateFactory.build_world_state("world2_bg","world2_terrain","world2_interaction", pallette, terrain_pallette, interaction_pallette, @@BGX, @@BGY, [])
+    @worldstate2 = WorldStateFactory.build_world_state("world2_bg","world2_terrain","world2_interaction", pallette_160, terrain_pallette, interaction_pallette, @@BGX, @@BGY, [])
   end
 
   # The "main loop". Repeat the #step method
@@ -1696,37 +1807,58 @@ private
     s
   end
   def interaction_pallette
-    pal = Hash.new(false)
+    pal = Pallette.new(false)
     pal['O'] = OpenTreasure.new("O")
     pal['T'] = Treasure.new("T")
     pal['1'] = Treasure.new("1")
     pal['2'] = Treasure.new("2")
     pal['3'] = Treasure.new("3")
 
-    pal['w'] = WarpPoint.new(1)
-    pal['W'] = WarpPoint.new(0)
+    pal['w'] = WarpPoint.new(1, 1020, 700)
+    pal['W'] = WarpPoint.new(0, 1200, 880)
 
     pal
   end
 
   def terrain_pallette
-    pal = Hash.new(true)
+    pal = Pallette.new(true)
     pal['T'] = false
     pal['.'] = false
     pal['e'] = true
     pal
   end
   
-
   def pallette
-    pal = Hash.new(tile(:blue))
-    
+    pal = SurfaceBackedPallette.new("scaled-background-20x20.png", 20, 20)
+    pal['G'] = [1,4]
+    pal['M'] = [0,2]
+    pal['g'] = [0,6]
+    pal['O'] = [1,3] #TODO this should not be open treasure
+    pal['T'] = [1,3] #TODO this should not be treasure
+    pal['w'] = [0,5] #TODO this should not be warp
+    pal['W'] = [0,5] #TODO this should not be warp
+    pal
+
+#    pal = SharedPallette.new("scaled-background-20x20.png", 20, 20)
+#    pal['O'] = SharedBlittable.new()
+#    pal['T'] = JsonLoadableSurface.new("treasure-on-grass-bg-160.png")
+#    pal['w'] = JsonLoadableSurface.new("water-bg-160.png")
+#    pal['W'] = JsonLoadableSurface.new("town-on-grass-bg-160.png")
+#    pal['M'] = JsonLoadableSurface.new("mountain-bg-160.png")
+#    pal['G'] = JsonLoadableSurface.new("grass-bg-160.png")
+#    pal['g'] = JsonLoadableSurface.new("real-grass-bg-160.png")
+#    pal
+  end
+
+  def pallette_160
+    pal = Pallette.new(tile(:blue))
     pal['O'] = JsonLoadableSurface.new("open-treasure-on-grass-bg-160.png")
     pal['T'] = JsonLoadableSurface.new("treasure-on-grass-bg-160.png")
     pal['w'] = JsonLoadableSurface.new("water-bg-160.png")
     pal['W'] = JsonLoadableSurface.new("town-on-grass-bg-160.png")
     pal['M'] = JsonLoadableSurface.new("mountain-bg-160.png")
     pal['G'] = JsonLoadableSurface.new("grass-bg-160.png")
+    pal['g'] = JsonLoadableSurface.new("real-grass-bg-160.png")
     pal
   end
 
