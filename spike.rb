@@ -1457,6 +1457,9 @@ class Pallette
   def []=(key,value)
     @pal[key] = value
   end
+
+
+
   def [](key)
     @pal[key]
   end
@@ -1474,18 +1477,54 @@ class SurfaceBackedPallette < Pallette
     @tile_x = x
     @tile_y = y
   end
+  def offsets(key)
+    @pal[key]
+  end
+
 
   def [](key)
-    offsets = super(key)
-    puts "hi: offsets are #{offsets} key is #{key}"
-    offset_x = offsets[0]
-    offset_y = offsets[1]
-    s = Surface.new([@tile_x, @tile_y])
+    offs = offsets(key)
+    puts "hi: offsets are #{offs} key is #{key}"
+    offset_x = offs[0]
+    offset_y = offs[1]
+    s = Surface.new([@tile_x,@tile_y])
     @surface.blit(s,[0,0], [offset_x * @tile_x, offset_y * @tile_y, @tile_x, @tile_y]  )
     s
   end
   
 end
+
+class ISBPEntry
+  attr_reader :offsets, :actionable
+  def initialize(offsets, actionable)
+    @offsets = offsets
+    @actionable = actionable
+  end
+end
+
+class ISBPResult
+  def initialize(surface, actionable)
+    @surface=  surface
+    @actionable = actionable
+  end
+
+  def activate(player, worldstate, tilex, tiley)
+    @actionable.activate(player, worldstate, tilex, tiley)
+  end
+end
+class InteractableSurfaceBackedPallette < SurfaceBackedPallette
+
+  def [](key)
+    entry = @pal[key]
+    return nil if entry.nil?
+    s = Surface.new([@tile_x,@tile_y])
+    puts "entry.offets are #{entry.offsets.join(',')}"
+    @surface.blit(s, [0,0], [entry.offsets[0] * @tile_x, entry.offsets[1] * @tile_y, @tile_x, @tile_y] )
+    ISBPResult.new(s, entry.actionable)
+  end
+
+end
+
 class Game
   include EventHandler::HasEventHandler
 
@@ -1807,15 +1846,15 @@ private
     s
   end
   def interaction_pallette
-    pal = Pallette.new(false)
-    pal['O'] = OpenTreasure.new("O")
-    pal['T'] = Treasure.new("T")
-    pal['1'] = Treasure.new("1")
-    pal['2'] = Treasure.new("2")
-    pal['3'] = Treasure.new("3")
+    pal = InteractableSurfaceBackedPallette.new("treasure-boxes.png", 32,32)
 
-    pal['w'] = WarpPoint.new(1, 1020, 700)
-    pal['W'] = WarpPoint.new(0, 1200, 880)
+    pal['O'] = ISBPEntry.new([3,7],OpenTreasure.new("O"))
+    pal['T'] = ISBPEntry.new([4,7],Treasure.new("T"))
+    pal['1'] = ISBPEntry.new([4,7],Treasure.new("1"))
+    pal['2'] = ISBPEntry.new([4,7],Treasure.new("2"))
+    pal['3'] = ISBPEntry.new([4,7],Treasure.new("3"))
+    pal['w'] = ISBPEntry.new([1,1],WarpPoint.new(1, 1020, 700))
+    pal['W'] = ISBPEntry.new([1,1],WarpPoint.new(0, 1200, 880))
 
     pal
   end
