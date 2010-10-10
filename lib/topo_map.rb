@@ -60,6 +60,30 @@ class TopoMap
     end
   end
 
+  def blit_foreground(palette, screen, px, py)
+    xoff = x_offset_for_world(px)
+    yoff = x_offset_for_world(py)
+    horizontal_tile_offset = ((screen.w/2)/@xsize).ceil
+    vertical_tile_offset = ((screen.h/2)/@ysize).ceil
+    startx = [0,xoff - horizontal_tile_offset].max
+    endx = [@x, xoff + horizontal_tile_offset].min
+
+    starty = [0,yoff - vertical_tile_offset].max
+    endy = [@y, yoff + vertical_tile_offset].min
+
+    starty.upto(endy) do |yi|
+      startx.upto(endx) do |xi|
+
+        datum = palette[data_at(xi,yi)]
+        unless datum.nil?
+
+          datum.blit(screen, px,py, xi, yi)
+        end
+      end
+    end
+    
+  end
+
   def blit_with_pallette(palette, target, wmx, wmy)
     vdata = viewport_data_for(x_offset_for_world(wmx), y_offset_for_world(wmy), 4,3)
 

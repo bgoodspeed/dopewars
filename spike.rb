@@ -105,7 +105,9 @@ class WorldState
     
     reblit_background
   end
-
+  def blit_foreground(screen, px, py)
+    @interaction_interpreter.blit_foreground(screen,px, py)
+  end
 
   def update_interaction_map(x,y, value)
     @interaction_interpreter.update(x,y,value)
@@ -1125,6 +1127,13 @@ class ReloaderHelper
   end
 end
 
+module ScreenOffsetHelper
+  def offset_from_screen(location, viewer_position, screen_extent)
+    location - viewer_position + screen_extent
+  end
+
+end
+
 class LoadAction < SaveLoadAction
   def activate(menu_idx, game, submenu_idx)
 
@@ -1136,7 +1145,7 @@ class LoadAction < SaveLoadAction
   end
 end
 class Monster
-
+  include ScreenOffsetHelper
   include Sprites::Sprite
   include EventHandler::HasEventHandler
   def px
@@ -1178,8 +1187,8 @@ class Monster
   end
 
   def draw(surface,x,y,sx,sy)
-    tx = @animated_sprite_helper.px - x + sx/2
-    ty = @animated_sprite_helper.py - y + sy/2
+    tx = offset_from_screen(@animated_sprite_helper.px, x, sx/2)
+    ty = offset_from_screen(@animated_sprite_helper.py, y, sy/2)
     @animated_sprite_helper.image.blit surface, [tx,ty,96,128]
   end
 
@@ -1397,7 +1406,9 @@ class InterpretedMap
     @topo_map = topo_map
     @pallette = pallette
   end
-
+  def blit_foreground(screen,px, py)
+    @topo_map.blit_foreground(@pallette, screen,px, py)
+  end
   def blit_to(surface)
     @topo_map.blit_to(@pallette, surface)
   end
@@ -1471,6 +1482,8 @@ class Pallette
 end
 
 class SurfaceBackedPallette < Pallette
+
+  attr_reader :tile_x, :tile_y
   def initialize(filename, x, y)
     super(nil)
     @surface = Surface.load(filename)
@@ -1503,13 +1516,27 @@ class ISBPEntry
 end
 
 class ISBPResult
-  def initialize(surface, actionable)
-    @surface=  surface
+  include ScreenOffsetHelper
+  def initialize(sdl_surface, actionable, wrapped_surface)
+    @surface=  sdl_surface
     @actionable = actionable
+    @wrapped_surface = wrapped_surface
   end
 
   def activate(player, worldstate, tilex, tiley)
     @actionable.activate(player, worldstate, tilex, tiley)
+  end
+
+  def screen_position_relative_to(px,py,xi,yi,sextx,sexty)
+    tx = @wrapped_surface.tile_x
+    ty = @wrapped_surface.tile_y
+    xoff = offset_from_screen(xi*tx, px, sextx)
+    yoff = offset_from_screen(yi*ty, py, sexty)
+    [xoff,yoff]
+  end
+
+  def blit(screen, px,py,xi, yi)
+    @surface.blit(screen, screen_position_relative_to(px,py,xi,yi, screen.w/2, screen.h/2))
   end
 end
 class InteractableSurfaceBackedPallette < SurfaceBackedPallette
@@ -1518,9 +1545,8 @@ class InteractableSurfaceBackedPallette < SurfaceBackedPallette
     entry = @pal[key]
     return nil if entry.nil?
     s = Surface.new([@tile_x,@tile_y])
-    puts "entry.offets are #{entry.offsets.join(',')}"
     @surface.blit(s, [0,0], [entry.offsets[0] * @tile_x, entry.offsets[1] * @tile_y, @tile_x, @tile_y] )
-    ISBPResult.new(s, entry.actionable)
+    ISBPResult.new(s, entry.actionable, self)
   end
 
 end
@@ -1799,7 +1825,11 @@ private
     
     @sx = 640
     @sy = 480
-    @universe.current_world.background_surface.blit(@screen, [0,0], [ @player.px - (@sx/2), @player.py - (@sy/2), @sx, @sy])
+    screen_left = @player.px - (@sx/2)
+    screen_top = @player.py - (@sy/2)
+    @universe.current_world.background_surface.blit(@screen, [0,0], [ screen_left,screen_top, @sx, @sy])
+
+    @universe.current_world.blit_foreground(@screen, @player.px, @player.py)
 
     @universe.current_world.npcs.each {|npc|
 
