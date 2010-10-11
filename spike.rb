@@ -92,13 +92,12 @@ end
 
 
 class WorldState
-  attr_reader :topo_interpreter, :terrain_interpreter,:interaction_interpreter,
+  attr_reader :topo_interpreter, :interaction_interpreter,
             :npcs, :background_surface
             
-  def initialize(topointerp, terrinterp, interinterp, npcs, bgsurface)
+  def initialize(topointerp, interinterp, npcs, bgsurface)
 
     @topo_interpreter = topointerp
-    @terrain_interpreter = terrinterp
     @interaction_interpreter = interinterp
     @npcs = npcs
     @background_surface = bgsurface
@@ -109,16 +108,22 @@ class WorldState
     @interaction_interpreter.blit_foreground(screen,px, py)
   end
 
+  def can_walk_on_background_at?(xi, yi)
+    @topo_interpreter.can_walk_at?(xi,yi)
+  end
+
   def update_interaction_map(x,y, value)
     @interaction_interpreter.update(x,y,value)
   end
   def update_topo_map(x,y,value)
     @topo_interpreter.update(x,y,value)
   end
-  def terrain_pallette
-    @terrain_interpreter.pallette
+  def x_offset_for_interaction(x)
+    @interaction_interpreter.x_offset_for_world(x)
   end
-
+  def y_offset_for_interaction(y)
+    @interaction_interpreter.y_offset_for_world(y)
+  end
   def x_offset_for_world(x)
     @topo_interpreter.x_offset_for_world(x)
   end
@@ -222,8 +227,8 @@ class InteractionHelper
     end
 
     puts "you are facing #{@facing}"
-    tilex = @universe.current_world.x_offset_for_world(px)
-    tiley = @universe.current_world.y_offset_for_world(py)
+    tilex = @universe.current_world.x_offset_for_interaction(px)
+    tiley = @universe.current_world.y_offset_for_interaction(py)
     this_tile_interacts = @universe.current_world.interaction_interpreter.interpret(tilex, tiley)
     facing_tile_interacts = false
 
@@ -272,6 +277,17 @@ class InteractionHelper
 
   end
 end
+
+class TileCoordinateSet
+  attr_reader :minx, :maxx, :miny, :maxy
+  def initialize(minx, maxx, miny, maxy)
+    @minx = minx
+    @maxx = maxx
+    @miny = miny
+    @maxy = maxy
+  end
+end
+
 class CoordinateHelper
   attr_accessor :px, :py
 
@@ -287,11 +303,23 @@ class CoordinateHelper
     @slowdown = 800.0 # Deceleration when not accelerating
   end
 
+  def world_coords
+    TileCoordinateSet.new( @universe.current_world.x_offset_for_world(@px - x_ext),
+                                          @universe.current_world.x_offset_for_world(@px + x_ext),
+                                          @universe.current_world.y_offset_for_world(@py - y_ext),
+                                          @universe.current_world.y_offset_for_world(@py + y_ext) )
+  end
+
+  def interact_coords
+    TileCoordinateSet.new( @universe.current_world.x_offset_for_interaction(@px - x_ext),
+                                          @universe.current_world.x_offset_for_interaction(@px + x_ext),
+                                          @universe.current_world.y_offset_for_interaction(@py - y_ext),
+                                          @universe.current_world.y_offset_for_interaction(@py + y_ext) )
+  end
+
   def update_tile_coords
-    @mintilex = @universe.current_world.x_offset_for_world(@px - x_ext)
-    @maxtilex = @universe.current_world.x_offset_for_world(@px + x_ext)
-    @mintiley = @universe.current_world.y_offset_for_world(@py - y_ext)
-    @maxtiley = @universe.current_world.y_offset_for_world(@py + y_ext)
+    @bg_tile_coords = world_coords
+    @interaction_tile_coords = interact_coords
   end
   def x_ext
     @hero_x_dim/2
@@ -367,40 +395,65 @@ class CoordinateHelper
     @py = @@BGY - y_ext if maxy > @@BGY
   end
 
-  def check_corners(tp, x1, y1, x2, y2)
-      c1 = tp.data_at(x1,y1)
-      c2 = tp.data_at(x2,y2)
+  def check_corners(interp, x1, y1, x2, y2)
+      #c1 = tp.   data_at(x1,y1)
+      c1 = interp.can_walk_at?(x1,y1)
+      c2 = interp.can_walk_at?(x2,y2)
 
-      unless tp[c2] and tp[c1]
+      unless c1 and c2
         return true
       end
       false
   end
 
 
-  def clamp_to_tile_restrictions_on_y(tp, new_mintilex, new_mintiley, new_maxtilex, new_maxtiley)
+  def clamp_to_tile_restrictions_on_y(interp, new_bg_tile_coords)
     rv = false
 
-    if new_mintiley != @mintiley
-      rv = true if check_corners(tp, new_maxtilex, new_mintiley, new_mintilex, new_mintiley)
+    if new_bg_tile_coords.miny != @bg_tile_coords.miny
+      rv = true if check_corners(interp, new_bg_tile_coords.maxx, new_bg_tile_coords.miny, new_bg_tile_coords.minx, new_bg_tile_coords.miny)
     end
-    if new_maxtiley != @maxtiley
-      rv = true if check_corners(tp, new_maxtilex, new_maxtiley, new_mintilex, new_maxtiley)
+    if new_bg_tile_coords.maxy != @bg_tile_coords.maxy
+      rv = true if check_corners(interp, new_bg_tile_coords.maxx, new_bg_tile_coords.maxy, new_bg_tile_coords.minx, new_bg_tile_coords.maxy)
     end
     rv
   end
-  def clamp_to_tile_restrictions_on_x(tp, new_mintilex, new_mintiley, new_maxtilex, new_maxtiley)
+  def clamp_to_tile_restrictions_on_x(interp, new_bg_tile_coords)
     rv = false
     
-    if new_mintilex != @mintilex
-      rv = true if check_corners(tp, new_mintilex, new_mintiley, new_mintilex, new_maxtiley)
+    if new_bg_tile_coords.minx != @bg_tile_coords.minx
+      rv = true if check_corners(interp, new_bg_tile_coords.minx, new_bg_tile_coords.miny, new_bg_tile_coords.minx, new_bg_tile_coords.maxy)
     end
 
-    if new_maxtilex != @maxtilex
-      rv = true if check_corners(tp, new_maxtilex, new_mintiley, new_maxtilex, new_maxtiley)
+    if new_bg_tile_coords.maxx != @bg_tile_coords.maxx
+      rv = true if check_corners(interp, new_bg_tile_coords.maxx, new_bg_tile_coords.miny, new_bg_tile_coords.maxx, new_bg_tile_coords.maxy)
     end
 
     rv
+  end
+
+
+  def blocking(col)
+    col.select do |npc|
+      npc.is_blocking?
+    end
+  end
+
+  def x_hits(npcs)
+    npcs.select do |npc|
+      npc.collides_on_x?(@px - x_ext) or npc.collides_on_x?(@px + x_ext)
+    end
+  end
+  def y_hits(npcs)
+    npcs.select do |npc|
+      npc.collides_on_y?(@py - y_ext) or npc.collides_on_y?(@py + y_ext)
+    end
+  end
+  def hit_blocking_npcs_on_x(npcs)
+    blocking(y_hits(x_hits(npcs)))
+  end
+  def hit_blocking_npcs_on_y(npcs)
+    blocking(y_hits(x_hits(npcs)))
   end
 
   
@@ -408,19 +461,25 @@ class CoordinateHelper
   def update_pos( dt )
     dx = @vx * dt
     dy = @vy * dt
-    @px += dx
-    @py += dy
 
+    @px += dx
+    x_collisions = hit_blocking_npcs_on_x(@universe.current_world.npcs)
+
+    @py += dy
+    y_collisions = hit_blocking_npcs_on_x(@universe.current_world.npcs) - x_collisions
     clamp_to_world_dimensions
 
-    tp = @universe.current_world.terrain_interpreter
-    new_mintilex = @universe.current_world.x_offset_for_world(@px - x_ext)
-    new_maxtilex = @universe.current_world.x_offset_for_world(@px + x_ext)
-    new_mintiley = @universe.current_world.y_offset_for_world(@py - y_ext)
-    new_maxtiley = @universe.current_world.y_offset_for_world(@py + y_ext)
+    topo = @universe.current_world.topo_interpreter
+    interact = @universe.current_world.interaction_interpreter
+    new_bg_tile_coords = world_coords
+    new_interaction_tile_coords = interact_coords
 
-    @px -= dx if clamp_to_tile_restrictions_on_x(tp, new_mintilex, new_mintiley, new_maxtilex, new_maxtiley)
-    @py -= dy if clamp_to_tile_restrictions_on_y(tp, new_mintilex, new_mintiley, new_maxtilex, new_maxtiley)
+    @px -= dx if clamp_to_tile_restrictions_on_x(topo, new_bg_tile_coords) or clamp_to_tile_restrictions_on_x(interact, new_interaction_tile_coords) or !x_collisions.empty?
+    @py -= dy if clamp_to_tile_restrictions_on_y(topo, new_bg_tile_coords) or clamp_to_tile_restrictions_on_y(interact, new_interaction_tile_coords) or !y_collisions.empty?
+
+    cols = y_hits(x_hits(@universe.current_world.npcs))
+
+    puts "Detected #{cols.size} colisions with npcs" unless cols.empty? #TODO automatic fights would go here
 
     update_tile_coords
 
@@ -465,6 +524,12 @@ class AnimatedSpriteHelper
     @all_char_postures.blit(@image, [0,0], Rect.new(animation_frame * @avatar_x_dim, @last_direction_offset,@avatar_x_dim, @avatar_y_dim))
   end
 
+  def collides_on_x?(x)
+    (@px - x).abs < @avatar_x_dim/2
+  end
+  def collides_on_y?(y)
+    (@py - y).abs < @avatar_y_dim/2
+  end
 
 end
 class TextRenderingHelper
@@ -742,18 +807,15 @@ end
 
 class Treasure
   attr_accessor :name
+  def is_blocking?
+    true
+  end
   def initialize(name)
     @name = name
   end
 
   def activate(player, worldstate, tilex, tiley)
     worldstate.update_interaction_map(tilex, tiley, @@OPEN_TREASURE)
-    #XXX this is not graceful, don't have to reblit the whole thing
-
-    worldstate.update_topo_map(tilex, tiley, @@OPEN_TREASURE)
-    worldstate.reblit_background
-    
-    puts "also, give it to the player"
     player.add_inventory(1, @name)
   end
 
@@ -777,6 +839,11 @@ end
 
 class WarpPoint
   attr_accessor :destination
+
+  def is_blocking?
+    false
+  end
+
   def initialize(dest_index, dest_x=nil, dest_y=nil)
     @destination = dest_index
     @destination_x = dest_x
@@ -1181,6 +1248,9 @@ class Monster
   end
 
 
+  def is_blocking?
+    false
+  end
 
   def take_damage(damage)
     @hp -= damage
@@ -1217,6 +1287,14 @@ class Monster
     universe.battle_layer.start_battle(game, universe, player, self)
   end
 
+
+  def collides_on_x?(x)
+    @animated_sprite_helper.collides_on_x?(x)
+  end
+  def collides_on_y?(y)
+    @animated_sprite_helper.collides_on_y?(y)
+  end
+
   def to_json(*a)
     params = [ @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @hp, @experience]
     {
@@ -1233,6 +1311,11 @@ class Monster
 
 end
 class TalkingNPC < Monster
+  def is_blocking?
+    true
+  end
+
+
   def initialize(text, filename, px, py, npc_x, npc_y, inv=nil, hp=0, exp=0)
     super(filename, px, py, npc_x, npc_y, inv, hp, exp)
     @text = text
@@ -1359,9 +1442,14 @@ class JsonSurface < Surface
 end
 
 class JsonLoadableSurface 
-  def initialize(filename)
+  def initialize(filename, blocking)
     @filename = filename
+    @blocking = blocking
     @surface = Surface.load(filename)
+  end
+
+  def is_blocking?
+    @blocking
   end
 
   def blit(layer, offset)
@@ -1447,15 +1535,22 @@ class InterpretedMap
   def update(x,y,value)
     @topo_map.update(x,y,value)
   end
+
+  def can_walk_at?(xi,yi)
+    d = @topo_map.data_at(xi,yi)
+    tile = self[d]
+    return true if tile.nil?
+
+    !tile.is_blocking?
+  end
 end
 
 class WorldStateFactory
-  def self.build_world_state(bg_file, ter_file, int_file, pallette, terrain_pallette, interaction_pallette, bgx, bgy, npcs)
+  def self.build_world_state(bg_file, int_file, pallette, interaction_pallette, bgx, bgy, npcs)
     bgsurface = JsonSurface.new([bgx,bgy])
     bg = InterpretedMap.new(TopoMapFactory.build_map(bg_file, bgx, bgy), pallette)
     inter = InterpretedMap.new(TopoMapFactory.build_map(int_file, bgx, bgy), interaction_pallette)
-    terr = InterpretedMap.new(TopoMapFactory.build_map(ter_file, bgx, bgy), terrain_pallette)
-    WorldState.new(bg, terr, inter, npcs, bgsurface)
+    WorldState.new(bg, inter, npcs, bgsurface)
   end
 end
 
@@ -1496,13 +1591,12 @@ class SurfaceBackedPallette < Pallette
 
 
   def [](key)
-    offs = offsets(key)
-    puts "hi: offsets are #{offs} key is #{key}"
-    offset_x = offs[0]
-    offset_y = offs[1]
+    entry = @pal[key]
+    offset_x = entry.offsets[0]
+    offset_y = entry.offsets[1]
     s = Surface.new([@tile_x,@tile_y])
     @surface.blit(s,[0,0], [offset_x * @tile_x, offset_y * @tile_y, @tile_x, @tile_y]  )
-    s
+    SBPResult.new(s, entry.actionable, self)
   end
   
 end
@@ -1515,6 +1609,10 @@ class ISBPEntry
   end
 end
 
+
+class SBPEntry < ISBPEntry
+  alias_method :walkable, :actionable
+end
 class ISBPResult
   include ScreenOffsetHelper
   def initialize(sdl_surface, actionable, wrapped_surface)
@@ -1538,7 +1636,23 @@ class ISBPResult
   def blit(screen, px,py,xi, yi)
     @surface.blit(screen, screen_position_relative_to(px,py,xi,yi, screen.w/2, screen.h/2))
   end
+
+  def is_blocking?
+    @actionable.is_blocking?
+  end
 end
+
+class SBPResult < ISBPResult
+  def blit(screen, offsets)
+    @surface.blit(screen, offsets)
+  end
+
+  def is_blocking?
+    @actionable
+  end
+
+end
+
 class InteractableSurfaceBackedPallette < SurfaceBackedPallette
 
   def [](key)
@@ -1589,10 +1703,10 @@ class Game
     monster_inv.add_item(1, "potion")
     @npcs = [TalkingNPC.new("i am an npc", "gogo-npc.png", 600, 200,48,64), Monster.new("monster.png", 400,660, @@MONSTER_X, @@MONSTER_Y, monster_inv)]
 
-    @worldstate = WorldStateFactory.build_world_state("world1_bg","world1_terrain","world1_interaction", pallette, terrain_pallette, interaction_pallette, @@BGX, @@BGY, @npcs)
+    @worldstate = WorldStateFactory.build_world_state("world1_bg","world1_interaction", pallette, interaction_pallette, @@BGX, @@BGY, @npcs)
   end
   def make_world2
-    @worldstate2 = WorldStateFactory.build_world_state("world2_bg","world2_terrain","world2_interaction", pallette_160, terrain_pallette, interaction_pallette, @@BGX, @@BGY, [])
+    @worldstate2 = WorldStateFactory.build_world_state("world2_bg","world2_interaction", pallette_160,  interaction_pallette_160, @@BGX, @@BGY, [])
   end
 
   # The "main loop". Repeat the #step method
@@ -1878,56 +1992,54 @@ private
   def interaction_pallette
     pal = InteractableSurfaceBackedPallette.new("treasure-boxes.png", 32,32)
 
-    pal['O'] = ISBPEntry.new([3,7],OpenTreasure.new("O"))
-    pal['T'] = ISBPEntry.new([4,7],Treasure.new("T"))
-    pal['1'] = ISBPEntry.new([4,7],Treasure.new("1"))
-    pal['2'] = ISBPEntry.new([4,7],Treasure.new("2"))
-    pal['3'] = ISBPEntry.new([4,7],Treasure.new("3"))
+    pal['O'] = ISBPEntry.new([4,7],OpenTreasure.new("O"))
+    pal['T'] = ISBPEntry.new([4,4],Treasure.new("T"))
+    pal['1'] = ISBPEntry.new([4,4],Treasure.new("1"))
+    pal['2'] = ISBPEntry.new([4,4],Treasure.new("2"))
+    pal['3'] = ISBPEntry.new([4,4],Treasure.new("3"))
     pal['w'] = ISBPEntry.new([1,1],WarpPoint.new(1, 1020, 700))
     pal['W'] = ISBPEntry.new([1,1],WarpPoint.new(0, 1200, 880))
 
     pal
   end
 
-  def terrain_pallette
-    pal = Pallette.new(true)
-    pal['T'] = false
-    pal['.'] = false
-    pal['e'] = true
+  def interaction_pallette_160
+    pal = InteractableSurfaceBackedPallette.new("treasure-boxes-160.png", 160,160)
+
+    pal['O'] = ISBPEntry.new([4,7],OpenTreasure.new("O"))
+    pal['T'] = ISBPEntry.new([4,4],Treasure.new("T"))
+    pal['1'] = ISBPEntry.new([4,4],Treasure.new("1"))
+    pal['2'] = ISBPEntry.new([4,4],Treasure.new("2"))
+    pal['3'] = ISBPEntry.new([4,4],Treasure.new("3"))
+    pal['w'] = ISBPEntry.new([1,1],WarpPoint.new(1, 1020, 700))
+    pal['W'] = ISBPEntry.new([1,1],WarpPoint.new(0, 1200, 880))
+
     pal
+
   end
   
   def pallette
     pal = SurfaceBackedPallette.new("scaled-background-20x20.png", 20, 20)
-    pal['G'] = [1,4]
-    pal['M'] = [0,2]
-    pal['g'] = [0,6]
-    pal['O'] = [1,3] #TODO this should not be open treasure
-    pal['T'] = [1,3] #TODO this should not be treasure
-    pal['w'] = [0,5] #TODO this should not be warp
-    pal['W'] = [0,5] #TODO this should not be warp
+    pal['G'] = SBPEntry.new([1,4], false)
+    pal['M'] = SBPEntry.new([0,2], true)
+    pal['g'] = SBPEntry.new([0,6], false)
+    pal['O'] = SBPEntry.new([1,3], true) #TODO this should not be open treasure
+    pal['T'] = SBPEntry.new([1,3], true) #TODO this should not be treasure
+    pal['w'] = SBPEntry.new([0,5], false) #TODO this should not be warp
+    pal['W'] = SBPEntry.new([0,5], false) #TODO this should not be warp
     pal
 
-#    pal = SharedPallette.new("scaled-background-20x20.png", 20, 20)
-#    pal['O'] = SharedBlittable.new()
-#    pal['T'] = JsonLoadableSurface.new("treasure-on-grass-bg-160.png")
-#    pal['w'] = JsonLoadableSurface.new("water-bg-160.png")
-#    pal['W'] = JsonLoadableSurface.new("town-on-grass-bg-160.png")
-#    pal['M'] = JsonLoadableSurface.new("mountain-bg-160.png")
-#    pal['G'] = JsonLoadableSurface.new("grass-bg-160.png")
-#    pal['g'] = JsonLoadableSurface.new("real-grass-bg-160.png")
-#    pal
   end
 
   def pallette_160
     pal = Pallette.new(tile(:blue))
-    pal['O'] = JsonLoadableSurface.new("open-treasure-on-grass-bg-160.png")
-    pal['T'] = JsonLoadableSurface.new("treasure-on-grass-bg-160.png")
-    pal['w'] = JsonLoadableSurface.new("water-bg-160.png")
-    pal['W'] = JsonLoadableSurface.new("town-on-grass-bg-160.png")
-    pal['M'] = JsonLoadableSurface.new("mountain-bg-160.png")
-    pal['G'] = JsonLoadableSurface.new("grass-bg-160.png")
-    pal['g'] = JsonLoadableSurface.new("real-grass-bg-160.png")
+    pal['O'] = JsonLoadableSurface.new("open-treasure-on-grass-bg-160.png", true)
+    pal['T'] = JsonLoadableSurface.new("treasure-on-grass-bg-160.png", true)
+    pal['w'] = JsonLoadableSurface.new("water-bg-160.png", true)
+    pal['W'] = JsonLoadableSurface.new("town-on-grass-bg-160.png", false)
+    pal['M'] = JsonLoadableSurface.new("mountain-bg-160.png", true)
+    pal['G'] = JsonLoadableSurface.new("grass-bg-160.png", false)
+    pal['g'] = JsonLoadableSurface.new("real-grass-bg-160.png", false)
     pal
   end
 
