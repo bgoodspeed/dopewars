@@ -14,6 +14,8 @@ require 'lib/hud'
 require 'lib/inventory'
 require 'lib/hero'
 
+require 'forwardable'
+
 # Include these modules so we can type "Surface" instead of
 # "Rubygame::Surface", etc. Purely for convenience/readability.
 
@@ -97,7 +99,7 @@ class Universe
     }.to_json(*a)
   end
   def self.json_create(o)
-    puts "creating #{o['json_class']}" ; new(*o['data'])
+    new(*o['data'])
   end
 
 end
@@ -135,18 +137,12 @@ class WorldState
   def update_topo_map(x,y,value)
     @topo_interpreter.update(x,y,value)
   end
-  def x_offset_for_interaction(x)
-    @interaction_interpreter.x_offset_for_world(x)
-  end
-  def y_offset_for_interaction(y)
-    @interaction_interpreter.y_offset_for_world(y)
-  end
-  def x_offset_for_world(x)
-    @topo_interpreter.x_offset_for_world(x)
-  end
-  def y_offset_for_world(y)
-    @topo_interpreter.y_offset_for_world(y)
-  end
+
+  extend Forwardable
+  def_delegator :@topo_interpreter, :update, :update_topo_map
+  def_delegator :@interaction_interpreter, :x_offset_for_world, :x_offset_for_interaction
+  def_delegator :@interaction_interpreter, :y_offset_for_world, :y_offset_for_interaction
+  def_delegators :@topo_interpreter, :x_offset_for_world, :y_offset_for_world
 
   def reblit_background
     @topo_interpreter.blit_to(@background_surface)
@@ -168,7 +164,7 @@ class WorldState
     }.to_json(*a)
   end
   def self.json_create(o)
-    puts "creating #{o['json_class']}" ; new(*o['data'])
+    new(*o['data'])
   end
 
 
@@ -689,7 +685,7 @@ class Party
     }.to_json(*a)
   end
   def self.json_create(o)
-    puts "creating #{o['json_class']}" ; new(*o['data'])
+    new(*o['data'])
   end
 
 
@@ -709,7 +705,7 @@ class Player
     }.to_json(*a)
   end
   def self.json_create(o)
-    puts "creating #{o['json_class']}" ; new(*o['data'])
+    new(*o['data'])
   end
 
   def image
@@ -850,7 +846,7 @@ class Treasure
   end
 
   def self.json_create(o)
-    puts "creating #{o['json_class']}" ; new(*o['data'])
+    new(*o['data'])
   end
 
 end
@@ -888,7 +884,7 @@ class WarpPoint
     }.to_json(*a)
   end
   def self.json_create(o)
-    puts "creating #{o['json_class']}" ; new(*o['data'])
+    new(*o['data'])
   end
 
 
@@ -1334,7 +1330,7 @@ class Monster
   end
 
   def self.json_create(o)
-    puts "creating #{o['json_class']}" ; new(*o['data'])
+    new(*o['data'])
   end
 
 
@@ -1365,7 +1361,7 @@ class TalkingNPC < Monster
   end
 
   def self.json_create(o)
-    puts "creating #{o['json_class']}" ; new(*o['data'])
+    new(*o['data'])
   end
 
 end
@@ -1466,7 +1462,7 @@ class JsonSurface < Surface
 #  end
 #
 #  def self.json_create(o)
-#    puts "creating #{o['json_class']}" ; new(*o['data'])
+#    new(*o['data'])
 #  end
 
 end
@@ -1494,7 +1490,7 @@ class JsonLoadableSurface
 #  end
 #
 #  def self.json_create(o)
-#    puts "creating #{o['json_class']}" ; new(*o['data'])
+#    new(*o['data'])
 #  end
 
 end
@@ -1585,7 +1581,7 @@ class InterpretedMap
     }.to_json(*a)
   end
   def self.json_create(o)
-    puts "creating #{o['json_class']}" ; new(*o['data'])
+    new(*o['data'])
   end
 end
 
