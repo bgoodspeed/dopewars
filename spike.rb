@@ -76,6 +76,18 @@ class Universe
   def reblit_backgrounds
     @worlds.each {|world| world.reblit_background}
   end
+  def replace_world_pallettes(orig_uni)
+    @worlds.each_with_index {|world, index|
+      orig_world = orig_uni.world_by_index(index)
+      world.replace_pallettes(orig_world)
+    }
+  end
+  def replace_world_bgsurfaces(orig_uni)
+    @worlds.each_with_index {|world, index|
+      orig_world = orig_uni.world_by_index(index)
+      world.replace_bgsurface(orig_world)
+    }
+  end
 
 
   def to_json(*a)
@@ -85,7 +97,7 @@ class Universe
     }.to_json(*a)
   end
   def self.json_create(o)
-    new(*o['data'])
+    puts "creating #{o['json_class']}" ; new(*o['data'])
   end
 
 end
@@ -102,10 +114,15 @@ class WorldState
     @npcs = npcs
     @background_surface = bgsurface
     
-    reblit_background
+    reblit_background unless bgsurface.nil?
   end
   def blit_foreground(screen, px, py)
     @interaction_interpreter.blit_foreground(screen,px, py)
+  end
+
+  def replace_pallettes(orig_world)
+    @topo_interpreter = orig_world.topo_interpreter
+    @interaction_interpreter.replace_pallette(orig_world.interaction_interpreter)
   end
 
   def can_walk_on_background_at?(xi, yi)
@@ -140,15 +157,18 @@ class WorldState
     @npcs -= [monster]
   end
 
+  def replace_bgsurface(orig_world)
+    @background_surface = orig_world.background_surface
+  end
+
   def to_json(*a)
     {
       'json_class' => self.class.name,
-      'data' => [ @topo_interpreter, @terrain_interpreter, @interaction_interpreter,
-         @npcs, @background_surface] #TODO reconsider terrain/etc loading
+      'data' => [ nil, @interaction_interpreter, @npcs, nil]
     }.to_json(*a)
   end
   def self.json_create(o)
-    new(*o['data'])
+    puts "creating #{o['json_class']}" ; new(*o['data'])
   end
 
 
@@ -669,7 +689,7 @@ class Party
     }.to_json(*a)
   end
   def self.json_create(o)
-    new(*o['data'])
+    puts "creating #{o['json_class']}" ; new(*o['data'])
   end
 
 
@@ -689,7 +709,7 @@ class Player
     }.to_json(*a)
   end
   def self.json_create(o)
-    new(*o['data'])
+    puts "creating #{o['json_class']}" ; new(*o['data'])
   end
 
   def image
@@ -736,7 +756,7 @@ class Player
     @keys = KeyHolder.new
     @coordinate_helper = CoordinateHelper.new(px, py, @keys, @universe, @hero_x_dim, @hero_y_dim)
     @animation_helper = AnimationHelper.new(@keys)
-    @coordinate_helper.update_tile_coords
+    
     @animated_sprite_helper = AnimatedSpriteHelper.new(filename, sx, sy, @hero_x_dim, @hero_y_dim)
     @party = party
 
@@ -747,6 +767,9 @@ class Player
     )
   end
 
+  def update_tile_coords
+    @coordinate_helper.update_tile_coords
+  end
 
   def interact_with_facing(game)
     @interaction_helper.interact_with_facing( game, @coordinate_helper.px , @coordinate_helper.py)
@@ -827,7 +850,7 @@ class Treasure
   end
 
   def self.json_create(o)
-    new(*o['data'])
+    puts "creating #{o['json_class']}" ; new(*o['data'])
   end
 
 end
@@ -865,7 +888,7 @@ class WarpPoint
     }.to_json(*a)
   end
   def self.json_create(o)
-    new(*o['data'])
+    puts "creating #{o['json_class']}" ; new(*o['data'])
   end
 
 
@@ -1182,15 +1205,21 @@ class ReloaderHelper
     universe = Universe.new(uni.current_world_idx, uni.worlds, orig_uni.dialog_layer, orig_uni.menu_layer, orig_uni.battle_layer )
 
     puts "universe has current world: #{universe.current_world_idx}"
+    universe.replace_world_pallettes(orig_uni)
+    universe.replace_world_bgsurfaces(orig_uni)
+    
     universe.reblit_backgrounds
+    puts "backgrounds rebuilt"
     player = Player.new(json_player.px, json_player.py,  universe, json_player.party, json_player.filename, json_player.hero_x_dim, json_player.hero_y_dim, game.screen.w/2, game.screen.h/2)
-
+#TODO update tile coords for player
     game.universe = universe
     game.player = player
+    game.update_player_tile_coords
     game.remove_all_hooks
     game.make_event_hooks
     game.universe.menu_layer.toggle_activity
     game.make_hud
+    puts "reloading should be done"
   end
 end
 
@@ -1206,6 +1235,7 @@ class LoadAction < SaveLoadAction
 
     puts "load from #{save_slot(submenu_idx)}"
     data = IO.readlines(save_slot(submenu_idx))
+
     rebuilt = JSON.parse(data.join(" "))
     puts "got rebuilt: #{rebuilt.class} "
     ReloaderHelper.new.replace(game, rebuilt)
@@ -1304,7 +1334,7 @@ class Monster
   end
 
   def self.json_create(o)
-    new(*o['data'])
+    puts "creating #{o['json_class']}" ; new(*o['data'])
   end
 
 
@@ -1335,7 +1365,7 @@ class TalkingNPC < Monster
   end
 
   def self.json_create(o)
-    new(*o['data'])
+    puts "creating #{o['json_class']}" ; new(*o['data'])
   end
 
 end
@@ -1428,16 +1458,16 @@ class JsonSurface < Surface
   end
 
 
-  def to_json(*a)
-    {
-      'json_class' => self.class.name,
-      'data' => [ @size] #TODO reconsider terrain/etc loading
-    }.to_json(*a)
-  end
-
-  def self.json_create(o)
-    new(*o['data'])
-  end
+#  def to_json(*a)
+#    {
+#      'json_class' => self.class.name,
+#      'data' => [ @size] #TODO reconsider terrain/etc loading
+#    }.to_json(*a)
+#  end
+#
+#  def self.json_create(o)
+#    puts "creating #{o['json_class']}" ; new(*o['data'])
+#  end
 
 end
 
@@ -1456,16 +1486,16 @@ class JsonLoadableSurface
     @surface.blit(layer, offset)
   end
 
-  def to_json(*a)
-    {
-      'json_class' => self.class.name,
-      'data' => [ @filename] #TODO reconsider terrain/etc loading
-    }.to_json(*a)
-  end
-
-  def self.json_create(o)
-    new(*o['data'])
-  end
+#  def to_json(*a)
+#    {
+#      'json_class' => self.class.name,
+#      'data' => [ @filename] #TODO reconsider terrain/etc loading
+#    }.to_json(*a)
+#  end
+#
+#  def self.json_create(o)
+#    puts "creating #{o['json_class']}" ; new(*o['data'])
+#  end
 
 end
 
@@ -1543,6 +1573,20 @@ class InterpretedMap
 
     !tile.is_blocking?
   end
+
+  def replace_pallette(orig_interpreter)
+    @pallette = orig_interpreter.pallette
+  end
+
+  def to_json(*a)
+    {
+      'json_class' => self.class.name,
+      'data' => [ @topo_map, nil]
+    }.to_json(*a)
+  end
+  def self.json_create(o)
+    puts "creating #{o['json_class']}" ; new(*o['data'])
+  end
 end
 
 class WorldStateFactory
@@ -1555,10 +1599,17 @@ class WorldStateFactory
 end
 
 class Pallette
-  def initialize(default_value)
-    @pal = Hash.new(default_value)
+  def initialize(default_value, updated=nil)
+    @default_value = default_value
+    if updated.nil?
+      @pal = Hash.new(default_value)
+    else
+      @pal = updated
+    end
     
   end
+
+
 
   def []=(key,value)
     @pal[key] = value
@@ -1574,13 +1625,14 @@ class Pallette
     datum.blit(target, [xi*xsize, yi * ysize])
   end
 
+
 end
 
 class SurfaceBackedPallette < Pallette
 
   attr_reader :tile_x, :tile_y
-  def initialize(filename, x, y)
-    super(nil)
+  def initialize(filename, x, y, pal=nil)
+    super(nil,pal)
     @surface = Surface.load(filename)
     @tile_x = x
     @tile_y = y
@@ -1598,7 +1650,6 @@ class SurfaceBackedPallette < Pallette
     @surface.blit(s,[0,0], [offset_x * @tile_x, offset_y * @tile_y, @tile_x, @tile_y]  )
     SBPResult.new(s, entry.actionable, self)
   end
-  
 end
 
 class ISBPEntry
@@ -1607,6 +1658,7 @@ class ISBPEntry
     @offsets = offsets
     @actionable = actionable
   end
+
 end
 
 
@@ -1662,7 +1714,6 @@ class InteractableSurfaceBackedPallette < SurfaceBackedPallette
     @surface.blit(s, [0,0], [entry.offsets[0] * @tile_x, entry.offsets[1] * @tile_y, @tile_x, @tile_y] )
     ISBPResult.new(s, entry.actionable, self)
   end
-
 end
 
 class Game
@@ -1801,6 +1852,10 @@ class Game
 
   end
 
+  def update_player_tile_coords
+    @player.update_tile_coords
+  end
+
   def toggle_battle_hooks(in_battle=false)
     EventManager.new.swap_event_sets(self, in_battle, non_battle_hooks, battle_hooks)
   end
@@ -1916,7 +1971,7 @@ private
     @ssx = @screen.w/2
     @ssy = @screen.h/2
     @player = Player.new(@ssx, @ssy , @universe, @party, @player_file, @hero_x_dim, @hero_y_dim , @ssx, @ssy )
-
+    @player.update_tile_coords
     # Make event hook to pass all events to @player#handle().
   end
 
