@@ -70,22 +70,29 @@ module JsonHelper
   end
 end
 
-class Universe
-  attr_reader :worlds, :current_world, :dialog_layer, :menu_layer, 
-              :battle_layer, :current_world_idx, :notifications_layer
-
-  extend Forwardable
-  def_delegators :@current_world, :interpret
-
-  def initialize(current_world_idx, worlds, dialog_layer=nil, menu_layer=nil, battle_layer=nil, notif_layer=nil)
-    raise "must have at least one world" if worlds.empty?
-    @current_world = worlds[current_world_idx]
-    @current_world_idx = current_world_idx
-    @worlds = worlds
+class GameLayers
+  attr_reader :dialog_layer, :menu_layer, :battle_layer, :notifications_layer
+  def initialize(dialog_layer=nil, menu_layer=nil, battle_layer=nil, notif_layer=nil)
     @dialog_layer = dialog_layer
     @menu_layer = menu_layer
     @battle_layer = battle_layer
     @notifications_layer = notif_layer
+  end
+end
+
+class Universe
+  attr_reader :worlds, :current_world,  :current_world_idx, :game_layers
+
+  extend Forwardable
+  def_delegators :@current_world, :interpret
+  def_delegators :@game_layers, :dialog_layer, :menu_layer, :battle_layer, :notifications_layer
+
+  def initialize(current_world_idx, worlds, game_layers=nil)
+    raise "must have at least one world" if worlds.empty?
+    @current_world = worlds[current_world_idx]
+    @current_world_idx = current_world_idx
+    @worlds = worlds
+    @game_layers = game_layers
   end
 
   def world_by_index(idx)
@@ -1125,7 +1132,7 @@ class ReloaderHelper
     puts "player is at #{game.player.px} and #{game.player.py} at load time"
     uni = json_player.universe
     orig_uni = game.universe
-    universe = Universe.new(uni.current_world_idx, uni.worlds, orig_uni.dialog_layer, orig_uni.menu_layer, orig_uni.battle_layer, orig_uni.notifications_layer )
+    universe = Universe.new(uni.current_world_idx, uni.worlds, orig_uni.game_layers)
 
     puts "universe has current world: #{universe.current_world_idx}"
     universe.replace_world_pallettes(orig_uni)
@@ -1632,17 +1639,22 @@ class Game
     @npc_hooks = []
     make_world1
     make_world2
-    make_dialog_layer
     @npc_hooks.flatten
-    make_menu_layer
-    make_battle_layer
-    make_notifications_layer
+
+    make_game_layers
     make_universe
     make_player
     make_hud
     make_event_hooks
   end
 
+  def make_game_layers
+    make_dialog_layer
+    make_menu_layer
+    make_battle_layer
+    make_notifications_layer
+    @game_layers = GameLayers.new(@dialog_layer, @menu_layer, @battle_layer, @notifications_layer)
+  end
   def make_battle_layer
     @battle_layer = BattleLayer.new(@screen)
   end
@@ -1834,7 +1846,7 @@ class Game
     @dialog_layer = DialogLayer.new(@screen)
   end
   def make_universe
-    @universe = Universe.new(0, [@worldstate, @worldstate2], @dialog_layer, @menu_layer, @battle_layer, @notifications_layer)
+    @universe = Universe.new(0, [@worldstate, @worldstate2], @game_layers)
   end
   def make_player
     #@player = Ship.new( @screen.w/2, @screen.h/2, @topomap, pallette, @terrainmap, terrain_pallette, @interactmap, interaction_pallette, @bgsurface )
