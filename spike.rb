@@ -1432,20 +1432,17 @@ class Monster
   end
 
   def to_json(*a)
-    params = [ @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @character_attribution]
     {
       'json_class' => self.class.name,
-      'data' => params
+      'data' => [ @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @character_attribution]
     }.to_json(*a)
   end
 
   def self.json_create(o)
     new(*o['data'])
   end
-
-
-
 end
+
 class TalkingNPC < Monster
   def is_blocking?
     true
@@ -1463,10 +1460,9 @@ class TalkingNPC < Monster
     universe.dialog_layer.text = @text
   end
   def to_json(*a)
-    params = [ @text, @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @character_attribution]
     {
       'json_class' => self.class.name,
-      'data' => params
+      'data' => [ @text, @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @character_attribution]
     }.to_json(*a)
   end
 
@@ -1500,6 +1496,18 @@ class BattleReadinessHelper
 
 end
 
+class BattleVictoryHelper
+
+  def monster_killed(universe, monster)
+    universe.current_world.delete_monster(monster)
+  end
+  def give_spoils(player,monster)
+    player.gain_experience(monster.experience)
+    player.gain_inventory(monster.inventory)
+
+  end
+end
+
 class Battle
   
   attr_reader :monster, :player
@@ -1525,10 +1533,9 @@ class Battle
 
   def end_battle
     @game.battle_completed
-    @player.gain_experience(@monster.experience)
-    puts "monster had #{@monster.inventory.keys.size} items"
-    @player.gain_inventory(@monster.inventory)
-    @universe.current_world.delete_monster(@monster)
+    helper = BattleVictoryHelper.new
+    helper.give_spoils(@player, @monster)
+    helper.monster_killed(@universe,@monster)
   end
 
 
@@ -1778,10 +1785,11 @@ class ISBPResult
     @actionable = actionable
     @wrapped_surface = wrapped_surface
   end
-
-  def activate(player, worldstate, tilex, tiley)
-    @actionable.activate(player, worldstate, tilex, tiley)
-  end
+  extend Forwardable
+  def_delegators :@actionable, :activate
+#  def activate(player, worldstate, tilex, tiley)
+#    @actionable.activate(player, worldstate, tilex, tiley)
+#  end
 
   def screen_position_relative_to(px,py,xi,yi,sextx,sexty)
     tx = @wrapped_surface.tile_x
@@ -1897,9 +1905,6 @@ class Game
     toggle_battle_hooks(true)
   end
 
-  
-
-
   def make_clock
     @clock = Clock.new()
     @clock.target_framerate = 50
@@ -1931,7 +1936,7 @@ class Game
 
     @always_on_hooks = make_magic_hooks( always_on_hooks )
 
-    menu_killed_hooks = { :i => :interact_with_facing }
+    menu_killed_hooks = { :i => :interact_with_facing, :space => :use_weapon }
     @menu_killed_hooks = make_magic_hooks( menu_killed_hooks )
     puts @menu_killed_hooks.size
     menu_active_hooks = { :left => :menu_left, :right => :menu_right, :up => :menu_up, :down => :menu_down, :i => :menu_enter, :b => :menu_cancel }
@@ -1957,10 +1962,21 @@ class Game
     puts "player hooks: #{@player_hooks[0]}"
 
   end
+  extend Forwardable
 
-  def update_player_tile_coords
-    @player.update_tile_coords
-  end
+  def_delegator :@menu_layer, :cancel_action, :menu_cancel
+  def_delegator :@menu_layer, :move_cursor_up, :menu_up
+  def_delegator :@menu_layer, :move_cursor_down, :menu_down
+  def_delegator :@menu_layer, :cancel_action, :menu_left
+
+  def_delegator :@battle_layer, :cancel_action, :battle_down
+  def_delegator :@battle_layer, :move_cursor_up, :battle_left
+  def_delegator :@battle_layer, :move_cursor_down, :battle_right
+  def_delegator :@battle_layer, :cancel_action, :battle_cancel
+
+  def_delegator :@dialog_layer, :toggle_visibility, :toggle_dialog_layer
+  def_delegator :@player, :update_tile_coords, :update_player_tile_coords
+
 
   def toggle_battle_hooks(in_battle=false)
     EventManager.new.swap_event_sets(self, in_battle, non_battle_hooks, battle_hooks)
@@ -1974,52 +1990,21 @@ private
   def menu_enter(event)
     @menu_layer.enter_current_cursor_location(self)
   end
-
-  def menu_cancel
-    @menu_layer.cancel_action
-  end
-
-  def menu_up
-    @menu_layer.move_cursor_up
-  end
-  def menu_down
-    @menu_layer.move_cursor_down
-  end
-  def menu_left
-    @menu_layer.cancel_action
-  end
   def menu_right(event)
     @menu_layer.enter_current_cursor_location(self)
   end
-
-  
   def battle_up
     @battle_layer.enter_current_cursor_location(self)
   end
-  def battle_down
-    @battle_layer.cancel_action
-  end
-  def battle_left
-    @battle_layer.move_cursor_up
-  end
-  def battle_right
-    @battle_layer.move_cursor_down
+  def interact_with_facing(event)
+    @player.interact_with_facing(self)
   end
   def battle_confirm
     @battle_layer.enter_current_cursor_location(self)
   end
 
-  def battle_cancel
-    @battle_layer.cancel_action
-  end
 
-  def toggle_dialog_layer
-    @dialog_layer.toggle_visibility
-  end
-  def interact_with_facing(event)
-    @player.interact_with_facing(self)
-  end
-
+  
   def capture_ss(event)
     #TODO this does not work, find a different way to dump screen data
 #    def @screen.monkeypatch
