@@ -49,6 +49,9 @@ include Rubygame::EventTriggers
 class Universe
   attr_reader :worlds, :current_world, :dialog_layer, :menu_layer, :battle_layer, :current_world_idx
 
+  extend Forwardable
+  def_delegators :@current_world, :interpret
+
   def initialize(current_world_idx, worlds, dialog_layer=nil, menu_layer=nil, battle_layer=nil)
     raise "must have at least one world" if worlds.empty?
     @current_world = worlds[current_world_idx]
@@ -60,9 +63,6 @@ class Universe
     
   end
 
-  def interpret(x,y)
-    @current_world.interpret(x,y)
-  end
   def world_by_index(idx)
     @worlds[idx]
   end
@@ -93,24 +93,32 @@ class Universe
 
 
   def to_json(*a)
+    puts "to_json in #{self.class.name}"
     {
       'json_class' => self.class.name,
       'data' => [ @current_world_idx, @worlds]
     }.to_json(*a)
   end
   def self.json_create(o)
-    new(*o['data'])
+    puts "json creating #{o['json_class']}" ; new(*o['data'])
   end
 
 end
 
-
 class WorldState
-  attr_reader :topo_interpreter, :interaction_interpreter,
-            :npcs, :background_surface
+  attr_reader :topo_interpreter, :interaction_interpreter,:npcs, :background_surface
             
-  def initialize(topointerp, interinterp, npcs, bgsurface)
+  extend Forwardable
+  def_delegator :@topo_interpreter, :update, :update_topo_map
+  def_delegator :@topo_interpreter, :update, :update_topo_map
+  def_delegator :@topo_interpreter, :can_walk_at?, :can_walk_on_background_at?
+  def_delegator :@interaction_interpreter, :x_offset_for_world, :x_offset_for_interaction
+  def_delegator :@interaction_interpreter, :y_offset_for_world, :y_offset_for_interaction
+  def_delegator :@interaction_interpreter, :update, :update_interaction_map
+  def_delegators :@topo_interpreter, :x_offset_for_world, :y_offset_for_world
+  def_delegators :@interaction_interpreter, :blit_foreground
 
+  def initialize(topointerp, interinterp, npcs, bgsurface)
     @topo_interpreter = topointerp
     @interaction_interpreter = interinterp
     @npcs = npcs
@@ -118,35 +126,14 @@ class WorldState
     
     reblit_background unless bgsurface.nil?
   end
-  def blit_foreground(screen, px, py)
-    @interaction_interpreter.blit_foreground(screen,px, py)
-  end
 
   def replace_pallettes(orig_world)
     @topo_interpreter = orig_world.topo_interpreter
     @interaction_interpreter.replace_pallette(orig_world.interaction_interpreter)
   end
 
-  def can_walk_on_background_at?(xi, yi)
-    @topo_interpreter.can_walk_at?(xi,yi)
-  end
-
-  def update_interaction_map(x,y, value)
-    @interaction_interpreter.update(x,y,value)
-  end
-  def update_topo_map(x,y,value)
-    @topo_interpreter.update(x,y,value)
-  end
-
-  extend Forwardable
-  def_delegator :@topo_interpreter, :update, :update_topo_map
-  def_delegator :@interaction_interpreter, :x_offset_for_world, :x_offset_for_interaction
-  def_delegator :@interaction_interpreter, :y_offset_for_world, :y_offset_for_interaction
-  def_delegators :@topo_interpreter, :x_offset_for_world, :y_offset_for_world
-
   def reblit_background
     @topo_interpreter.blit_to(@background_surface)
-    
   end
 
   def delete_monster(monster)
@@ -158,29 +145,24 @@ class WorldState
   end
 
   def to_json(*a)
+    puts "to_json in #{self.class.name}"
     {
       'json_class' => self.class.name,
       'data' => [ nil, @interaction_interpreter, @npcs, nil]
     }.to_json(*a)
   end
   def self.json_create(o)
-    new(*o['data'])
+    puts "json creating #{o['json_class']}" ; new(*o['data'])
   end
-
-
-
 end
 
 class KeyHolder
   def initialize
     @keys = []
   end
-  def include?(other)
-    @keys.include?(other)
-  end
-  def empty?
-    @keys.empty?
-  end
+
+  extend Forwardable
+  def_delegators :@keys, :include?, :empty?
 
   def delete_key(key)
     @keys -= [key]
@@ -188,7 +170,6 @@ class KeyHolder
   def add_key(key)
     @keys += [key]
   end
-  
 end
 class AlwaysDownMonsterKeyHolder < KeyHolder
   @@DOWNKEY = :always_down
@@ -308,7 +289,7 @@ class CoordinateHelper
   attr_accessor :px, :py
 
   def initialize(px,py, key,universe, hero_x_dim, hero_y_dim)
-     @hero_x_dim, @hero_y_dim =  hero_x_dim, hero_y_dim
+    @hero_x_dim, @hero_y_dim =  hero_x_dim, hero_y_dim
     @universe = universe
     @keys = key
     @px, @py = px, py # Current Position
@@ -321,16 +302,16 @@ class CoordinateHelper
 
   def world_coords
     TileCoordinateSet.new( @universe.current_world.x_offset_for_world(@px - x_ext),
-                                          @universe.current_world.x_offset_for_world(@px + x_ext),
-                                          @universe.current_world.y_offset_for_world(@py - y_ext),
-                                          @universe.current_world.y_offset_for_world(@py + y_ext) )
+      @universe.current_world.x_offset_for_world(@px + x_ext),
+      @universe.current_world.y_offset_for_world(@py - y_ext),
+      @universe.current_world.y_offset_for_world(@py + y_ext) )
   end
 
   def interact_coords
     TileCoordinateSet.new( @universe.current_world.x_offset_for_interaction(@px - x_ext),
-                                          @universe.current_world.x_offset_for_interaction(@px + x_ext),
-                                          @universe.current_world.y_offset_for_interaction(@py - y_ext),
-                                          @universe.current_world.y_offset_for_interaction(@py + y_ext) )
+      @universe.current_world.x_offset_for_interaction(@px + x_ext),
+      @universe.current_world.y_offset_for_interaction(@py - y_ext),
+      @universe.current_world.y_offset_for_interaction(@py + y_ext) )
   end
 
   def update_tile_coords
@@ -360,14 +341,12 @@ class CoordinateHelper
     @ax, @ay = x, y
   end
 
-
   # Update the velocity based on the acceleration and the time since
   # last update.
   def update_vel( dt )
     @vx = update_vel_axis( @vx, @ax, dt )
     @vy = update_vel_axis( @vy, @ay, dt )
   end
-
 
   # Calculate the velocity for one axis.
   # v = current velocity on that axis (e.g. @vx)
@@ -399,7 +378,6 @@ class CoordinateHelper
   end
 
   def clamp_to_world_dimensions
-
     minx = @px - x_ext
     maxx = @px + x_ext
     miny = @py - y_ext
@@ -412,16 +390,14 @@ class CoordinateHelper
   end
 
   def check_corners(interp, x1, y1, x2, y2)
-      #c1 = tp.   data_at(x1,y1)
-      c1 = interp.can_walk_at?(x1,y1)
-      c2 = interp.can_walk_at?(x2,y2)
+    c1 = interp.can_walk_at?(x1,y1)
+    c2 = interp.can_walk_at?(x2,y2)
 
-      unless c1 and c2
-        return true
-      end
-      false
+    unless c1 and c2
+      return true
+    end
+    false
   end
-
 
   def clamp_to_tile_restrictions_on_y(interp, new_bg_tile_coords)
     rv = false
@@ -434,6 +410,7 @@ class CoordinateHelper
     end
     rv
   end
+  
   def clamp_to_tile_restrictions_on_x(interp, new_bg_tile_coords)
     rv = false
     
@@ -447,7 +424,6 @@ class CoordinateHelper
 
     rv
   end
-
 
   def blocking(col)
     col.select do |npc|
@@ -471,8 +447,6 @@ class CoordinateHelper
   def hit_blocking_npcs_on_y(npcs)
     blocking(y_hits(x_hits(npcs)))
   end
-
-  
 
   def update_pos( dt )
     dx = @vx * dt
@@ -498,11 +472,7 @@ class CoordinateHelper
     puts "Detected #{cols.size} colisions with npcs" unless cols.empty? #TODO automatic fights would go here
 
     update_tile_coords
-
-    # @rect.center = [@px, @py]
   end
-
-
 end
 class AnimatedSpriteHelper
   attr_reader :image, :rect, :px, :py
@@ -624,9 +594,7 @@ class MenuHelper
       conf = menu_layer_config.main_cursor
       @cursor.blit(@layer, [conf.xc + conf.xf * @cursor_position, conf.yc + conf.yf * @cursor_position])
     end
-    @layer.blit(
-      @screen, menu_layer_config.layer_inset_on_screen)
-
+    @layer.blit(@screen, menu_layer_config.layer_inset_on_screen)
   end
 end
 class BattleMenuHelper < MenuHelper
@@ -654,13 +622,13 @@ class BattleMenuHelper < MenuHelper
 end
 
 class Party
+  extend Forwardable
+  def_delegators :@inventory, :add_item, :gain_inventory
+
   attr_reader :members, :inventory
   def initialize(members, inventory)
     @members = members
     @inventory = inventory
-  end
-  def add_item(qty, item)
-    @inventory.add_item(qty, item)
   end
 
   def collect
@@ -674,21 +642,17 @@ class Party
     @members.each {|member| member.gain_experience(pts) }
   end
 
-  def gain_inventory(inventory)
-    @inventory.gain_inventory(inventory)
-  end
-
   def to_json(*a)
+    puts "to_json in #{self.class.name}"
     {
       'json_class' => self.class.name,
       'data' => [ @members, @inventory]
     }.to_json(*a)
   end
+
   def self.json_create(o)
-    new(*o['data'])
+    puts "json creating #{o['json_class']}" ; new(*o['data'])
   end
-
-
 end
 
 class Player
@@ -697,52 +661,13 @@ class Player
   
   attr_accessor :universe, :party
 
-  def to_json(*a)
-    puts "px,py: #{px},#{py}"
-    {
-      'json_class' => self.class.name,
-      'data' => [ @coordinate_helper.px, @coordinate_helper.py, @universe, @party, @filename,@hero_x_dim, @hero_y_dim, @animated_sprite_helper.px, @animated_sprite_helper.py]
-    }.to_json(*a)
-  end
-  def self.json_create(o)
-    new(*o['data'])
-  end
+  extend Forwardable
+  def_delegators :@animated_sprite_helper, :image, :rect
+  def_delegators :@coordinate_helper, :update_tile_coords, :px, :py
+  def_delegators :@party, :add_readiness, :gain_experience, :gain_inventory, :inventory
+  def_delegator :@party, :add_item, :add_inventory
 
-  def image
-    @animated_sprite_helper.image
-  end
-  def rect
-    @animated_sprite_helper.rect
-  end
-
-  def inventory
-    @party.inventory
-  end
-
-  def gain_inventory(inventory)
-    @party.gain_inventory(inventory)
-  end
-  def gain_experience(pts)
-    @party.gain_experience(pts)
-  end
-
-  def add_readiness(pts)
-    @party.add_readiness(pts)
-  end
-
-  def add_inventory(qty, item)
-    @party.add_item(qty, item)
-  end
-
-  def px
-    @coordinate_helper.px
-  end
-  def py
-    @coordinate_helper.py
-  end
-
-
-  attr_reader :party, :universe, :filename, :hero_x_dim, :hero_y_dim
+  attr_reader :filename, :hero_x_dim, :hero_y_dim
   def initialize( px, py,  universe, party, filename, hx, hy, sx, sy)
     @universe = universe
     @filename = filename
@@ -763,9 +688,6 @@ class Player
     )
   end
 
-  def update_tile_coords
-    @coordinate_helper.update_tile_coords
-  end
 
   def interact_with_facing(game)
     @interaction_helper.interact_with_facing( game, @coordinate_helper.px , @coordinate_helper.py)
@@ -773,12 +695,22 @@ class Player
   def set_position(px, py)
     @coordinate_helper.px = px
     @coordinate_helper.py = py
+  end
 
+
+  def to_json(*a)
+    puts "to_json in #{self.class.name}"
+    {
+      'json_class' => self.class.name,
+      'data' => [ @coordinate_helper.px, @coordinate_helper.py, @universe, @party, @filename,@hero_x_dim, @hero_y_dim, @animated_sprite_helper.px, @animated_sprite_helper.py]
+    }.to_json(*a)
+  end
+  def self.json_create(o)
+    puts "json creating #{o['json_class']}" ; new(*o['data'])
   end
 
   private
 
-  # Add it to the list of keys being pressed.
   def key_pressed( event )
     newkey = event.key
     if [:down, :left,:up, :right].include?(newkey)
@@ -799,14 +731,10 @@ class Player
     @keys.add_key(event.key)
   end
 
-
-  # Remove it from the list of keys being pressed.
   def key_released( event )
     @keys.delete_key(event.key)
-    
   end
 
-  # Update the ship state. Called once per frame.
   def update( event )
     dt = event.seconds # Time since last update
     @animation_helper.update_animation(dt) { |frame| @animated_sprite_helper.replace_avatar(frame) }
@@ -839,6 +767,7 @@ class Treasure
   end
 
   def to_json(*a)
+    puts "to_json in #{self.class.name}"
     {
       'json_class' => self.class.name,
       'data' => [ @name] #TODO reconsider terrain/etc loading
@@ -846,7 +775,7 @@ class Treasure
   end
 
   def self.json_create(o)
-    new(*o['data'])
+    puts "json creating #{o['json_class']}" ; new(*o['data'])
   end
 
 end
@@ -878,32 +807,26 @@ class WarpPoint
   end
 
   def to_json(*a)
+    puts "to_json in #{self.class.name}"
     {
       'json_class' => self.class.name,
       'data' => [ @destination] #TODO reconsider terrain/etc loading
     }.to_json(*a)
   end
   def self.json_create(o)
-    new(*o['data'])
+    puts "json creating #{o['json_class']}" ; new(*o['data'])
   end
-
-
-
 end
 
 class AbstractLayer
-
   include FontLoader #TODO unify resource loading
   attr_accessor :active
-
-  
 
   def initialize(screen, layer_width, layer_height)
     @screen = screen
     @active = false
     @layer = Surface.new([layer_width, layer_height])
     @font = load_font("FreeSans.ttf")
-
   end
 
   def toggle_activity
@@ -940,10 +863,8 @@ class DialogLayer < AbstractLayer
     @active = false
     puts "dialog done"
   end
-  
 end
 class MenuLayer < AbstractLayer
-
   include FontLoader #TODO unify resource loading
   attr_accessor :active
 
@@ -962,11 +883,11 @@ class MenuLayer < AbstractLayer
     @layer.alpha = 192
     @text_rendering_helper = TextRenderingHelper.new(@layer, @font)
     sections = [MenuSection.new("Status", [MenuAction.new("status info line 1"), MenuAction.new("status info line 2")]),
-          MenuSection.new("Inventory", [MenuAction.new("inventory contents:"), MenuAction.new("TODO real data")]),
+      MenuSection.new("Inventory", [MenuAction.new("inventory contents:"), MenuAction.new("TODO real data")]),
       MenuSection.new("Equip", [MenuAction.new("head equipment:"), MenuAction.new("arm equipment: "), MenuAction.new("etc")]),
       MenuSection.new("Save", [SaveAction.new("Slot 1")]),
       MenuSection.new("Load", [LoadAction.new("Slot 1")])
-      ]
+    ]
     @menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
   end
 
@@ -986,7 +907,6 @@ class MenuLayer < AbstractLayer
     @layer.fill(:red)
     @menu_helper.draw(menu_layer_config)
   end
-
 end
 class BattleLayer < AbstractLayer
   attr_reader :battle
@@ -998,7 +918,7 @@ class BattleLayer < AbstractLayer
     @battle = nil
     @menu_helper = nil
     sections = [MenuSection.new("Exp",[EndBattleAction.new("Confirm", self)]),
-                MenuSection.new("Items", [EndBattleAction.new("Confirm", self)])]
+      MenuSection.new("Items", [EndBattleAction.new("Confirm", self)])]
     @end_of_battle_menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
     make_magic_hooks({ClockTicked => :update})
   end
@@ -1158,6 +1078,7 @@ end
 
 class SaveAction < SaveLoadAction
   def activate(menu_idx, game, submenu_idx)
+    puts "saving: #{game.player}"
     json = JSON.generate(game.player)
 
     save_file = File.open(save_slot(submenu_idx), "w")
@@ -1183,7 +1104,7 @@ class ReloaderHelper
     universe.reblit_backgrounds
     puts "backgrounds rebuilt"
     player = Player.new(json_player.px, json_player.py,  universe, json_player.party, json_player.filename, json_player.hero_x_dim, json_player.hero_y_dim, game.screen.w/2, game.screen.h/2)
-#TODO update tile coords for player
+    #TODO update tile coords for player
     game.universe = universe
     game.player = player
     game.update_player_tile_coords
@@ -1228,6 +1149,7 @@ class CharacterAttributes
 
 
   def to_json(*a)
+    puts "to_json in #{self.class.name}"
     {
       'json_class' => self.class.name,
       'data' => [ @hp,@mp, @strength, @defense, @magic_power, @magic_defense, @agility, @luck]
@@ -1235,7 +1157,7 @@ class CharacterAttributes
   end
 
   def self.json_create(o)
-    new(*o['data'])
+    puts "json creating #{o['json_class']}" ; new(*o['data'])
   end
 end
 
@@ -1266,6 +1188,7 @@ class CharacterState
     @experience += pts
   end
   def to_json(*a)
+    puts "to_json in #{self.class.name}"
     {
       'json_class' => self.class.name,
       'data' => [ @attributes, @experience, @current_hp, @current_mp, @status_effects]
@@ -1273,7 +1196,7 @@ class CharacterState
   end
 
   def self.json_create(o)
-    new(*o['data'])
+    puts "json creating #{o['json_class']}" ; new(*o['data'])
   end
 end
 
@@ -1286,6 +1209,7 @@ class CharacterAttribution
   end
 
   def to_json(*a)
+    puts "to_json in #{self.class.name}"
     {
       'json_class' => self.class.name,
       'data' => [ @state]
@@ -1293,7 +1217,7 @@ class CharacterAttribution
   end
 
   def self.json_create(o)
-    new(*o['data'])
+    puts "json creating #{o['json_class']}" ; new(*o['data'])
   end
 end
 
@@ -1364,6 +1288,7 @@ class Monster
 
 
   def to_json(*a)
+    puts "to_json in #{self.class.name}"
     {
       'json_class' => self.class.name,
       'data' => [ @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @character_attribution]
@@ -1371,7 +1296,7 @@ class Monster
   end
 
   def self.json_create(o)
-    new(*o['data'])
+    puts "json creating #{o['json_class']}" ; new(*o['data'])
   end
 end
 
@@ -1391,6 +1316,7 @@ class TalkingNPC < Monster
     universe.dialog_layer.text = @text
   end
   def to_json(*a)
+    puts "to_json in #{self.class.name}"
     {
       'json_class' => self.class.name,
       'data' => [ @text, @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @character_attribution]
@@ -1398,7 +1324,7 @@ class TalkingNPC < Monster
   end
 
   def self.json_create(o)
-    new(*o['data'])
+    puts "json creating #{o['json_class']}" ; new(*o['data'])
   end
 
 end
@@ -1569,13 +1495,14 @@ class InterpretedMap
   end
 
   def to_json(*a)
+    puts "to_json in #{self.class.name}"
     {
       'json_class' => self.class.name,
       'data' => [ @topo_map, nil]
     }.to_json(*a)
   end
   def self.json_create(o)
-    new(*o['data'])
+    puts "json creating #{o['json_class']}" ; new(*o['data'])
   end
 end
 
@@ -1658,9 +1585,9 @@ class ISBPResult
   end
   extend Forwardable
   def_delegators :@actionable, :activate
-#  def activate(player, worldstate, tilex, tiley)
-#    @actionable.activate(player, worldstate, tilex, tiley)
-#  end
+  #  def activate(player, worldstate, tilex, tiley)
+  #    @actionable.activate(player, worldstate, tilex, tiley)
+  #  end
 
   def screen_position_relative_to(px,py,xi,yi,sextx,sexty)
     tx = @wrapped_surface.tile_x
@@ -1857,7 +1784,7 @@ class Game
     EventManager.new.swap_event_sets(self, @menu_layer.active?, non_menu_hooks, @menu_active_hooks)
     @menu_layer.toggle_activity
   end
-private
+  private
   def menu_enter(event)
     @menu_layer.enter_current_cursor_location(self)
   end
@@ -1878,15 +1805,15 @@ private
   
   def capture_ss(event)
     #TODO this does not work, find a different way to dump screen data
-#    def @screen.monkeypatch
-#      filename = "screenshot.bmp"
-#      result = SDL.SaveBMP_RW( @struct, filename )
-#      if(result != 0)
-#       raise( Rubygame::SDLError, "Couldn't save surface to file %s: %s"%\
-#             [filename, SDL.GetError()] )
-#      end
-#      nil
-#    end
+    #    def @screen.monkeypatch
+    #      filename = "screenshot.bmp"
+    #      result = SDL.SaveBMP_RW( @struct, filename )
+    #      if(result != 0)
+    #       raise( Rubygame::SDLError, "Couldn't save surface to file %s: %s"%\
+    #             [filename, SDL.GetError()] )
+    #      end
+    #      nil
+    #    end
     
     #@screen.savebmp("screenshot.bmp")
 
@@ -1937,22 +1864,14 @@ private
     # Make event hook to pass all events to @player#handle().
   end
 
-
-  # Quit the game
   def quit
     puts "Quitting!"
     throw :quit
   end
 
-
-  # Do everything needed for one frame.
   def step
     # Clear the screen.
     @screen.fill( :black )
-#    puts "ship is at #{@player.px}, #{@player.py}"
-#    puts "ship rect is #{@player.rect}"
-#    puts "bg is #{@bgimage.size}"
-    
     
     @sx = 640
     @sy = 480
@@ -1968,11 +1887,6 @@ private
 
     }
     
-    #@topomap.blit_with_pallette(pallette, @screen, @player.px, @player.py)
-#    puts "topomap should be in (#{@topomap.x_offset_for_world(@player.px)},#{@topomap.y_offset_for_world(@player.py)})"
-
-
-    # Fetch input events, etc. from SDL, and add them to the queue.
     @queue.fetch_sdl_events
 
     # Tick the clock and add the TickEvent to the queue.
@@ -1985,7 +1899,6 @@ private
     end
 
     # Draw the ship in its new position.
-
     @player.draw(@screen)
     @hud.draw
     if @universe.dialog_layer.active?
