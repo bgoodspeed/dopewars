@@ -1237,6 +1237,109 @@ class LoadAction < SaveLoadAction
     ReloaderHelper.new.replace(game, rebuilt)
   end
 end
+
+class CharacterAttributes
+  attr_accessor :hp, :mp, :strength, :defense, :magic_power, :magic_defense, :agility, :luck
+  def initialize(hp,mp, strength, defense, magic_power, magic_defense, agility, luck)
+    @hp = hp
+    @mp = mp
+    @strength = strength
+    @defense = defense
+    @magic_power = magic_power
+    @magic_defense = magic_defense
+    @agility = agility
+    @luck = luck
+  end
+
+
+  def to_json(*a)
+    {
+      'json_class' => self.class.name,
+      'data' => [ @hp,@mp, @strength, @defense, @magic_power, @magic_defense, @agility, @luck]
+    }.to_json(*a)
+  end
+
+  def self.json_create(o)
+    new(*o['data'])
+  end
+
+
+end
+
+class CharacterState
+
+  attr_accessor :current_hp, :current_mp, :status_effects, :experience
+
+  def initialize(attributes, exp=nil, chp=nil, cmp=nil, statii=nil)
+    @attributes = attributes
+    @current_hp = chp.nil? ? attributes.hp : chp
+    @current_mp = cmp.nil? ? attributes.mp : cmp
+    @status_effects = statii.nil? ? [] : statii
+    @experience = exp.nil? ? 0 : exp
+  end
+
+  def dead?
+    @current_hp <= 0
+  end
+
+  def take_damage(damage)
+    @current_hp -= damage
+  end
+  def damage
+    #TODO this should be a more complex formula than just Str :)
+    @attributes.strength
+  end
+
+  def gain_experience(pts)
+    @experience += pts
+  end
+  def to_json(*a)
+    {
+      'json_class' => self.class.name,
+      'data' => [ @attributes, @experience, @current_hp, @current_mp, @status_effects]
+    }.to_json(*a)
+  end
+
+  def self.json_create(o)
+    new(*o['data'])
+  end
+
+
+end
+
+class CharacterAttribution
+  def initialize(state)
+    @state = state
+  end
+
+  def dead?
+    @state.dead?
+  end
+
+  def take_damage(damage)
+    @state.take_damage(damage)
+  end
+  def damage
+    @state.damage
+  end
+  def gain_experience(pts)
+    @state.gain_experience(pts)
+  end
+  def experience
+    @state.experience
+  end
+  def to_json(*a)
+    {
+      'json_class' => self.class.name,
+      'data' => [ @state]
+    }.to_json(*a)
+  end
+
+  def self.json_create(o)
+    new(*o['data'])
+  end
+
+end
 class Monster
   include ScreenOffsetHelper
   include Sprites::Sprite
@@ -1251,9 +1354,8 @@ class Monster
   def add_readiness(pts)
     @readiness_helper.add_readiness(pts)
   end
-  attr_reader :experience, :inventory
-  def initialize(filename, px, py, npc_x = @@MONSTER_X, npc_y = @@MONSTER_Y, inventory=Inventory.new(255), hp=3, exp=10)
-    super()
+  attr_reader :inventory
+  def initialize(filename, px, py, npc_x = @@MONSTER_X, npc_y = @@MONSTER_Y, inventory=Inventory.new(255), character_attrib=nil)
     @npc_x = npc_x
     @npc_y = npc_y
     @filename = filename
@@ -1261,25 +1363,33 @@ class Monster
     @keys = AlwaysDownMonsterKeyHolder.new
     @animation_helper = AnimationHelper.new(@keys, 3)
     @readiness_helper = BattleReadinessHelper.new(@@MONSTER_START_BATTLE_PTS, @@MONSTER_BATTLE_PTS_RATE)
-    @hp = hp
-    @experience = exp
+    @character_attribution = character_attrib.nil? ? default_attribution : character_attrib
     @inventory = inventory
+    
     make_magic_hooks(
       ClockTicked => :update
     )
   end
 
+  def default_attribution
+    #TODO probably shouldn't be here, haha
+    CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(3, 0, 0, 0, 0, 0, 0, 0)))
+  end
+
   def dead?
-    @hp <= 0
+    @character_attribution.dead?
   end
 
 
+  def experience
+    @character_attribution.experience
+  end
   def is_blocking?
     false
   end
 
   def take_damage(damage)
-    @hp -= damage
+    @character_attribution.take_damage(damage)
   end
 
   def draw(surface,x,y,sx,sy)
@@ -1322,7 +1432,7 @@ class Monster
   end
 
   def to_json(*a)
-    params = [ @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @hp, @experience]
+    params = [ @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @character_attribution]
     {
       'json_class' => self.class.name,
       'data' => params
@@ -1342,8 +1452,8 @@ class TalkingNPC < Monster
   end
 
 
-  def initialize(text, filename, px, py, npc_x, npc_y, inv=nil, hp=0, exp=0)
-    super(filename, px, py, npc_x, npc_y, inv, hp, exp)
+  def initialize(text, filename, px, py, npc_x, npc_y, inv=nil, attrib=nil)
+    super(filename, px, py, npc_x, npc_y, inv, attrib)
     @text = text
   end
 
@@ -1353,7 +1463,7 @@ class TalkingNPC < Monster
     universe.dialog_layer.text = @text
   end
   def to_json(*a)
-    params = [ @text, @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @hp, @experience]
+    params = [ @text, @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @character_attribution]
     {
       'json_class' => self.class.name,
       'data' => params
@@ -1957,8 +2067,8 @@ private
   # Create the player ship in the middle of the screen
   def make_player
     #@player = Ship.new( @screen.w/2, @screen.h/2, @topomap, pallette, @terrainmap, terrain_pallette, @interactmap, interaction_pallette, @bgsurface )
-    @hero = Hero.new("hero",  @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE)
-    @hero2 = Hero.new("cohort", @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE)
+    @hero = Hero.new("hero",  @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(10, 5, 1, 0, 0, 0, 0, 0))))
+    @hero2 = Hero.new("cohort", @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(10, 5, 1, 0, 0, 0, 0, 0))))
     @party_inventory = Inventory.new(255) #TODO revisit inventory -- should it have a maximum? probably should not be stored on hero as well...
     @party = Party.new([@hero, @hero2], @party_inventory)
     @hero_x_dim = 48
