@@ -46,6 +46,25 @@ include Rubygame::EventTriggers
 @@MONSTER_X = 32
 @@MONSTER_Y = 32
 
+
+
+module JsonHelper
+  def self.included(kmod)
+    kmod.class_eval <<-EOF
+  def self.json_create(o)
+    puts "json creating #{kmod}" ; new(*o['data'])
+  end
+EOF
+  end
+  def to_json(*a)
+    puts "to_json in #{self.class.name}"
+    {
+      'json_class' => self.class.name,
+      'data' => json_params
+    }.to_json(*a)
+  end
+end
+
 class Universe
   attr_reader :worlds, :current_world, :dialog_layer, :menu_layer, :battle_layer, :current_world_idx
 
@@ -91,18 +110,10 @@ class Universe
     }
   end
 
-
-  def to_json(*a)
-    puts "to_json in #{self.class.name}"
-    {
-      'json_class' => self.class.name,
-      'data' => [ @current_world_idx, @worlds]
-    }.to_json(*a)
+  include JsonHelper
+  def json_params
+    [ @current_world_idx, @worlds]
   end
-  def self.json_create(o)
-    puts "json creating #{o['json_class']}" ; new(*o['data'])
-  end
-
 end
 
 class WorldState
@@ -143,16 +154,9 @@ class WorldState
   def replace_bgsurface(orig_world)
     @background_surface = orig_world.background_surface
   end
-
-  def to_json(*a)
-    puts "to_json in #{self.class.name}"
-    {
-      'json_class' => self.class.name,
-      'data' => [ nil, @interaction_interpreter, @npcs, nil]
-    }.to_json(*a)
-  end
-  def self.json_create(o)
-    puts "json creating #{o['json_class']}" ; new(*o['data'])
+  include JsonHelper
+  def json_params
+    [ nil, @interaction_interpreter, @npcs, nil]
   end
 end
 
@@ -642,16 +646,9 @@ class Party
     @members.each {|member| member.gain_experience(pts) }
   end
 
-  def to_json(*a)
-    puts "to_json in #{self.class.name}"
-    {
-      'json_class' => self.class.name,
-      'data' => [ @members, @inventory]
-    }.to_json(*a)
-  end
-
-  def self.json_create(o)
-    puts "json creating #{o['json_class']}" ; new(*o['data'])
+  include JsonHelper
+  def json_params
+    [ @members, @inventory]
   end
 end
 
@@ -662,6 +659,7 @@ class Player
   attr_accessor :universe, :party
 
   extend Forwardable
+  
   def_delegators :@animated_sprite_helper, :image, :rect
   def_delegators :@coordinate_helper, :update_tile_coords, :px, :py
   def_delegators :@party, :add_readiness, :gain_experience, :gain_inventory, :inventory
@@ -696,17 +694,9 @@ class Player
     @coordinate_helper.px = px
     @coordinate_helper.py = py
   end
-
-
-  def to_json(*a)
-    puts "to_json in #{self.class.name}"
-    {
-      'json_class' => self.class.name,
-      'data' => [ @coordinate_helper.px, @coordinate_helper.py, @universe, @party, @filename,@hero_x_dim, @hero_y_dim, @animated_sprite_helper.px, @animated_sprite_helper.py]
-    }.to_json(*a)
-  end
-  def self.json_create(o)
-    puts "json creating #{o['json_class']}" ; new(*o['data'])
+  include JsonHelper
+  def json_params
+    [ @coordinate_helper.px, @coordinate_helper.py, @universe, @party, @filename,@hero_x_dim, @hero_y_dim, @animated_sprite_helper.px, @animated_sprite_helper.py]
   end
 
   private
@@ -766,18 +756,10 @@ class Treasure
     player.add_inventory(1, @name)
   end
 
-  def to_json(*a)
-    puts "to_json in #{self.class.name}"
-    {
-      'json_class' => self.class.name,
-      'data' => [ @name] #TODO reconsider terrain/etc loading
-    }.to_json(*a)
+  include JsonHelper
+  def json_params
+    [ @name]
   end
-
-  def self.json_create(o)
-    puts "json creating #{o['json_class']}" ; new(*o['data'])
-  end
-
 end
 class OpenTreasure < Treasure
   def activate( player, worldstate, tilex, tiley)
@@ -805,16 +787,9 @@ class WarpPoint
     puts "warp from  #{worldstate} to #{uni.world_by_index(@destination)}"
     uni.set_current_world_by_index(@destination)
   end
-
-  def to_json(*a)
-    puts "to_json in #{self.class.name}"
-    {
-      'json_class' => self.class.name,
-      'data' => [ @destination] #TODO reconsider terrain/etc loading
-    }.to_json(*a)
-  end
-  def self.json_create(o)
-    puts "json creating #{o['json_class']}" ; new(*o['data'])
+  include JsonHelper
+  def json_params
+    [ @destination]
   end
 end
 
@@ -1147,17 +1122,9 @@ class CharacterAttributes
     @luck = luck
   end
 
-
-  def to_json(*a)
-    puts "to_json in #{self.class.name}"
-    {
-      'json_class' => self.class.name,
-      'data' => [ @hp,@mp, @strength, @defense, @magic_power, @magic_defense, @agility, @luck]
-    }.to_json(*a)
-  end
-
-  def self.json_create(o)
-    puts "json creating #{o['json_class']}" ; new(*o['data'])
+  include JsonHelper
+  def json_params
+    [@hp,@mp, @strength, @defense, @magic_power, @magic_defense, @agility, @luck ]
   end
 end
 
@@ -1187,17 +1154,12 @@ class CharacterState
   def gain_experience(pts)
     @experience += pts
   end
-  def to_json(*a)
-    puts "to_json in #{self.class.name}"
-    {
-      'json_class' => self.class.name,
-      'data' => [ @attributes, @experience, @current_hp, @current_mp, @status_effects]
-    }.to_json(*a)
+
+  include JsonHelper
+  def json_params
+    [ @attributes, @experience, @current_hp, @current_mp, @status_effects]
   end
 
-  def self.json_create(o)
-    puts "json creating #{o['json_class']}" ; new(*o['data'])
-  end
 end
 
 class CharacterAttribution
@@ -1208,16 +1170,9 @@ class CharacterAttribution
     @state = state
   end
 
-  def to_json(*a)
-    puts "to_json in #{self.class.name}"
-    {
-      'json_class' => self.class.name,
-      'data' => [ @state]
-    }.to_json(*a)
-  end
-
-  def self.json_create(o)
-    puts "json creating #{o['json_class']}" ; new(*o['data'])
+  include JsonHelper
+  def json_params
+    [ @state]
   end
 end
 
@@ -1287,16 +1242,9 @@ class Monster
   end
 
 
-  def to_json(*a)
-    puts "to_json in #{self.class.name}"
-    {
-      'json_class' => self.class.name,
-      'data' => [ @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @character_attribution]
-    }.to_json(*a)
-  end
-
-  def self.json_create(o)
-    puts "json creating #{o['json_class']}" ; new(*o['data'])
+  include JsonHelper
+  def json_params
+    [ @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @character_attribution]
   end
 end
 
@@ -1315,18 +1263,11 @@ class TalkingNPC < Monster
     universe.dialog_layer.active = true
     universe.dialog_layer.text = @text
   end
-  def to_json(*a)
-    puts "to_json in #{self.class.name}"
-    {
-      'json_class' => self.class.name,
-      'data' => [ @text, @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @character_attribution]
-    }.to_json(*a)
-  end
 
-  def self.json_create(o)
-    puts "json creating #{o['json_class']}" ; new(*o['data'])
+  include JsonHelper
+  def json_params
+    [ @text, @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @character_attribution]
   end
-
 end
 
 class BattleReadinessHelper
@@ -1494,15 +1435,9 @@ class InterpretedMap
     @pallette = orig_interpreter.pallette
   end
 
-  def to_json(*a)
-    puts "to_json in #{self.class.name}"
-    {
-      'json_class' => self.class.name,
-      'data' => [ @topo_map, nil]
-    }.to_json(*a)
-  end
-  def self.json_create(o)
-    puts "json creating #{o['json_class']}" ; new(*o['data'])
+  include JsonHelper
+  def json_params
+    [ @topo_map, nil]
   end
 end
 
