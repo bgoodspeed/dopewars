@@ -1631,8 +1631,12 @@ end
 
 
 class InterpretedMap
-
   attr_reader :topo_map, :pallette
+
+  extend Forwardable
+  def_delegators :@topo_map, :left_side, :right_side, :bottom_side, :top_side,
+    :update, :x_offset_for_world, :y_offset_for_world, :data_at
+
   def initialize(topo_map, pallette)
     @topo_map = topo_map
     @pallette = pallette
@@ -1644,39 +1648,12 @@ class InterpretedMap
     @topo_map.blit_to(@pallette, surface)
   end
 
-  def x_offset_for_world(x)
-    @topo_map.x_offset_for_world(x)
-  end
-  def y_offset_for_world(y)
-    @topo_map.y_offset_for_world(y)
-  end
-
-  def data_at(x,y)
-    @topo_map.data_at(x,y)
-  end
   def [](key)
     @pallette[key]
   end
   
   def interpret(tilex, tiley)
     self[data_at(tilex,tiley)]
-  end
-
-  def bottom_side(y)
-    @topo_map.bottom_side(y)
-  end
-  def top_side(y)
-    @topo_map.top_side(y)
-  end
-  def left_side(x)
-    @topo_map.left_side(x)
-  end
-  def right_side(x)
-    @topo_map.right_side(x)
-  end
-
-  def update(x,y,value)
-    @topo_map.update(x,y,value)
   end
 
   def can_walk_at?(xi,yi)
@@ -1722,13 +1699,9 @@ class Pallette
     
   end
 
-
-
   def []=(key,value)
     @pal[key] = value
   end
-
-
 
   def [](key)
     @pal[key]
@@ -1737,8 +1710,6 @@ class Pallette
   def blit(target, xi, yi, datum, xsize, ysize)
     datum.blit(target, [xi*xsize, yi * ysize])
   end
-
-
 end
 
 class SurfaceBackedPallette < Pallette
@@ -2193,11 +2164,6 @@ private
 
 end
 
-
-# Start the main game loop. It will repeat forever
-# until the user quits the game!
 Game.new.go
 
-
-# Make sure everything is cleaned up properly.
 Rubygame.quit()
