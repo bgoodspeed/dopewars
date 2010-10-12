@@ -52,7 +52,7 @@ include Rubygame::EventTriggers
 @@NOTIFICATION_LAYER_INSET_X = 2 * @@SCREEN_X/3
 @@NOTIFICATION_LAYER_INSET_Y = 2 * @@SCREEN_Y/3
 @@TICKS_TO_DISPLAY_NOTIFICATIONS = 125
-
+@@GAME_TITLE = "splatwars"
 module JsonHelper
   def self.included(kmod)
     kmod.class_eval <<-EOF
@@ -71,6 +71,17 @@ module JsonHelper
 end
 
 class GameLayers
+  extend Forwardable
+  def_delegator :@menu_layer, :move_cursor_up, :menu_move_cursor_up
+  def_delegator :@menu_layer, :move_cursor_down, :menu_move_cursor_down
+  def_delegator :@menu_layer, :cancel_action, :menu_cancel_action
+  def_delegator :@battle_layer, :move_cursor_up, :battle_move_cursor_up
+  def_delegator :@battle_layer, :move_cursor_down, :battle_move_cursor_down
+  def_delegator :@battle_layer, :cancel_action, :battle_cancel_action
+  def_delegators :@notifications_layer, :add_notification
+
+
+
   attr_reader :dialog_layer, :menu_layer, :battle_layer, :notifications_layer
   def initialize(dialog_layer=nil, menu_layer=nil, battle_layer=nil, notif_layer=nil)
     @dialog_layer = dialog_layer
@@ -78,14 +89,36 @@ class GameLayers
     @battle_layer = battle_layer
     @notifications_layer = notif_layer
   end
+
+  def draw_game_layers_if_active
+    if @dialog_layer.active?
+      @dialog_layer.draw
+    end
+    if @menu_layer.active?
+      @menu_layer.draw
+    end
+    if @battle_layer.active?
+      @battle_layer.draw
+    end
+    if @notifications_layer.active?
+      @notifications_layer.draw
+    end
+  end
+
+  def reset_menu_positions
+    @menu_layer.reset_indices
+  end
 end
 
 class Universe
   attr_reader :worlds, :current_world,  :current_world_idx, :game_layers
 
   extend Forwardable
-  def_delegators :@current_world, :interpret
-  def_delegators :@game_layers, :dialog_layer, :menu_layer, :battle_layer, :notifications_layer
+  def_delegators :@current_world, :interpret, :npcs, :blit_world
+  def_delegators :@game_layers, :dialog_layer, :menu_layer, :battle_layer, :notifications_layer, 
+    :draw_game_layers_if_active, :menu_move_cursor_up, :menu_move_cursor_down, :menu_cancel_action,
+    :battle_cancel_action, :battle_move_cursor_down, :battle_move_cursor_up, :add_notification,
+    :reset_menu_positions
 
   def initialize(current_world_idx, worlds, game_layers=nil)
     raise "must have at least one world" if worlds.empty?
@@ -163,6 +196,24 @@ class WorldState
   def delete_monster(monster)
     @npcs -= [monster]
   end
+
+
+  def blit_world(screen, player)
+    sx = screen.w
+    sy = screen.h
+    ext_x = sx/2
+    ext_y = sy/2
+    screen_left = player.px - ext_x
+    screen_top = player.py - ext_y
+
+    @background_surface.blit(screen, [0,0], [ screen_left,screen_top, sx, sy])
+    blit_foreground(screen, player.px, player.py)
+
+    @npcs.each {|npc|
+      npc.draw(screen, player.px, player.py, sx, sy) if npc.nearby?(player.px, player.py, ext_x, ext_y)
+    }
+  end
+
 
   def replace_bgsurface(orig_world)
     @background_surface = orig_world.background_surface
@@ -562,8 +613,6 @@ class MenuHelper
     @screen = screen
     reset_indices
   end
-
-
 
   def color_for_current_section_cursor
     @cursor_main_color
@@ -1004,6 +1053,7 @@ class BattleLayer < AbstractLayer
   end
 
   def enter_current_cursor_location(game)
+    puts "weird: game is #{game}" if @battle.nil?
     if @battle.over?
       @end_of_battle_menu_helper.enter_current_cursor_location(game)
     else
@@ -1146,9 +1196,10 @@ class ReloaderHelper
     game.player = player
     game.update_player_tile_coords
     game.remove_all_hooks
-    game.make_event_hooks
+    game.rebuild_event_hooks
     game.universe.menu_layer.toggle_activity
-    game.make_hud
+    game.rebuild_hud
+    game.reset_menu_positions
     puts "reloading should be done"
   end
 end
@@ -1627,303 +1678,134 @@ class InteractableSurfaceBackedPallette < SurfaceBackedPallette
   end
 end
 
-class Game
-  include EventHandler::HasEventHandler
+class EventHelper
+  attr_reader :player_hooks, :npc_hooks, :battle_layer_hooks, :battle_active_hooks,
+    :menu_active_hooks, :menu_killed_hooks, :always_on_hooks
+  def initialize(game, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
+    @game = game
 
-  attr_accessor :player, :universe, :screen
-  def initialize()
-    make_screen
-    make_clock
-    make_queue
-    
+    @always_on_hooks_config = always_on_hooks
+    @menu_killed_hooks_config = menu_killed_hooks
+    @menu_active_hooks_config = menu_active_hooks
+    @battle_hooks_config = battle_hooks
+    rebuild_event_hooks
+  end
+
+  def rebuild_event_hooks
+    @always_on_hooks = @game.make_magic_hooks(@always_on_hooks_config)
+    @menu_killed_hooks = @game.make_magic_hooks(@menu_killed_hooks_config)
+    @menu_active_hooks = @game.make_magic_hooks(@menu_active_hooks_config)
+    @battle_active_hooks = @game.make_magic_hooks(@battle_hooks_config)
+
+    @battle_layer_hooks = @game.make_magic_hooks_for(@game.battle_layer, { YesTrigger.new() => :handle } )
     @npc_hooks = []
-    make_world1
-    make_world2
-    @npc_hooks.flatten
+    @game.npcs.each {|npc|
+      @npc_hooks << @game.make_magic_hooks_for( npc, { YesTrigger.new() => :handle } )
+    }
+    @player_hooks = @game.make_magic_hooks_for( @game.player, { YesTrigger.new() => :handle } )
 
-    make_game_layers
-    make_universe
-    make_player
-    make_hud
-    make_event_hooks
+    remove_menu_active_hooks
+    remove_battle_active_hooks
+    
   end
-
-  def make_game_layers
-    make_dialog_layer
-    make_menu_layer
-    make_battle_layer
-    make_notifications_layer
-    @game_layers = GameLayers.new(@dialog_layer, @menu_layer, @battle_layer, @notifications_layer)
-  end
-  def make_battle_layer
-    @battle_layer = BattleLayer.new(@screen)
-  end
-  def make_notifications_layer
-    @notifications_layer = NotificationsLayer.new(@screen)
-  end
-
-  def make_menu_layer
-    @menu_layer = MenuLayer.new(@screen)
-  end
-
-  def make_hud
-    @hud = Hud.new :screen => @screen, :player => @player, :topomap => @topomap
-  end
-  def make_world1
-    monster_inv = Inventory.new(255)
-    monster_inv.add_item(1, "potion")
-    @npcs = [TalkingNPC.new("i am an npc", "gogo-npc.png", 600, 200,48,64), Monster.new("monster.png", 400,660, @@MONSTER_X, @@MONSTER_Y, monster_inv)]
-
-    @worldstate = WorldStateFactory.build_world_state("world1_bg","world1_interaction", pallette, interaction_pallette, @@BGX, @@BGY, @npcs)
-  end
-  def make_world2
-    @worldstate2 = WorldStateFactory.build_world_state("world2_bg","world2_interaction", pallette_160,  interaction_pallette_160, @@BGX, @@BGY, [])
-  end
-
-  # The "main loop". Repeat the #step method
-  # over and over and over until the user quits.
-  def go
-    catch(:quit) do
-      loop do
-        step
-      end
-    end
-  end
-
   def non_menu_hooks
     (@npc_hooks + @player_hooks + @menu_killed_hooks).flatten
   end
 
-  def menu_hooks
-    @menu_active_hooks
+  def remove_menu_active_hooks
+    remove_hooks(@menu_active_hooks)
+  end
+  def remove_battle_active_hooks
+    remove_hooks(@battle_active_hooks)
   end
 
-  def battle_hooks
-    @battle_active_hooks
+  def remove_hooks(hooks)
+    hooks.each {|hook| @game.remove_hook(hook)}
   end
-  def non_battle_hooks
-    non_menu_hooks
-  end
-  def battle_begun(universe, player)
-    toggle_battle_hooks(false)
-  end
-  def battle_completed
-    toggle_battle_hooks(true)
-  end
+end
 
-  def make_clock
-    @clock = Clock.new()
-    @clock.target_framerate = 50
-    @clock.calibrate
-    @clock.enable_tick_events
-  end
-
-  def all_hooks
-    @event_handler.hooks.flatten
-  end
-
-  def remove_all_hooks
-    puts "pre hook count: #{all_hooks.size}"
-    all_hooks.each {|hook|
-      remove_hook(hook)
-    }
-    puts "post hook count: #{all_hooks.size}"
-  end
-
-  def make_event_hooks
-    always_on_hooks = {
-      :escape => :quit,
-      :q => :quit,
-      QuitRequested => :quit,
-      :c => :capture_ss,
-      :d => :toggle_dialog_layer,
-      :m => :toggle_menu
-    }
-
-    @always_on_hooks = make_magic_hooks( always_on_hooks )
-
-    menu_killed_hooks = { :i => :interact_with_facing, :space => :use_weapon }
-    @menu_killed_hooks = make_magic_hooks( menu_killed_hooks )
-    puts @menu_killed_hooks.size
-    menu_active_hooks = { :left => :menu_left, :right => :menu_right, :up => :menu_up, :down => :menu_down, :i => :menu_enter, :b => :menu_cancel }
-
-    @menu_active_hooks = make_magic_hooks(menu_active_hooks)
-    @menu_active_hooks.each do |hook|
-      remove_hook(hook)
-    end
-
-    battle_hooks = {
-      :left => :battle_left, :right => :battle_right, :up => :battle_up, :down => :battle_down,
-      :i => :battle_confirm, :b => :battle_cancel
-    }
-    @battle_active_hooks = make_magic_hooks(battle_hooks)
-    @battle_active_hooks.each do |hook|
-      remove_hook(hook)
-    end
-    @battle_layer_hooks = make_magic_hooks_for(@battle_layer, { YesTrigger.new() => :handle } )
-    @npcs.each {|npc|
-      @npc_hooks << make_magic_hooks_for( npc, { YesTrigger.new() => :handle } )
-    }
-    @player_hooks = make_magic_hooks_for( @player, { YesTrigger.new() => :handle } )
-    puts "player hooks: #{@player_hooks[0]}"
-
-  end
-  extend Forwardable
-
-  def_delegator :@menu_layer, :cancel_action, :menu_cancel
-  def_delegator :@menu_layer, :move_cursor_up, :menu_up
-  def_delegator :@menu_layer, :move_cursor_down, :menu_down
-  def_delegator :@menu_layer, :cancel_action, :menu_left
-
-  def_delegator :@battle_layer, :cancel_action, :battle_down
-  def_delegator :@battle_layer, :move_cursor_up, :battle_left
-  def_delegator :@battle_layer, :move_cursor_down, :battle_right
-  def_delegator :@battle_layer, :cancel_action, :battle_cancel
-  def_delegators :@notifications_layer, :add_notification
-
-  def_delegator :@dialog_layer, :toggle_visibility, :toggle_dialog_layer
-  def_delegator :@player, :update_tile_coords, :update_player_tile_coords
-
-
-  def toggle_battle_hooks(in_battle=false)
-    EventManager.new.swap_event_sets(self, in_battle, non_battle_hooks, battle_hooks)
-  end
-
-  def toggle_menu
-    
-    EventManager.new.swap_event_sets(self, @menu_layer.active?, non_menu_hooks, @menu_active_hooks)
-    @menu_layer.toggle_activity
-    unless @menu_layer.active?
-      @menu_layer.reset_indices
-    end
-  end
-  private
-  def menu_enter(event)
-    @menu_layer.enter_current_cursor_location(self)
-  end
-  def menu_right(event)
-    @menu_layer.enter_current_cursor_location(self)
-  end
-  def battle_up
-    @battle_layer.enter_current_cursor_location(self)
-  end
-  def interact_with_facing(event)
-    @player.interact_with_facing(self)
-  end
-  def battle_confirm
-    @battle_layer.enter_current_cursor_location(self)
-  end
-  def capture_ss(event)
-    #TODO this does not work, find a different way to dump screen data
-    #    def @screen.monkeypatch
-    #      filename = "screenshot.bmp"
-    #      result = SDL.SaveBMP_RW( @struct, filename )
-    #      if(result != 0)
-    #       raise( Rubygame::SDLError, "Couldn't save surface to file %s: %s"%\
-    #             [filename, SDL.GetError()] )
-    #      end
-    #      nil
-    #    end
-    
-    #@screen.savebmp("screenshot.bmp")
-
-    SDL.SaveBMP_RW("screenshot.bmp",@screen, 0)
-  end
-  def make_queue
-    # Create EventQueue with new-style events (added in Rubygame 2.4)
-    @queue = EventQueue.new()
-    @queue.enable_new_style_events
-
-    # Don't care about mouse movement, so let's ignore it.
-    @queue.ignore = [MouseMoved]
-  end
+class GameInternalsFactory
   def make_screen
     #@screen = Screen.open( [640, 480] )
-    @screen = Screen.new([@@SCREEN_X, @@SCREEN_Y])
-    @screen.title = "Square! In! Space!"
+    screen = Screen.new([@@SCREEN_X, @@SCREEN_Y])
+    screen.title = @@GAME_TITLE
+    screen
   end
-  def make_dialog_layer
-    @dialog_layer = DialogLayer.new(@screen)
+  def make_clock
+    clock = Clock.new()
+    clock.target_framerate = 50
+    clock.calibrate
+    clock.enable_tick_events
+    clock
   end
-  def make_universe
-    @universe = Universe.new(0, [@worldstate, @worldstate2], @game_layers)
+
+  def make_queue
+    queue = EventQueue.new()
+    queue.enable_new_style_events
+
+    queue.ignore = [MouseMoved]
+    queue
   end
-  def make_player
+
+  def make_game_layers(screen)
+    GameLayers.new(make_dialog_layer(screen), make_menu_layer(screen), make_battle_layer(screen), make_notifications_layer(screen))
+  end
+  def make_battle_layer(screen)
+    BattleLayer.new(screen)
+  end
+  def make_notifications_layer(screen)
+    NotificationsLayer.new(screen)
+  end
+  def make_dialog_layer(screen)
+    DialogLayer.new(screen)
+  end
+  def make_menu_layer(screen)
+    MenuLayer.new(screen)
+  end
+  def make_universe(worldstates, layers)
+    Universe.new(0, worldstates , layers)
+  end
+  def make_hud(screen, player, universe)
+    Hud.new :screen => screen, :player => player, :universe => universe 
+  end
+  def make_player(screen, universe)
     #@player = Ship.new( @screen.w/2, @screen.h/2, @topomap, pallette, @terrainmap, terrain_pallette, @interactmap, interaction_pallette, @bgsurface )
-    @hero = Hero.new("hero",  @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(10, 5, 1, 0, 0, 0, 0, 0))))
-    @hero2 = Hero.new("cohort", @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(10, 5, 1, 0, 0, 0, 0, 0))))
-    @party_inventory = Inventory.new(255) #TODO revisit inventory -- should it have a maximum? probably should not be stored on hero as well...
-    @party = Party.new([@hero, @hero2], @party_inventory)
-    @hero_x_dim = 48
-    @hero_y_dim = 64
-    @player_file = "Charactern8.png"
-    @ssx = @screen.w/2
-    @ssy = @screen.h/2
-    @player = Player.new(@ssx, @ssy , @universe, @party, @player_file, @hero_x_dim, @hero_y_dim , @ssx, @ssy )
-    @player.update_tile_coords
+    hero = Hero.new("hero",  @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(10, 5, 1, 0, 0, 0, 0, 0))))
+    hero2 = Hero.new("cohort", @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(10, 5, 1, 0, 0, 0, 0, 0))))
+    party_inventory = Inventory.new(255) #TODO revisit inventory -- should it have a maximum? probably should not be stored on hero as well...
+    party = Party.new([hero, hero2], party_inventory)
+    hero_x_dim = 48
+    hero_y_dim = 64
+    player_file = "Charactern8.png"
+    ssx = screen.w/2
+    ssy = screen.h/2
+    player = Player.new(ssx, ssy , universe, party, player_file, hero_x_dim, hero_y_dim , ssx, ssy )
+    player.update_tile_coords
+    player
     # Make event hook to pass all events to @player#handle().
   end
-
-  def quit
-    puts "Quitting!"
-    throw :quit
+  def make_world1
+    monster_inv = Inventory.new(255)
+    monster_inv.add_item(1, "potion")
+    npcs = [TalkingNPC.new("i am an npc", "gogo-npc.png", 600, 200,48,64), Monster.new("monster.png", 400,660, @@MONSTER_X, @@MONSTER_Y, monster_inv)]
+    WorldStateFactory.build_world_state("world1_bg","world1_interaction", pallette, interaction_pallette, @@BGX, @@BGY, npcs)
+  end
+  def make_world2
+    WorldStateFactory.build_world_state("world2_bg","world2_interaction", pallette_160,  interaction_pallette_160, @@BGX, @@BGY, [])
   end
 
-  def step
-    # Clear the screen.
-    @screen.fill( :black )
-    
-    @sx = 640
-    @sy = 480
-    screen_left = @player.px - (@sx/2)
-    screen_top = @player.py - (@sy/2)
-    @universe.current_world.background_surface.blit(@screen, [0,0], [ screen_left,screen_top, @sx, @sy])
-
-    @universe.current_world.blit_foreground(@screen, @player.px, @player.py)
-
-    @universe.current_world.npcs.each {|npc|
-
-      npc.draw(@screen, @player.px, @player.py, @sx, @sy) if npc.nearby?(@player.px, @player.py, @sx/2, @sy/2)
-
-    }
-
-
-
-    @queue.fetch_sdl_events
-
-    # Tick the clock and add the TickEvent to the queue.
-    tick = @clock.tick
-    @queue << tick
-    @hud.update :time => "Framerate: #{1.0/tick.seconds}"
-    # Process all the events on the queue.
-    @queue.each do |event|
-      handle( event )
-    end
-
-    # Draw the ship in its new position.
-    @player.draw(@screen)
-    @hud.draw
-    if @universe.dialog_layer.active?
-      @universe.dialog_layer.draw
-    end
-    if @universe.menu_layer.active?
-      @universe.menu_layer.draw
-    end
-    if @universe.battle_layer.active?
-      @universe.battle_layer.draw
-    end
-    if @universe.notifications_layer.active?
-      @universe.notifications_layer.draw
-    end
-    # Refresh the screen.
-    @screen.update()
+  def make_event_hooks(game, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
+    event_helper = EventHelper.new(game, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
+    event_helper
   end
+
 
   def tile(color)
     s = Surface.new([160,160])
     s.fill(color)
     s
   end
+  
   def interaction_pallette
     pal = InteractableSurfaceBackedPallette.new("treasure-boxes.png", 32,32)
 
@@ -1937,7 +1819,6 @@ class Game
 
     pal
   end
-
   def interaction_pallette_160
     pal = InteractableSurfaceBackedPallette.new("treasure-boxes-160.png", 160,160)
 
@@ -1952,7 +1833,6 @@ class Game
     pal
 
   end
-  
   def pallette
     pal = SurfaceBackedPallette.new("scaled-background-20x20.png", 20, 20)
     pal['G'] = SBPEntry.new([1,4], false)
@@ -1965,7 +1845,6 @@ class Game
     pal
 
   end
-
   def pallette_160
     pal = Pallette.new(tile(:blue))
     pal['O'] = JsonLoadableSurface.new("open-treasure-on-grass-bg-160.png", true)
@@ -1978,6 +1857,183 @@ class Game
     pal
   end
 
+
+
+end
+
+class Game
+  include EventHandler::HasEventHandler
+
+  attr_accessor :player, :universe, :screen
+  def initialize()
+    @factory = GameInternalsFactory.new
+    @screen = @factory.make_screen
+    @clock = @factory.make_clock
+    @queue = @factory.make_queue
+    
+    @universe = @factory.make_universe([@factory.make_world1, @factory.make_world2], @factory.make_game_layers(@screen))
+    @player = @factory.make_player(@screen, @universe)
+    @hud = @factory.make_hud(@screen, @player, @universe)
+    always_on_hooks = {
+      :escape => :quit,
+      :q => :quit,
+      QuitRequested => :quit,
+      :c => :capture_ss,
+      :d => :toggle_dialog_layer,
+      :m => :toggle_menu
+    }
+    menu_killed_hooks = { :i => :interact_with_facing, :space => :use_weapon }
+    menu_active_hooks = { :left => :menu_left, :right => :menu_right, :up => :menu_up, :down => :menu_down, :i => :menu_enter, :b => :menu_cancel }
+    battle_hooks = {
+      :left => :battle_left, :right => :battle_right, :up => :battle_up, :down => :battle_down,
+      :i => :battle_confirm, :b => :battle_cancel
+    }
+
+
+    @event_helper = @factory.make_event_hooks(self, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
+  end
+
+  def go
+    catch(:quit) do
+      loop do
+        step
+      end
+    end
+  end
+
+  def battle_begun(universe, player)
+    toggle_battle_hooks(false)
+  end
+  def battle_completed
+    toggle_battle_hooks(true)
+  end
+
+
+  def rebuild_hud
+    @hud = @factory.make_hud(@screen, @player, @universe)
+  end
+
+  def all_hooks
+    @event_handler.hooks.flatten
+  end
+
+  def remove_all_hooks
+    puts "pre hook count: #{all_hooks.size}"
+    all_hooks.each {|hook|
+      remove_hook(hook)
+    }
+    puts "post hook count: #{all_hooks.size}"
+  end
+
+  extend Forwardable
+
+  def_delegator :@universe, :menu_cancel_action, :menu_cancel
+  def_delegator :@universe, :menu_move_cursor_up, :menu_up
+  def_delegator :@universe, :menu_move_cursor_down, :menu_down
+  def_delegator :@universe, :menu_cancel_action, :menu_left
+
+  def_delegator :@universe, :battle_cancel_action, :battle_down
+  def_delegator :@universe, :battle_move_cursor_up, :battle_left
+  def_delegator :@universe, :battle_move_cursor_down, :battle_right
+  def_delegator :@universe, :battle_cancel_action, :battle_cancel
+  def_delegator :@universe, :toggle_dialog_visibility, :toggle_dialog_layer
+  def_delegators :@universe, :battle_layer, :npcs, :menu_layer, :reset_menu_positions, :add_notification
+
+  def_delegators :@event_helper, :non_menu_hooks, :rebuild_event_hooks
+  def_delegator :@event_helper, :menu_active_hooks, :menu_hooks
+  def_delegator :@event_helper, :battle_active_hooks, :battle_hooks
+  def_delegator :@event_helper, :non_menu_hooks, :non_battle_hooks
+
+  def_delegator :@player, :update_tile_coords, :update_player_tile_coords
+
+
+  def toggle_battle_hooks(in_battle=false)
+    EventManager.new.swap_event_sets(self, in_battle, non_battle_hooks, battle_hooks)
+  end
+
+  def toggle_menu
+    #puts "tm: #{@event_helper.menu_active_hooks}"
+    EventManager.new.swap_event_sets(self, menu_layer.active?, non_menu_hooks, menu_hooks)
+    menu_layer.toggle_activity
+    unless menu_layer.active?
+      menu_layer.reset_indices
+    end
+  end
+  private
+  def menu_enter(event)
+    menu_layer.enter_current_cursor_location(self)
+  end
+  def menu_right(event)
+    menu_layer.enter_current_cursor_location(self)
+  end
+  def battle_up
+    @universe.battle_layer.enter_current_cursor_location(self)
+  end
+  def interact_with_facing(event)
+    @player.interact_with_facing(self)
+  end
+  def battle_confirm
+    battle_layer.enter_current_cursor_location(self)
+  end
+  def capture_ss(event)
+    #TODO this does not work, find a different way to dump screen data
+    #@screen.savebmp("screenshot.bmp")
+
+    SDL.SaveBMP_RW("screenshot.bmp",@screen, 0)
+  end
+  def quit
+    puts "Quitting!"
+    throw :quit
+  end
+
+  def step
+    fill_bg
+
+    blit_universe
+    tick = tick_clock
+    update_hud(tick)
+
+    process_events
+
+    blit_player
+    blit_hud
+    blit_game_layers
+    
+    refresh_screen
+  end
+  
+  def fill_bg
+    @screen.fill( :black )
+  end
+  def blit_universe
+    @universe.blit_world(@screen, @player)
+  end
+  def tick_clock
+    @queue.fetch_sdl_events
+    tick = @clock.tick
+    @queue << tick
+    tick
+  end
+  def update_hud(tick)
+    @hud.update :time => "Framerate: #{1.0/tick.seconds}"
+  end
+  def process_events
+    @queue.each do |event|
+      handle( event )
+    end
+  end
+  def blit_player
+    @player.draw(@screen)
+  end
+  def blit_hud
+    @hud.draw
+  end
+  def blit_game_layers
+    @universe.draw_game_layers_if_active
+  end
+  def refresh_screen
+    @screen.update()
+  end
 
 
 end
