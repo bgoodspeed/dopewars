@@ -54,7 +54,7 @@ module JsonHelper
   def self.json_create(o)
     puts "json creating #{kmod}" ; new(*o['data'])
   end
-EOF
+    EOF
   end
   def to_json(*a)
     puts "to_json in #{self.class.name}"
@@ -542,15 +542,15 @@ class MenuHelper
     @text_rendering_helper = text_helper
     @menu_sections = sections
     @text_lines = @menu_sections.collect{|ms|ms.text}
-    @cursor_position = 0
-    @section_position = 0
     @cursor = Surface.new([cursor_x, cursor_y])
     @cursor_main_color = cursor_main_color
     @cursor_inactive_color = cursor_inactive_color
     @cursor.fill(@cursor_inactive_color)
-    @show_section = false
     @screen = screen
+    reset_indices
   end
+
+
 
   def color_for_current_section_cursor
     @cursor_main_color
@@ -599,6 +599,12 @@ class MenuHelper
       @cursor.blit(@layer, [conf.xc + conf.xf * @cursor_position, conf.yc + conf.yf * @cursor_position])
     end
     @layer.blit(@screen, menu_layer_config.layer_inset_on_screen)
+  end
+
+  def reset_indices
+    @cursor_position = 0
+    @section_position = 0
+    @show_section = false
   end
 end
 class BattleMenuHelper < MenuHelper
@@ -849,8 +855,7 @@ class MenuLayer < AbstractLayer
 
   extend Forwardable
   def_delegators :@menu_helper, :enter_current_cursor_location, :move_cursor_down,
-    :move_cursor_up, :cancel_action
-
+    :move_cursor_up, :cancel_action, :reset_indices
 
   def initialize(screen)
     super(screen, (screen.w) - 2*@@MENU_LAYER_INSET, (screen.h) - 2*@@MENU_LAYER_INSET)
@@ -1061,7 +1066,8 @@ class SaveAction < SaveLoadAction
     save_file.close
     puts "saving to slot #{submenu_idx}, json data is: "
     puts "player was at #{game.player.px} and #{game.player.py} at save time"
-    puts json
+    puts "save action believes the menu layer to be active? #{game.universe.menu_layer.active}"
+    game.toggle_menu
   end
 end
 
@@ -1716,8 +1722,12 @@ class Game
   end
 
   def toggle_menu
+    
     EventManager.new.swap_event_sets(self, @menu_layer.active?, non_menu_hooks, @menu_active_hooks)
     @menu_layer.toggle_activity
+    unless @menu_layer.active?
+      @menu_layer.reset_indices
+    end
   end
   private
   def menu_enter(event)
