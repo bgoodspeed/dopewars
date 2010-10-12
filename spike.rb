@@ -30,7 +30,9 @@ include Rubygame::EventTriggers
 @@BGY = 960
 @@MENU_LAYER_INSET = 25
 @@MENU_TEXT_INSET = 10
+@@NOTIFICATION_TEXT_INSET = 10
 @@MENU_LINE_SPACING = 25
+@@NOTIFICATION_LINE_SPACING = 25
 @@MENU_TEXT_WIDTH = 100
 @@LAYER_INSET = 25
 @@TEXT_INSET = 10
@@ -45,8 +47,11 @@ include Rubygame::EventTriggers
 @@OPEN_TREASURE = 'O'
 @@MONSTER_X = 32
 @@MONSTER_Y = 32
-
-
+@@NOTIFICATION_LAYER_WIDTH = @@SCREEN_X/3
+@@NOTIFICATION_LAYER_HEIGHT = @@SCREEN_Y/3
+@@NOTIFICATION_LAYER_INSET_X = 2 * @@SCREEN_X/3
+@@NOTIFICATION_LAYER_INSET_Y = 2 * @@SCREEN_Y/3
+@@TICKS_TO_DISPLAY_NOTIFICATIONS = 125
 
 module JsonHelper
   def self.included(kmod)
@@ -66,12 +71,13 @@ module JsonHelper
 end
 
 class Universe
-  attr_reader :worlds, :current_world, :dialog_layer, :menu_layer, :battle_layer, :current_world_idx
+  attr_reader :worlds, :current_world, :dialog_layer, :menu_layer, 
+              :battle_layer, :current_world_idx, :notifications_layer
 
   extend Forwardable
   def_delegators :@current_world, :interpret
 
-  def initialize(current_world_idx, worlds, dialog_layer=nil, menu_layer=nil, battle_layer=nil)
+  def initialize(current_world_idx, worlds, dialog_layer=nil, menu_layer=nil, battle_layer=nil, notif_layer=nil)
     raise "must have at least one world" if worlds.empty?
     @current_world = worlds[current_world_idx]
     @current_world_idx = current_world_idx
@@ -79,7 +85,7 @@ class Universe
     @dialog_layer = dialog_layer
     @menu_layer = menu_layer
     @battle_layer = battle_layer
-    
+    @notifications_layer = notif_layer
   end
 
   def world_by_index(idx)
@@ -799,6 +805,22 @@ class WarpPoint
   end
 end
 
+class Notification
+  attr_reader :message, :time_to_live
+  def initialize(msg, ttl)
+    @message = msg
+    @time_to_live = ttl
+  end
+
+  def displayed
+    @time_to_live -= 1
+  end
+
+  def dead?
+    @time_to_live <= 0
+  end
+end
+
 class AbstractLayer
   include FontLoader #TODO unify resource loading
   attr_accessor :active
@@ -808,6 +830,7 @@ class AbstractLayer
     @active = false
     @layer = Surface.new([layer_width, layer_height])
     @font = load_font("FreeSans.ttf")
+    @text_rendering_helper = TextRenderingHelper.new(@layer, @font)
   end
 
   def toggle_activity
@@ -817,6 +840,32 @@ class AbstractLayer
   alias_method :active?, :active
   alias_method :visible, :active
   alias_method :toggle_visibility, :toggle_activity
+end
+class NotificationsLayer < AbstractLayer
+  def initialize(screen)
+    super(screen, @@NOTIFICATION_LAYER_WIDTH, @@NOTIFICATION_LAYER_HEIGHT)
+    @notifications = []
+    @config = TextRenderingConfig.new(@@NOTIFICATION_TEXT_INSET, 0, @@NOTIFICATION_TEXT_INSET, @@NOTIFICATION_LINE_SPACING)
+  end
+
+  def add_notification(notification)
+    @notifications << notification
+    @active = true
+  end
+
+  def draw
+    @layer.fill(:black)
+    @notifications.each do |notif|
+      @text_rendering_helper.render_lines_to_layer( notif.message, @config)
+      notif.displayed
+    end
+    
+    @notifications.delete_if do |notif|
+      notif.dead?
+    end
+    @layer.blit(@screen, [@@NOTIFICATION_LAYER_INSET_X, @@NOTIFICATION_LAYER_INSET_Y])
+    @active = false if @notifications.empty?
+  end
 end
 class DialogLayer < AbstractLayer
   attr_accessor :visible, :text
@@ -861,7 +910,6 @@ class MenuLayer < AbstractLayer
     super(screen, (screen.w) - 2*@@MENU_LAYER_INSET, (screen.h) - 2*@@MENU_LAYER_INSET)
     @layer.fill(:red)
     @layer.alpha = 192
-    @text_rendering_helper = TextRenderingHelper.new(@layer, @font)
     sections = [MenuSection.new("Status", [MenuAction.new("status info line 1"), MenuAction.new("status info line 2")]),
       MenuSection.new("Inventory", [MenuAction.new("inventory contents:"), MenuAction.new("TODO real data")]),
       MenuSection.new("Equip", [MenuAction.new("head equipment:"), MenuAction.new("arm equipment: "), MenuAction.new("etc")]),
@@ -1060,14 +1108,15 @@ class SaveAction < SaveLoadAction
   def activate(menu_idx, game, submenu_idx)
     puts "saving: #{game.player}"
     json = JSON.generate(game.player)
-
-    save_file = File.open(save_slot(submenu_idx), "w")
+    slot = save_slot(submenu_idx)
+    save_file = File.open(slot, "w")
     save_file.puts json
     save_file.close
     puts "saving to slot #{submenu_idx}, json data is: "
     puts "player was at #{game.player.px} and #{game.player.py} at save time"
     puts "save action believes the menu layer to be active? #{game.universe.menu_layer.active}"
     game.toggle_menu
+    game.add_notification(Notification.new("Saved to #{slot}", @@TICKS_TO_DISPLAY_NOTIFICATIONS))
   end
 end
 
@@ -1076,7 +1125,7 @@ class ReloaderHelper
     puts "player is at #{game.player.px} and #{game.player.py} at load time"
     uni = json_player.universe
     orig_uni = game.universe
-    universe = Universe.new(uni.current_world_idx, uni.worlds, orig_uni.dialog_layer, orig_uni.menu_layer, orig_uni.battle_layer )
+    universe = Universe.new(uni.current_world_idx, uni.worlds, orig_uni.dialog_layer, orig_uni.menu_layer, orig_uni.battle_layer, orig_uni.notifications_layer )
 
     puts "universe has current world: #{universe.current_world_idx}"
     universe.replace_world_pallettes(orig_uni)
@@ -1105,13 +1154,15 @@ end
 
 class LoadAction < SaveLoadAction
   def activate(menu_idx, game, submenu_idx)
+    slot = save_slot(submenu_idx)
+    puts "load from #{slot}"
 
-    puts "load from #{save_slot(submenu_idx)}"
-    data = IO.readlines(save_slot(submenu_idx))
+    data = IO.readlines(slot)
 
     rebuilt = JSON.parse(data.join(" "))
     puts "got rebuilt: #{rebuilt.class} "
     ReloaderHelper.new.replace(game, rebuilt)
+    game.add_notification(Notification.new("Loaded from #{slot}", @@TICKS_TO_DISPLAY_NOTIFICATIONS))
   end
 end
 
@@ -1585,6 +1636,7 @@ class Game
     @npc_hooks.flatten
     make_menu_layer
     make_battle_layer
+    make_notifications_layer
     make_universe
     make_player
     make_hud
@@ -1593,8 +1645,11 @@ class Game
 
   def make_battle_layer
     @battle_layer = BattleLayer.new(@screen)
-    
   end
+  def make_notifications_layer
+    @notifications_layer = NotificationsLayer.new(@screen)
+  end
+
   def make_menu_layer
     @menu_layer = MenuLayer.new(@screen)
   end
@@ -1712,6 +1767,7 @@ class Game
   def_delegator :@battle_layer, :move_cursor_up, :battle_left
   def_delegator :@battle_layer, :move_cursor_down, :battle_right
   def_delegator :@battle_layer, :cancel_action, :battle_cancel
+  def_delegators :@notifications_layer, :add_notification
 
   def_delegator :@dialog_layer, :toggle_visibility, :toggle_dialog_layer
   def_delegator :@player, :update_tile_coords, :update_player_tile_coords
@@ -1745,9 +1801,6 @@ class Game
   def battle_confirm
     @battle_layer.enter_current_cursor_location(self)
   end
-
-
-  
   def capture_ss(event)
     #TODO this does not work, find a different way to dump screen data
     #    def @screen.monkeypatch
@@ -1764,11 +1817,6 @@ class Game
 
     SDL.SaveBMP_RW("screenshot.bmp",@screen, 0)
   end
-
-
-  # Create an EventQueue to take events from the keyboard, etc.
-  # The events are taken from the queue and passed to objects
-  # as part of the main loop.
   def make_queue
     # Create EventQueue with new-style events (added in Rubygame 2.4)
     @queue = EventQueue.new()
@@ -1777,22 +1825,17 @@ class Game
     # Don't care about mouse movement, so let's ignore it.
     @queue.ignore = [MouseMoved]
   end
-
-
-  # Create the Rubygame window.
   def make_screen
     #@screen = Screen.open( [640, 480] )
     @screen = Screen.new([@@SCREEN_X, @@SCREEN_Y])
     @screen.title = "Square! In! Space!"
   end
-
   def make_dialog_layer
     @dialog_layer = DialogLayer.new(@screen)
   end
   def make_universe
-    @universe = Universe.new(0, [@worldstate, @worldstate2], @dialog_layer, @menu_layer, @battle_layer)
+    @universe = Universe.new(0, [@worldstate, @worldstate2], @dialog_layer, @menu_layer, @battle_layer, @notifications_layer)
   end
-  # Create the player ship in the middle of the screen
   def make_player
     #@player = Ship.new( @screen.w/2, @screen.h/2, @topomap, pallette, @terrainmap, terrain_pallette, @interactmap, interaction_pallette, @bgsurface )
     @hero = Hero.new("hero",  @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(10, 5, 1, 0, 0, 0, 0, 0))))
@@ -1831,7 +1874,9 @@ class Game
       npc.draw(@screen, @player.px, @player.py, @sx, @sy) if npc.nearby?(@player.px, @player.py, @sx/2, @sy/2)
 
     }
-    
+
+
+
     @queue.fetch_sdl_events
 
     # Tick the clock and add the TickEvent to the queue.
@@ -1854,6 +1899,9 @@ class Game
     end
     if @universe.battle_layer.active?
       @universe.battle_layer.draw
+    end
+    if @universe.notifications_layer.active?
+      @universe.notifications_layer.draw
     end
     # Refresh the screen.
     @screen.update()
