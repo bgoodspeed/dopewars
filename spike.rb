@@ -951,6 +951,11 @@ class MenuLayer < AbstractLayer
   alias_method :visible, :active
   alias_method :toggle_visibility, :toggle_activity
 
+  extend Forwardable
+  def_delegators :@menu_helper, :enter_current_cursor_location, :move_cursor_down,
+    :move_cursor_up, :cancel_action
+
+
   def initialize(screen)
     super(screen, (screen.w) - 2*@@MENU_LAYER_INSET, (screen.h) - 2*@@MENU_LAYER_INSET)
     @layer.fill(:red)
@@ -980,20 +985,6 @@ class MenuLayer < AbstractLayer
   def draw()
     @layer.fill(:red)
     @menu_helper.draw(menu_layer_config)
-  end
-
-  def enter_current_cursor_location(game)
-    @menu_helper.enter_current_cursor_location(game)
-  end
-  def move_cursor_down
-    @menu_helper.move_cursor_down
-  end
-  def move_cursor_up
-    @menu_helper.move_cursor_up
-  end
-
-  def cancel_action
-    @menu_helper.cancel_action
   end
 
 end
@@ -1063,32 +1054,23 @@ class BattleLayer < AbstractLayer
     else
       @menu_helper.enter_current_cursor_location(game)
     end
-
   end
+  
   def move_cursor_down
-    if @battle.over?
-      @end_of_battle_menu_helper.move_cursor_down
-    else
-      @menu_helper.move_cursor_down
-    end
-
+    send_action_to_target(:move_cursor_down)
   end
   def move_cursor_up
-    if @battle.over?
-      @end_of_battle_menu_helper.move_cursor_up
-    else
-      @menu_helper.move_cursor_up
-    end
+    send_action_to_target(:move_cursor_up)
   end
 
   def cancel_action
-    if @battle.over?
-      @end_of_battle_menu_helper.cancel_action
-    else
-      @menu_helper.cancel_action
-    end
+    send_action_to_target(:cancel_action)
   end
 
+  def send_action_to_target(sym)
+    target = @battle.over? ? @end_of_battle_menu_helper : @menu_helper
+    target.send(sym)
+  end
 end
 
 class MenuSection
@@ -1108,9 +1090,7 @@ class HeroMenuSection < MenuSection
     super(hero.name, content)
     @hero = hero
   end
-
 end
-
 
 class TextRenderingConfig
   attr_reader :xc,:xf,:yc,:yf
@@ -1140,8 +1120,8 @@ class AttackAction < MenuAction
   def initialize(text, battle_layer)
     super(text, @@ATTACK_ACTION_COST)
     @battle_layer = battle_layer
-
   end
+
   def activate(party_member_index, game, submenu_idx)
     battle = @battle_layer.battle
     
@@ -1156,10 +1136,7 @@ class ItemAction < MenuAction
   def activate(party_member_index, game, submenu_idx)
     battle = @battle_layer.battle
     puts "TODO itemaction"
-
-
   end
-
 end
 class EndBattleAction < MenuAction
   def initialize(text, battle_layer)
@@ -1192,7 +1169,6 @@ class SaveAction < SaveLoadAction
   end
 end
 
-
 class ReloaderHelper
   def replace(game, json_player)
     puts "player is at #{game.player.px} and #{game.player.py} at load time"
@@ -1223,7 +1199,6 @@ module ScreenOffsetHelper
   def offset_from_screen(location, viewer_position, screen_extent)
     location - viewer_position + screen_extent
   end
-
 end
 
 class LoadAction < SaveLoadAction
@@ -1262,12 +1237,9 @@ class CharacterAttributes
   def self.json_create(o)
     new(*o['data'])
   end
-
-
 end
 
 class CharacterState
-
   attr_accessor :current_hp, :current_mp, :status_effects, :experience
 
   def initialize(attributes, exp=nil, chp=nil, cmp=nil, statii=nil)
@@ -1303,31 +1275,16 @@ class CharacterState
   def self.json_create(o)
     new(*o['data'])
   end
-
-
 end
 
 class CharacterAttribution
+  extend Forwardable
+  def_delegators :@state, :dead?, :take_damage, :damage, :gain_experience, :experience
+
   def initialize(state)
     @state = state
   end
 
-  def dead?
-    @state.dead?
-  end
-
-  def take_damage(damage)
-    @state.take_damage(damage)
-  end
-  def damage
-    @state.damage
-  end
-  def gain_experience(pts)
-    @state.gain_experience(pts)
-  end
-  def experience
-    @state.experience
-  end
   def to_json(*a)
     {
       'json_class' => self.class.name,
@@ -1338,22 +1295,18 @@ class CharacterAttribution
   def self.json_create(o)
     new(*o['data'])
   end
-
 end
+
 class Monster
   include ScreenOffsetHelper
   include Sprites::Sprite
   include EventHandler::HasEventHandler
-  def px
-    @animated_sprite_helper.px
-  end
-  def py
-    @animated_sprite_helper.py
-  end
 
-  def add_readiness(pts)
-    @readiness_helper.add_readiness(pts)
-  end
+  extend Forwardable
+  def_delegators :@animated_sprite_helper, :collides_on_x?, :collides_on_y?, :px, :py
+  def_delegators :@character_attribution, :take_damage, :experience, :dead?
+  def_delegators :@readiness_helper, :add_readiness, :add_readiness
+
   attr_reader :inventory
   def initialize(filename, px, py, npc_x = @@MONSTER_X, npc_y = @@MONSTER_Y, inventory=Inventory.new(255), character_attrib=nil)
     @npc_x = npc_x
@@ -1376,20 +1329,8 @@ class Monster
     CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(3, 0, 0, 0, 0, 0, 0, 0)))
   end
 
-  def dead?
-    @character_attribution.dead?
-  end
-
-
-  def experience
-    @character_attribution.experience
-  end
   def is_blocking?
     false
-  end
-
-  def take_damage(damage)
-    @character_attribution.take_damage(damage)
   end
 
   def draw(surface,x,y,sx,sy)
@@ -1400,13 +1341,11 @@ class Monster
 
   def draw_to(layer)
     @animated_sprite_helper.image.blit layer, [0,0,96,128]
-
   end
 
   def update(event)
     dt = event.seconds # Time since last update
     @animation_helper.update_animation(dt) { |frame| @animated_sprite_helper.replace_avatar(frame) }
-
   end
 
   def distance_to(x,y)
@@ -1424,13 +1363,6 @@ class Monster
   end
 
 
-  def collides_on_x?(x)
-    @animated_sprite_helper.collides_on_x?(x)
-  end
-  def collides_on_y?(y)
-    @animated_sprite_helper.collides_on_y?(y)
-  end
-
   def to_json(*a)
     {
       'json_class' => self.class.name,
@@ -1447,7 +1379,6 @@ class TalkingNPC < Monster
   def is_blocking?
     true
   end
-
 
   def initialize(text, filename, px, py, npc_x, npc_y, inv=nil, attrib=nil)
     super(filename, px, py, npc_x, npc_y, inv, attrib)
@@ -1493,7 +1424,6 @@ class BattleReadinessHelper
   def ready?
     @points >= @points_needed_for_ready
   end
-
 end
 
 class BattleVictoryHelper
@@ -1509,12 +1439,14 @@ class BattleVictoryHelper
 end
 
 class Battle
+  extend Forwardable
+  def_delegators :@player, :party
   
   attr_reader :monster, :player
   def initialize(game, universe, player, monster, battle_layer)
     @game = game
     @player = player
-    @monster = monster
+    @monster = monster #TODO allow multi-monster battles
     @universe = universe
   end
 
@@ -1522,9 +1454,6 @@ class Battle
     points = dt * @@READINESS_POINTS_PER_SECOND
     @player.add_readiness(points)
     @monster.add_readiness(points)
-  end
-  def party
-    @player.party
   end
 
   def over?
@@ -1537,8 +1466,6 @@ class Battle
     helper.give_spoils(@player, @monster)
     helper.monster_killed(@universe,@monster)
   end
-
-
 end
 
 
@@ -1570,21 +1497,12 @@ class JsonSurface < Surface
     @size = size
   end
 
-
-#  def to_json(*a)
-#    {
-#      'json_class' => self.class.name,
-#      'data' => [ @size] #TODO reconsider terrain/etc loading
-#    }.to_json(*a)
-#  end
-#
-#  def self.json_create(o)
-#    new(*o['data'])
-#  end
-
 end
 
 class JsonLoadableSurface 
+  extend Forwardable
+  def_delegators :@surface, :blit
+
   def initialize(filename, blocking)
     @filename = filename
     @blocking = blocking
@@ -1594,22 +1512,6 @@ class JsonLoadableSurface
   def is_blocking?
     @blocking
   end
-
-  def blit(layer, offset)
-    @surface.blit(layer, offset)
-  end
-
-#  def to_json(*a)
-#    {
-#      'json_class' => self.class.name,
-#      'data' => [ @filename] #TODO reconsider terrain/etc loading
-#    }.to_json(*a)
-#  end
-#
-#  def self.json_create(o)
-#    new(*o['data'])
-#  end
-
 end
 
 
@@ -1623,9 +1525,7 @@ class TopoMapFactory
     x = chrs.size
     y = lines.size
 
-    puts "x,y = #{x},#{y}"
     TopoMap.new(x,y,bgx, bgy, data)
-
   end
 end
 
