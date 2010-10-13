@@ -110,22 +110,73 @@ class GameLayers
   end
 end
 
+class BackgroundMusic
+  def initialize(filename)
+    @filename = filename
+    @music = Music.load(@filename)
+  end
+
+  def play_pause
+    if @music.playing?
+      @music.pause
+    else
+      @music.play
+    end
+  end
+  def fade_out_bg_music
+    @music.fade_out(2)
+  end
+  def fade_in_bg_music
+    @music.play({:fade_in => 2})
+  end
+end
+
+class SoundEffect
+  WEAPON = "weapon"
+  WARP = "warp"
+  BATTLE_START = "battle"
+  TREASURE = "treasure"
+end
+
+class SoundEffectSet
+  def initialize(filenames)
+    @effects = {}
+    filenames.each do |filename|
+      @effects[filename] = Sound.load(filename)
+    end
+  end
+
+  def mapping
+    pal = {}
+    pal[SoundEffect::TREASURE] = "treasure-open.ogg"
+    pal[SoundEffect::WEAPON] = "laser.ogg"
+    pal[SoundEffect::WARP] = "warp.ogg"
+    pal[SoundEffect::BATTLE_START] = "battle-start.ogg"
+    pal
+  end
+
+  def play_sound_effect(which)
+    @effects[mapping[which]].play
+  end
+end
 class Universe
-  attr_reader :worlds, :current_world,  :current_world_idx, :game_layers
+  attr_reader :worlds, :current_world,  :current_world_idx, :game_layers, :sound_effects
 
   extend Forwardable
-  def_delegators :@current_world, :interpret, :npcs, :blit_world
+  def_delegators :@sound_effects, :play_sound_effect
+  def_delegators :@current_world, :interpret, :npcs, :blit_world, :toggle_bg_music, :fade_out_bg_music, :fade_in_bg_music
   def_delegators :@game_layers, :dialog_layer, :menu_layer, :battle_layer, :notifications_layer, 
     :draw_game_layers_if_active, :menu_move_cursor_up, :menu_move_cursor_down, :menu_cancel_action,
     :battle_cancel_action, :battle_move_cursor_down, :battle_move_cursor_up, :add_notification,
     :reset_menu_positions
 
-  def initialize(current_world_idx, worlds, game_layers=nil)
+  def initialize(current_world_idx, worlds, game_layers=nil, sound_effects=nil)
     raise "must have at least one world" if worlds.empty?
     @current_world = worlds[current_world_idx]
     @current_world_idx = current_world_idx
     @worlds = worlds
     @game_layers = game_layers
+    @sound_effects = sound_effects
   end
 
   def world_by_index(idx)
@@ -144,16 +195,28 @@ class Universe
     @worlds.each {|world| world.reblit_background}
   end
   def replace_world_pallettes(orig_uni)
-    @worlds.each_with_index {|world, index|
-      orig_world = orig_uni.world_by_index(index)
+    worlds_with_index(orig_uni) {|world, orig_world|
       world.replace_pallettes(orig_world)
     }
   end
-  def replace_world_bgsurfaces(orig_uni)
-    @worlds.each_with_index {|world, index|
+
+  def worlds_with_index(orig_uni)
+    @worlds.each_with_index do |world, index|
       orig_world = orig_uni.world_by_index(index)
+      yield world, orig_world
+    end
+  end
+  def replace_world_bgsurfaces(orig_uni)
+    worlds_with_index(orig_uni) {|world, orig_world|
       world.replace_bgsurface(orig_world)
     }
+  end
+
+  def replace_world_bgmusics(orig_uni)
+    worlds_with_index(orig_uni) {|world, orig_world|
+      world.replace_bgmusic(orig_world)
+    }
+
   end
 
   include JsonHelper
@@ -163,7 +226,7 @@ class Universe
 end
 
 class WorldState
-  attr_reader :topo_interpreter, :interaction_interpreter,:npcs, :background_surface
+  attr_reader :topo_interpreter, :interaction_interpreter,:npcs, :background_surface, :background_music
             
   extend Forwardable
   def_delegator :@topo_interpreter, :update, :update_topo_map
@@ -174,12 +237,15 @@ class WorldState
   def_delegator :@interaction_interpreter, :update, :update_interaction_map
   def_delegators :@topo_interpreter, :x_offset_for_world, :y_offset_for_world
   def_delegators :@interaction_interpreter, :blit_foreground
+  def_delegator :@background_music, :play_pause, :toggle_bg_music
+  def_delegators :@background_music, :fade_out_bg_music, :fade_in_bg_music
 
-  def initialize(topointerp, interinterp, npcs, bgsurface)
+  def initialize(topointerp, interinterp, npcs, bgsurface, bgmusic)
     @topo_interpreter = topointerp
     @interaction_interpreter = interinterp
     @npcs = npcs
     @background_surface = bgsurface
+    @background_music = bgmusic
     
     reblit_background unless bgsurface.nil?
   end
@@ -218,9 +284,15 @@ class WorldState
   def replace_bgsurface(orig_world)
     @background_surface = orig_world.background_surface
   end
+  def replace_bgmusic(orig_world)
+    @background_music = orig_world.background_music
+  end
+
+  
+
   include JsonHelper
   def json_params
-    [ nil, @interaction_interpreter, @npcs, nil]
+    [ nil, @interaction_interpreter, @npcs, nil,nil]
   end
 end
 
@@ -820,6 +892,7 @@ class Treasure
   end
 
   def activate(player, worldstate, tilex, tiley)
+    player.universe.play_sound_effect(SoundEffect::TREASURE)
     worldstate.update_interaction_map(tilex, tiley, @@OPEN_TREASURE)
     player.add_inventory(1, @name)
   end
@@ -850,10 +923,13 @@ class WarpPoint
 
   def activate(player, worldstate, tilex, tiley)
     uni = player.universe
+    player.universe.fade_out_bg_music
+    player.universe.play_sound_effect(SoundEffect::WARP)
     puts "player was at #{player.px},#{player.py}"
     player.set_position(@destination_x, @destination_y)
     puts "warp from  #{worldstate} to #{uni.world_by_index(@destination)}"
     uni.set_current_world_by_index(@destination)
+    player.universe.fade_in_bg_music
   end
   include JsonHelper
   def json_params
@@ -1182,11 +1258,12 @@ class ReloaderHelper
     puts "player is at #{game.player.px} and #{game.player.py} at load time"
     uni = json_player.universe
     orig_uni = game.universe
-    universe = Universe.new(uni.current_world_idx, uni.worlds, orig_uni.game_layers)
+    universe = Universe.new(uni.current_world_idx, uni.worlds, orig_uni.game_layers, orig_uni.sound_effects)
 
     puts "universe has current world: #{universe.current_world_idx}"
     universe.replace_world_pallettes(orig_uni)
     universe.replace_world_bgsurfaces(orig_uni)
+    universe.replace_world_bgmusics(orig_uni)
     
     universe.reblit_backgrounds
     puts "backgrounds rebuilt"
@@ -1557,11 +1634,11 @@ class InterpretedMap
 end
 
 class WorldStateFactory
-  def self.build_world_state(bg_file, int_file, pallette, interaction_pallette, bgx, bgy, npcs)
+  def self.build_world_state(bg_file, int_file, pallette, interaction_pallette, bgx, bgy, npcs, bgm)
     bgsurface = JsonSurface.new([bgx,bgy])
     bg = InterpretedMap.new(TopoMapFactory.build_map(bg_file, bgx, bgy), pallette)
     inter = InterpretedMap.new(TopoMapFactory.build_map(int_file, bgx, bgy), interaction_pallette)
-    WorldState.new(bg, inter, npcs, bgsurface)
+    WorldState.new(bg, inter, npcs, bgsurface, bgm)
   end
 end
 
@@ -1762,8 +1839,8 @@ class GameInternalsFactory
   def make_menu_layer(screen)
     MenuLayer.new(screen)
   end
-  def make_universe(worldstates, layers)
-    Universe.new(0, worldstates , layers)
+  def make_universe(worldstates, layers, sound_effects)
+    Universe.new(0, worldstates , layers, sound_effects)
   end
   def make_hud(screen, player, universe)
     Hud.new :screen => screen, :player => player, :universe => universe 
@@ -1788,10 +1865,11 @@ class GameInternalsFactory
     monster_inv = Inventory.new(255)
     monster_inv.add_item(1, "potion")
     npcs = [TalkingNPC.new("i am an npc", "gogo-npc.png", 600, 200,48,64), Monster.new("monster.png", 400,660, @@MONSTER_X, @@MONSTER_Y, monster_inv)]
-    WorldStateFactory.build_world_state("world1_bg","world1_interaction", pallette, interaction_pallette, @@BGX, @@BGY, npcs)
+    bgm = BackgroundMusic.new("bonobo-time_is_the_enemy.mp3")
+    WorldStateFactory.build_world_state("world1_bg","world1_interaction", pallette, interaction_pallette, @@BGX, @@BGY, npcs, bgm)
   end
   def make_world2
-    WorldStateFactory.build_world_state("world2_bg","world2_interaction", pallette_160,  interaction_pallette_160, @@BGX, @@BGY, [])
+    WorldStateFactory.build_world_state("world2_bg","world2_interaction", pallette_160,  interaction_pallette_160, @@BGX, @@BGY, [], BackgroundMusic.new("bonobo-gypsy.mp3"))
   end
 
   def make_event_hooks(game, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
@@ -1799,6 +1877,10 @@ class GameInternalsFactory
     event_helper
   end
 
+
+  def make_sound_effects
+    SoundEffectSet.new(["battle-start.ogg", "laser.ogg", "warp.ogg", "treasure-open.ogg"])
+  end
 
   def tile(color)
     s = Surface.new([160,160])
@@ -1871,7 +1953,8 @@ class Game
     @clock = @factory.make_clock
     @queue = @factory.make_queue
     
-    @universe = @factory.make_universe([@factory.make_world1, @factory.make_world2], @factory.make_game_layers(@screen))
+    @universe = @factory.make_universe([@factory.make_world1, @factory.make_world2], @factory.make_game_layers(@screen), @factory.make_sound_effects)
+    @universe.toggle_bg_music
     @player = @factory.make_player(@screen, @universe)
     @hud = @factory.make_hud(@screen, @player, @universe)
     always_on_hooks = {
@@ -1882,15 +1965,15 @@ class Game
       :d => :toggle_dialog_layer,
       :m => :toggle_menu
     }
-    menu_killed_hooks = { :i => :interact_with_facing, :space => :use_weapon }
+    menu_killed_hooks = { :i => :interact_with_facing, :space => :use_weapon, :p => :toggle_bg_music }
     menu_active_hooks = { :left => :menu_left, :right => :menu_right, :up => :menu_up, :down => :menu_down, :i => :menu_enter, :b => :menu_cancel }
     battle_hooks = {
       :left => :battle_left, :right => :battle_right, :up => :battle_up, :down => :battle_down,
       :i => :battle_confirm, :b => :battle_cancel
     }
 
-
     @event_helper = @factory.make_event_hooks(self, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
+    
   end
 
   def go
@@ -1937,7 +2020,8 @@ class Game
   def_delegator :@universe, :battle_move_cursor_down, :battle_right
   def_delegator :@universe, :battle_cancel_action, :battle_cancel
   def_delegator :@universe, :toggle_dialog_visibility, :toggle_dialog_layer
-  def_delegators :@universe, :battle_layer, :npcs, :menu_layer, :reset_menu_positions, :add_notification
+  def_delegators :@universe, :battle_layer, :npcs, :menu_layer, 
+    :reset_menu_positions, :add_notification, :toggle_bg_music
 
   def_delegators :@event_helper, :non_menu_hooks, :rebuild_event_hooks
   def_delegator :@event_helper, :menu_active_hooks, :menu_hooks
@@ -1987,6 +2071,7 @@ class Game
   end
 
   def step
+    
     fill_bg
 
     blit_universe
