@@ -262,7 +262,9 @@ class WorldState
   def delete_monster(monster)
     @npcs -= [monster]
   end
-
+  def add_npc(npc)
+    @npcs += [npc]
+  end
 
   def blit_world(screen, player)
     sx = screen.w
@@ -316,6 +318,11 @@ class AlwaysDownMonsterKeyHolder < KeyHolder
   def initialize(key=@@DOWNKEY)
     super()
     add_key(key)
+  end
+
+  def switch(oldkey, newkey)
+    delete_key(oldkey)
+    add_key(newkey)
   end
 end
 
@@ -428,43 +435,59 @@ end
 class CoordinateHelper
   attr_accessor :px, :py
 
-  def initialize(px,py, key,universe, hero_x_dim, hero_y_dim)
+  def initialize(px,py, key,universe, hero_x_dim, hero_y_dim, max_speed=400, accel=1200, slowdown=800)
     @hero_x_dim, @hero_y_dim =  hero_x_dim, hero_y_dim
     @universe = universe
     @keys = key
     @px, @py = px, py # Current Position
     @vx, @vy = 0, 0 # Current Velocity
     @ax, @ay = 0, 0 # Current Acceleration
-    @max_speed = 400.0 # Max speed on an axis
-    @accel = 1200.0 # Max Acceleration on an axis
-    @slowdown = 800.0 # Deceleration when not accelerating
+    @max_speed = max_speed # Max speed on an axis
+    @accel = accel # Max Acceleration on an axis
+    @slowdown = slowdown # Deceleration when not accelerating
+    update_tile_coords
   end
 
   def world_coords
-    TileCoordinateSet.new( @universe.current_world.x_offset_for_world(@px - x_ext),
-      @universe.current_world.x_offset_for_world(@px + x_ext),
-      @universe.current_world.y_offset_for_world(@py - y_ext),
-      @universe.current_world.y_offset_for_world(@py + y_ext) )
+    TileCoordinateSet.new( @universe.current_world.x_offset_for_world(base_x),
+      @universe.current_world.x_offset_for_world(max_x),
+      @universe.current_world.y_offset_for_world(base_y ),
+      @universe.current_world.y_offset_for_world(max_y) )
   end
 
   def interact_coords
-    TileCoordinateSet.new( @universe.current_world.x_offset_for_interaction(@px - x_ext),
-      @universe.current_world.x_offset_for_interaction(@px + x_ext),
-      @universe.current_world.y_offset_for_interaction(@py - y_ext),
-      @universe.current_world.y_offset_for_interaction(@py + y_ext) )
+    TileCoordinateSet.new( @universe.current_world.x_offset_for_interaction(base_x),
+      @universe.current_world.x_offset_for_interaction(max_x),
+      @universe.current_world.y_offset_for_interaction(base_y ),
+      @universe.current_world.y_offset_for_interaction(max_y) )
   end
+
+  def max_x
+    @px + x_ext
+  end
+  def max_y
+    @py + y_ext
+  end
+
+  def base_x
+    @px - x_ext
+  end
+  
+  def base_y
+    @py - y_ext
+  end
+ def collides_on_x?(x)
+    (@px - x).abs < x_ext
+  end
+  def collides_on_y?(y)
+    (@py - y).abs < y_ext
+  end
+
 
   def update_tile_coords
     @bg_tile_coords = world_coords
     @interaction_tile_coords = interact_coords
   end
-  def x_ext
-    @hero_x_dim/2
-  end
-  def y_ext
-    @hero_y_dim/2
-  end
-  # Update the acceleration based on what keys are pressed.
   def update_accel
     x, y = 0,0
 
@@ -480,20 +503,10 @@ class CoordinateHelper
 
     @ax, @ay = x, y
   end
-
-  # Update the velocity based on the acceleration and the time since
-  # last update.
   def update_vel( dt )
     @vx = update_vel_axis( @vx, @ax, dt )
     @vy = update_vel_axis( @vy, @ay, dt )
   end
-
-  # Calculate the velocity for one axis.
-  # v = current velocity on that axis (e.g. @vx)
-  # a = current acceleration on that axis (e.g. @ax)
-  #
-  # Returns what the new velocity (@vx) should be.
-  #
   def update_vel_axis( v, a, dt )
 
     # Apply slowdown if not accelerating.
@@ -516,19 +529,23 @@ class CoordinateHelper
 
     return v
   end
-
+  def x_ext
+    @hero_x_dim/2
+  end
+  def y_ext
+    @hero_y_dim/2
+  end
   def clamp_to_world_dimensions
     minx = @px - x_ext
     maxx = @px + x_ext
     miny = @py - y_ext
     maxy = @py + y_ext
     @px = x_ext if minx < 0
-    @px = @@BGX - x_ext if maxx > @@BGX
+    @px = @@BGX - x_ext if maxx > @@BGX #TODO this should come from the current world
 
     @py = y_ext if miny < 0
     @py = @@BGY - y_ext if maxy > @@BGY
   end
-
   def check_corners(interp, x1, y1, x2, y2)
     c1 = interp.can_walk_at?(x1,y1)
     c2 = interp.can_walk_at?(x2,y2)
@@ -538,7 +555,6 @@ class CoordinateHelper
     end
     false
   end
-
   def clamp_to_tile_restrictions_on_y(interp, new_bg_tile_coords)
     rv = false
 
@@ -550,7 +566,6 @@ class CoordinateHelper
     end
     rv
   end
-  
   def clamp_to_tile_restrictions_on_x(interp, new_bg_tile_coords)
     rv = false
     
@@ -564,21 +579,19 @@ class CoordinateHelper
 
     rv
   end
-
   def blocking(col)
     col.select do |npc|
       npc.is_blocking?
     end
   end
-
   def x_hits(npcs)
     npcs.select do |npc|
-      npc.collides_on_x?(@px - x_ext) or npc.collides_on_x?(@px + x_ext)
+      npc.collides_on_x?(base_x) or npc.collides_on_x?(max_x)
     end
   end
   def y_hits(npcs)
     npcs.select do |npc|
-      npc.collides_on_y?(@py - y_ext) or npc.collides_on_y?(@py + y_ext)
+      npc.collides_on_y?(base_y) or npc.collides_on_y?(max_y)
     end
   end
   def hit_blocking_npcs_on_x(npcs)
@@ -588,15 +601,19 @@ class CoordinateHelper
     blocking(y_hits(x_hits(npcs)))
   end
 
-  def update_pos( dt )
+
+  def candidate_npcs(who=nil)
+    @universe.current_world.npcs
+  end
+
+  def update_pos( dt, who=nil )
     dx = @vx * dt
     dy = @vy * dt
 
     @px += dx
-    x_collisions = hit_blocking_npcs_on_x(@universe.current_world.npcs)
-
+    x_collisions = hit_blocking_npcs_on_x(candidate_npcs(who))
     @py += dy
-    y_collisions = hit_blocking_npcs_on_x(@universe.current_world.npcs) - x_collisions
+    y_collisions = hit_blocking_npcs_on_x(candidate_npcs(who)) - x_collisions
     clamp_to_world_dimensions
 
     topo = @universe.current_world.topo_interpreter
@@ -607,11 +624,21 @@ class CoordinateHelper
     @px -= dx if clamp_to_tile_restrictions_on_x(topo, new_bg_tile_coords) or clamp_to_tile_restrictions_on_x(interact, new_interaction_tile_coords) or !x_collisions.empty?
     @py -= dy if clamp_to_tile_restrictions_on_y(topo, new_bg_tile_coords) or clamp_to_tile_restrictions_on_y(interact, new_interaction_tile_coords) or !y_collisions.empty?
 
-    cols = y_hits(x_hits(@universe.current_world.npcs))
-
-    puts "Detected #{cols.size} colisions with npcs" unless cols.empty? #TODO automatic fights would go here
+#    puts "tile topo x: #{clamp_to_tile_restrictions_on_x(topo, new_bg_tile_coords)} tile interact x: #{clamp_to_tile_restrictions_on_x(interact, new_interaction_tile_coords)} x cols: #{!x_collisions.empty?}"
+#    puts "tile topo y: #{clamp_to_tile_restrictions_on_y(topo, new_bg_tile_coords)} tile interact y: #{clamp_to_tile_restrictions_on_y(interact, new_interaction_tile_coords)} y cols: #{!y_collisions.empty?}"
+    cols = y_hits(x_hits(candidate_npcs(who)))
+    puts "Detected #{cols.size} colisions in #{self.class} with npcs" unless cols.empty? #TODO automatic fights would go here
 
     update_tile_coords
+  end
+end
+
+class MonsterCoordinateHelper < CoordinateHelper
+  def candidate_npcs(who=nil)
+    r = super()
+    cands = (r - [who]) # + [who.player]
+    
+    cands
   end
 end
 class AnimatedSpriteHelper
@@ -650,13 +677,7 @@ class AnimatedSpriteHelper
     @all_char_postures.blit(@image, [0,0], Rect.new(animation_frame * @avatar_x_dim, @last_direction_offset,@avatar_x_dim, @avatar_y_dim))
   end
 
-  def collides_on_x?(x)
-    (@px - x).abs < @avatar_x_dim/2
-  end
-  def collides_on_y?(y)
-    (@py - y).abs < @avatar_y_dim/2
-  end
-
+ 
 end
 class TextRenderingHelper
   def initialize(layer, font)
@@ -1368,26 +1389,87 @@ class CharacterAttribution
   end
 end
 
+class NotMovingAI
+  def update(keys)
+    #NOOP
+  end
+  include JsonHelper
+  def json_params
+    []
+  end
+
+end
+
+class ArtificialIntelligence
+
+  def initialize(path, ticks_per_char)
+    @path = path
+    @ticks_per_path_unit = ticks_per_char
+    @ticks_seen = 0
+    @path_idx = 0
+
+  end
+
+  def update(keys)
+    @ticks_seen += 1
+    if @ticks_seen >= @ticks_per_path_unit
+      @ticks_seen = 0
+      new_idx = (@path_idx + 1) % @path.length
+      keys.switch(keysym_at(@path_idx),keysym_at(new_idx))
+      @path_idx = new_idx
+    end
+  end
+
+
+
+
+  def keysym_at(idx)
+    char_syms[@path.slice(idx,1)]
+  end
+
+  def char_syms
+    m = {}
+    m["L"] = :left
+    m["U"] = :up
+    m["R"] = :right
+    m["D"] = :down
+    m
+  end
+
+  include JsonHelper
+  def json_params
+    [@path, @ticks_per_path_unit]
+  end
+
+
+
+end
+
 class Monster
   include ScreenOffsetHelper
   include Sprites::Sprite
   include EventHandler::HasEventHandler
 
   extend Forwardable
-  def_delegators :@animated_sprite_helper, :collides_on_x?, :collides_on_y?, :px, :py
+  def_delegators :@coordinate_helper, :px, :py, :collides_on_x?, :collides_on_y?
+
   def_delegators :@character_attribution, :take_damage, :experience, :dead?
   def_delegators :@readiness_helper, :add_readiness, :add_readiness
 
-  attr_reader :inventory
-  def initialize(filename, px, py, npc_x = @@MONSTER_X, npc_y = @@MONSTER_Y, inventory=Inventory.new(255), character_attrib=nil)
+  attr_reader :inventory, :player
+  def initialize(player, universe, filename, px, py, npc_x = @@MONSTER_X, npc_y = @@MONSTER_Y, inventory=Inventory.new(255), character_attrib=nil, ai=nil)
     @npc_x = npc_x
     @npc_y = npc_y
     @filename = filename
+    @universe = universe
+    @player = player
+    @ai = ai
     @animated_sprite_helper = AnimatedSpriteHelper.new(filename, px, py, @npc_x, @npc_y)
     @keys = AlwaysDownMonsterKeyHolder.new
+    @coordinate_helper = MonsterCoordinateHelper.new(px, py, @keys, @universe, @npc_x, @npc_y,100, 300,200)
     @animation_helper = AnimationHelper.new(@keys, 3)
     @readiness_helper = BattleReadinessHelper.new(@@MONSTER_START_BATTLE_PTS, @@MONSTER_BATTLE_PTS_RATE)
-    @character_attribution = character_attrib.nil? ? default_attribution : character_attrib
+    @character_attribution = character_attrib
     @inventory = inventory
     
     make_magic_hooks(
@@ -1395,32 +1477,36 @@ class Monster
     )
   end
 
-  def default_attribution
-    #TODO probably shouldn't be here, haha
-    CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(3, 0, 0, 0, 0, 0, 0, 0)))
-  end
 
   def is_blocking?
     false
   end
 
   def draw(surface,x,y,sx,sy)
-    tx = offset_from_screen(@animated_sprite_helper.px, x, sx/2)
-    ty = offset_from_screen(@animated_sprite_helper.py, y, sy/2)
-    @animated_sprite_helper.image.blit surface, [tx,ty,96,128]
+
+    tx = offset_from_screen(@coordinate_helper.px, x, sx/2)
+    ty = offset_from_screen(@coordinate_helper.py, y, sy/2)
+    @animated_sprite_helper.image.blit surface, [tx,ty,@npc_x,@npc_y]
+    s = Surface.new([@npc_x,@npc_y])
+    s.fill(:yellow)
+    s.blit surface, [tx,ty,@npc_x,@npc_y]
   end
 
   def draw_to(layer)
-    @animated_sprite_helper.image.blit layer, [0,0,96,128]
+    @animated_sprite_helper.image.blit layer, [0,0,@npc_x,@npc_y]
   end
 
   def update(event)
     dt = event.seconds # Time since last update
     @animation_helper.update_animation(dt) { |frame| @animated_sprite_helper.replace_avatar(frame) }
+    @coordinate_helper.update_accel
+    @coordinate_helper.update_vel( dt )
+    @coordinate_helper.update_pos( dt, self )
+    @ai.update(@keys)
   end
 
   def distance_to(x,y)
-    [(px - x).abs, (py - y).abs]
+    [(@coordinate_helper.px - x).abs, (@coordinate_helper.py - y).abs]
   end
 
   def nearby?(x,y, distx, disty)
@@ -1436,7 +1522,7 @@ class Monster
 
   include JsonHelper
   def json_params
-    [ @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @character_attribution]
+    [ @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @character_attribution, @ai]
   end
 end
 
@@ -1445,8 +1531,8 @@ class TalkingNPC < Monster
     true
   end
 
-  def initialize(text, filename, px, py, npc_x, npc_y, inv=nil, attrib=nil)
-    super(filename, px, py, npc_x, npc_y, inv, attrib)
+  def initialize(player, universe, text, filename, px, py, npc_x, npc_y, inv=nil, attrib=nil, ai=nil)
+    super(player, universe,filename, px, py, npc_x, npc_y, inv, attrib, ai)
     @text = text
   end
 
@@ -1458,7 +1544,7 @@ class TalkingNPC < Monster
 
   include JsonHelper
   def json_params
-    [ @text, @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @character_attribution]
+    [ @text, @filename, @animated_sprite_helper.px, @animated_sprite_helper.py, @npc_x, @npc_y, @inventory, @character_attribution, @ai]
   end
 end
 
@@ -1857,17 +1943,30 @@ class GameInternalsFactory
     ssx = screen.w/2
     ssy = screen.h/2
     player = Player.new(ssx, ssy , universe, party, player_file, hero_x_dim, hero_y_dim , ssx, ssy )
-    player.update_tile_coords
+
     player
     # Make event hook to pass all events to @player#handle().
   end
   def make_world1
+    bgm = BackgroundMusic.new("bonobo-time_is_the_enemy.mp3")
+    WorldStateFactory.build_world_state("world1_bg","world1_interaction", pallette, interaction_pallette, @@BGX, @@BGY, [], bgm)
+  end
+
+  def make_monster(player,universe)
     monster_inv = Inventory.new(255)
     monster_inv.add_item(1, "potion")
-    npcs = [TalkingNPC.new("i am an npc", "gogo-npc.png", 600, 200,48,64), Monster.new("monster.png", 400,660, @@MONSTER_X, @@MONSTER_Y, monster_inv)]
-    bgm = BackgroundMusic.new("bonobo-time_is_the_enemy.mp3")
-    WorldStateFactory.build_world_state("world1_bg","world1_interaction", pallette, interaction_pallette, @@BGX, @@BGY, npcs, bgm)
+    monattrib = CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(3, 0, 0, 0, 0, 0, 0, 0)))
+    monai = ArtificialIntelligence.new("DRUL", 80)
+    Monster.new(player,universe,"monster.png", 400,660, @@MONSTER_X, @@MONSTER_Y, monster_inv, monattrib, monai)
   end
+
+  def make_npc(player, universe)
+    npcattrib = CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(3, 0, 0, 0, 0, 0, 0, 0)))
+    #npcai = ArtificialIntelligence.new("LURD", 80)
+    npcai = NotMovingAI.new
+    TalkingNPC.new(player, universe, "i am an npc", "gogo-npc.png", 600, 200,48,64, Inventory.new(255), npcattrib, npcai)
+  end
+
   def make_world2
     WorldStateFactory.build_world_state("world2_bg","world2_interaction", pallette_160,  interaction_pallette_160, @@BGX, @@BGY, [], BackgroundMusic.new("bonobo-gypsy.mp3"))
   end
@@ -1952,10 +2051,14 @@ class Game
     @screen = @factory.make_screen
     @clock = @factory.make_clock
     @queue = @factory.make_queue
-    
-    @universe = @factory.make_universe([@factory.make_world1, @factory.make_world2], @factory.make_game_layers(@screen), @factory.make_sound_effects)
+    world1 = @factory.make_world1
+    world2 = @factory.make_world2
+    @universe = @factory.make_universe([world1, world2], @factory.make_game_layers(@screen), @factory.make_sound_effects)
     @universe.toggle_bg_music
+
     @player = @factory.make_player(@screen, @universe)
+    world1.add_npc(@factory.make_npc(@player, @universe))
+    world1.add_npc(@factory.make_monster(@player, @universe))
     @hud = @factory.make_hud(@screen, @player, @universe)
     always_on_hooks = {
       :escape => :quit,
