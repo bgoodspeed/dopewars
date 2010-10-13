@@ -160,7 +160,7 @@ class SoundEffectSet
   end
 end
 class Universe
-  attr_reader :worlds, :current_world,  :current_world_idx, :game_layers, :sound_effects
+  attr_reader :worlds, :current_world,  :current_world_idx, :game_layers, :sound_effects, :game
 
   extend Forwardable
   def_delegators :@sound_effects, :play_sound_effect
@@ -170,13 +170,14 @@ class Universe
     :battle_cancel_action, :battle_move_cursor_down, :battle_move_cursor_up, :add_notification,
     :reset_menu_positions
 
-  def initialize(current_world_idx, worlds, game_layers=nil, sound_effects=nil)
+  def initialize(current_world_idx, worlds, game_layers=nil, sound_effects=nil, game=nil)
     raise "must have at least one world" if worlds.empty?
     @current_world = worlds[current_world_idx]
     @current_world_idx = current_world_idx
     @worlds = worlds
     @game_layers = game_layers
     @sound_effects = sound_effects
+    @game = game #TODO this makes the model circular... maybe a problem?
   end
 
   def world_by_index(idx)
@@ -627,9 +628,15 @@ class CoordinateHelper
 #    puts "tile topo x: #{clamp_to_tile_restrictions_on_x(topo, new_bg_tile_coords)} tile interact x: #{clamp_to_tile_restrictions_on_x(interact, new_interaction_tile_coords)} x cols: #{!x_collisions.empty?}"
 #    puts "tile topo y: #{clamp_to_tile_restrictions_on_y(topo, new_bg_tile_coords)} tile interact y: #{clamp_to_tile_restrictions_on_y(interact, new_interaction_tile_coords)} y cols: #{!y_collisions.empty?}"
     cols = y_hits(x_hits(candidate_npcs(who)))
-    puts "Detected #{cols.size} colisions in #{self.class} with npcs" unless cols.empty? #TODO automatic fights would go here
-
+    handle_collision(cols) unless cols.empty?
     update_tile_coords
+  end
+
+  def handle_collision(cols)
+    monsters = cols.select { |col| col.class == Monster}
+    return if monsters.empty?
+    monster = monsters[0]
+    monster.interact(@universe.game, @universe, @universe.game.player)
   end
 end
 
@@ -639,6 +646,9 @@ class MonsterCoordinateHelper < CoordinateHelper
     cands = (r - [who]) # + [who.player]
     
     cands
+  end
+  def handle_collision(cols)
+    #NOOP
   end
 end
 class AnimatedSpriteHelper
@@ -1922,8 +1932,8 @@ class GameInternalsFactory
   def make_menu_layer(screen)
     MenuLayer.new(screen)
   end
-  def make_universe(worldstates, layers, sound_effects)
-    Universe.new(0, worldstates , layers, sound_effects)
+  def make_universe(worldstates, layers, sound_effects, game)
+    Universe.new(0, worldstates , layers, sound_effects, game)
   end
   def make_hud(screen, player, universe)
     Hud.new :screen => screen, :player => player, :universe => universe 
@@ -2050,7 +2060,7 @@ class Game
     @queue = @factory.make_queue
     world1 = @factory.make_world1
     world2 = @factory.make_world2
-    @universe = @factory.make_universe([world1, world2], @factory.make_game_layers(@screen), @factory.make_sound_effects)
+    @universe = @factory.make_universe([world1, world2], @factory.make_game_layers(@screen), @factory.make_sound_effects, self) #XXX might be bad to pass self and make loops in the obj graph
     @universe.toggle_bg_music
 
     @player = @factory.make_player(@screen, @universe)
