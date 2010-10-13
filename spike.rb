@@ -969,10 +969,11 @@ class WarpPoint
 end
 
 class Notification
-  attr_reader :message, :time_to_live
-  def initialize(msg, ttl)
+  attr_reader :message, :time_to_live, :location
+  def initialize(msg, ttl, location)
     @message = msg
     @time_to_live = ttl
+    @location = location
   end
 
   def displayed
@@ -981,6 +982,17 @@ class Notification
 
   def dead?
     @time_to_live <= 0
+  end
+end
+
+class WorldScreenNotification < Notification
+  def initialize(msg)
+    super(msg,@@TICKS_TO_DISPLAY_NOTIFICATIONS, [@@NOTIFICATION_LAYER_INSET_X,@@NOTIFICATION_LAYER_INSET_Y ])
+  end
+end
+class BattleScreenNotification < Notification
+  def initialize(msg)
+    super(msg,@@TICKS_TO_DISPLAY_NOTIFICATIONS, [@@NOTIFICATION_LAYER_INSET_X,@@NOTIFICATION_LAYER_INSET_Y/3 ])
   end
 end
 
@@ -1019,14 +1031,18 @@ class NotificationsLayer < AbstractLayer
   def draw
     @layer.fill(:black)
     @notifications.each do |notif|
-      @text_rendering_helper.render_lines_to_layer( notif.message, @config)
+      @text_rendering_helper.render_lines_to_layer( notif.message, @config) #TODO this is where the ugly pop text is formatted
       notif.displayed
     end
     
     @notifications.delete_if do |notif|
       notif.dead?
     end
-    @layer.blit(@screen, [@@NOTIFICATION_LAYER_INSET_X, @@NOTIFICATION_LAYER_INSET_Y])
+
+    unless @notifications.empty?
+      @layer.blit(@screen, @notifications[0].location)
+    end
+    
     @active = false if @notifications.empty?
   end
 end
@@ -1120,7 +1136,6 @@ class BattleLayer < AbstractLayer
   end
   def start_battle(game, universe, player, monster)
     @active = true
-    puts "starting battle, bound field value is #{self.active?}"
     @battle = Battle.new(game, universe, player, monster, self)
     sections = player.party.collect {|hero|  HeroMenuSection.new(hero, [AttackAction.new("Attack", self), ItemAction.new("Item")])}
     @menu_helper = BattleMenuHelper.new(@battle, @screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
@@ -1160,7 +1175,6 @@ class BattleLayer < AbstractLayer
   end
 
   def enter_current_cursor_location(game)
-    puts "weird: game is #{game}" if @battle.nil?
     if @battle.over?
       @end_of_battle_menu_helper.enter_current_cursor_location(game)
     else
@@ -1240,8 +1254,9 @@ class AttackAction < MenuAction
     hero = battle.player.party.members[party_member_index]
     battle.monster.take_damage(hero.damage)
     hero.consume_readiness(@action_cost)
-    puts "hero #{hero} hit #{battle.monster} for #{hero.damage}"
-    puts "hero #{hero} killed #{battle.monster}" if battle.monster.dead?
+    msg = "attacked for #{hero.damage} damage"
+#    msg += "hero #{hero} killed #{battle.monster}" if battle.monster.dead?
+    game.add_notification(BattleScreenNotification.new("Attacked for #{}"))
   end
 end
 class ItemAction < MenuAction
@@ -1280,7 +1295,7 @@ class SaveAction < SaveLoadAction
     puts "player was at #{game.player.px} and #{game.player.py} at save time"
     puts "save action believes the menu layer to be active? #{game.universe.menu_layer.active}"
     game.toggle_menu
-    game.add_notification(Notification.new("Saved to #{slot}", @@TICKS_TO_DISPLAY_NOTIFICATIONS))
+    game.add_notification(WorldScreenNotification.new("Saved to #{slot}"))
   end
 end
 
@@ -1328,7 +1343,7 @@ class LoadAction < SaveLoadAction
     rebuilt = JSON.parse(data.join(" "))
     puts "got rebuilt: #{rebuilt.class} "
     ReloaderHelper.new.replace(game, rebuilt)
-    game.add_notification(Notification.new("Loaded from #{slot}", @@TICKS_TO_DISPLAY_NOTIFICATIONS))
+    game.add_notification(WorldScreenNotification.new("Loaded from #{slot}"))
   end
 end
 
