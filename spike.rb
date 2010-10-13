@@ -463,18 +463,18 @@ class CoordinateHelper
   end
 
   def max_x
-    @px + x_ext
+    @px 
   end
   def max_y
-    @py + y_ext
+    @py 
   end
 
   def base_x
-    @px - x_ext
+    @px -  @hero_x_dim
   end
   
   def base_y
-    @py - y_ext
+    @py -  @hero_y_dim
   end
  def collides_on_x?(x)
     (@px - x).abs < x_ext
@@ -1487,9 +1487,6 @@ class Monster
     tx = offset_from_screen(@coordinate_helper.px, x, sx/2)
     ty = offset_from_screen(@coordinate_helper.py, y, sy/2)
     @animated_sprite_helper.image.blit surface, [tx,ty,@npc_x,@npc_y]
-    s = Surface.new([@npc_x,@npc_y])
-    s.fill(:yellow)
-    s.blit surface, [tx,ty,@npc_x,@npc_y]
   end
 
   def draw_to(layer)
@@ -1962,8 +1959,8 @@ class GameInternalsFactory
 
   def make_npc(player, universe)
     npcattrib = CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(3, 0, 0, 0, 0, 0, 0, 0)))
-    #npcai = ArtificialIntelligence.new("LURD", 80)
-    npcai = NotMovingAI.new
+    npcai = ArtificialIntelligence.new("LURD", 80)
+    #npcai = NotMovingAI.new
     TalkingNPC.new(player, universe, "i am an npc", "gogo-npc.png", 600, 200,48,64, Inventory.new(255), npcattrib, npcai)
   end
 
