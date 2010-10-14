@@ -44,6 +44,8 @@ include Rubygame::EventTriggers
 @@READINESS_POINTS_NEEDED_TO_ACT = 3000
 @@DEFAULT_ACTION_COST = 2500
 @@ATTACK_ACTION_COST = 2000
+@@NOOP_ACTION_COST = 1000
+
 @@OPEN_TREASURE = 'O'
 @@MONSTER_X = 32
 @@MONSTER_Y = 32
@@ -1130,7 +1132,7 @@ class BattleLayer < AbstractLayer
     make_magic_hooks({ClockTicked => :update})
   end
   def update( event )
-    return unless @battle
+    return unless @battle and !@battle.over?
     dt = event.seconds # Time since last update
     @battle.accumulate_readiness(dt)
   end
@@ -1414,7 +1416,7 @@ class CharacterAttribution
   end
 end
 
-class NotMovingAI
+class StaticPathFollower
   def update(keys)
     #NOOP
   end
@@ -1425,7 +1427,7 @@ class NotMovingAI
 
 end
 
-class ArtificialIntelligence
+class RepeatingPathFollower
 
   def initialize(path, ticks_per_char)
     @path = path
@@ -1470,6 +1472,99 @@ class ArtificialIntelligence
 
 end
 
+class TargetMatcher
+  def initialize(target)
+    @target = target
+  end
+
+  def target_is_enemy?
+    @target.downcase.include?("enemy")
+  end
+
+  def matches?(src,target)
+    
+    puts "target #{@target} matches #{target}?"
+    true
+  end
+end
+
+class ConditionMatcher
+  def initialize(cond)
+    @condition = cond
+  end
+  def matches?(src, target)
+    puts "condition #{@condition} matches #{target} ?"
+    true
+  end
+end
+
+class ActionInvoker
+  def initialize(action)
+    @action = action
+  end
+
+  def perform_on(src, actor)
+    puts "perform #{@action} on #{actor} by #{src}"
+  end
+end
+class BattleTactic
+  extend Forwardable
+  def_delegators :@action, :perform_on
+  
+  attr_reader :target, :condition, :action
+  def initialize(desc)
+    parse(desc)
+  end
+
+  def parse(desc)
+    target_and_rest = desc.split(":")
+    cond_and_act = target_and_rest[1].split("->")
+    @target = TargetMatcher.new(target_and_rest[0])
+    @condition = ConditionMatcher.new(cond_and_act[0])
+    @action = ActionInvoker.new(cond_and_act[1])
+  end
+
+  def matches?(source, target)
+    @target.matches?(source, target) and @condition.matches?(source, target)
+  end
+
+end
+
+class BattleStrategy
+  def initialize(tactics)
+    @tactics = tactics
+  end
+
+  def take_battle_turn(actor, battle)
+    puts "take #{actor}s battle turn in #{battle}"
+    
+    battle.participants.each {|foe| #TODO this should be each battle participant, including self
+      @tactics.each {|tactic|
+        if tactic.matches?(actor, foe)
+          tactic.perform_on(actor, foe)
+        end
+      }
+    }
+
+    actor.consume_readiness(@@NOOP_ACTION_COST)
+  end
+end
+
+class ArtificialIntelligence
+  extend Forwardable
+
+  def_delegators :@battle_strategy, :take_battle_turn
+
+  def initialize(follow_strategy, battle_strategy)
+    @follow_strategy = follow_strategy
+    @battle_strategy = battle_strategy
+  end
+
+  def update(event)
+    @follow_strategy.update(event)
+  end
+end
+
 class Monster
   include ScreenOffsetHelper
   include Sprites::Sprite
@@ -1479,7 +1574,8 @@ class Monster
   def_delegators :@coordinate_helper, :px, :py, :collides_on_x?, :collides_on_y?
 
   def_delegators :@character_attribution, :take_damage, :experience, :dead?
-  def_delegators :@readiness_helper, :add_readiness, :add_readiness
+  def_delegators :@readiness_helper, :consume_readiness
+  
 
   attr_reader :inventory, :player
   def initialize(player, universe, filename, px, py, npc_x = @@MONSTER_X, npc_y = @@MONSTER_Y, inventory=Inventory.new(255), character_attrib=nil, ai=nil)
@@ -1540,6 +1636,14 @@ class Monster
     game.battle_begun(universe,player)
     universe.battle_layer.start_battle(game, universe, player, self)
   end
+
+  def add_readiness(pts, battle)
+    @readiness_helper.add_readiness(pts)
+    if @readiness_helper.ready?
+      @ai.take_battle_turn(self, battle)
+    end
+  end
+
 
 
   include JsonHelper
@@ -1620,7 +1724,12 @@ class Battle
   def accumulate_readiness(dt)
     points = dt * @@READINESS_POINTS_PER_SECOND
     @player.add_readiness(points)
-    @monster.add_readiness(points)
+    @monster.add_readiness(points, self)
+  end
+
+  def participants
+    #TODO check to see class of actor, for now only monsters use AI battle strategies
+    [@monster, @player]
   end
 
   def over?
@@ -1978,14 +2087,14 @@ class GameInternalsFactory
     monster_inv = Inventory.new(255)
     monster_inv.add_item(1, "potion")
     monattrib = CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(3, 0, 0, 0, 0, 0, 0, 0)))
-    monai = ArtificialIntelligence.new("DRUL", 80)
+    monai = ArtificialIntelligence.new(RepeatingPathFollower.new("DRUL", 80), BattleStrategy.new([BattleTactic.new("Enemy: Any -> Attack")]))
     Monster.new(player,universe,"monster.png", 400,660, @@MONSTER_X, @@MONSTER_Y, monster_inv, monattrib, monai)
   end
 
   def make_npc(player, universe)
     npcattrib = CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(3, 0, 0, 0, 0, 0, 0, 0)))
-    npcai = ArtificialIntelligence.new("LURD", 80)
-    #npcai = NotMovingAI.new
+    npcai = ArtificialIntelligence.new(RepeatingPathFollower.new("LURD", 80), nil) #TODO maybe make a noop battle strategy just in case?
+    #npcai = StaticPathFollower.new
     TalkingNPC.new(player, universe, "i am an npc", "gogo-npc.png", 600, 200,48,64, Inventory.new(255), npcattrib, npcai)
   end
 
