@@ -6,6 +6,10 @@ class InsufficientMoneyException < Exception
 end
 
 class Hero
+  extend Forwardable
+  
+  def_delegators :@character_attribution, :damage, :take_damage, :gain_experience, :dead?
+  def_delegators :@readiness_helper, :consume_readiness, :add_readiness, :ready?
 
   attr_reader :money, :inventory, :name 
   def initialize(name="MAIN DUDE", helper_start=1, helper_rate=1, attrib=nil)
@@ -14,24 +18,6 @@ class Hero
     @character_attribution = attrib
   end
 
-  def damage
-    @character_attribution.damage
-  end
-
-  def gain_experience(pts)
-    @character_attribution.gain_experience(pts)
-  end
-
-  def consume_readiness(pts)
-    @readiness_helper.consume_readiness(pts)
-  end
-  def add_readiness(pts)
-    @readiness_helper.add_readiness(pts)
-  end
-
-  def ready?
-    @readiness_helper.ready?
-  end
 
   def free_inventory_slots
     @inventory.free_slots

@@ -7,14 +7,14 @@ require 'rubygems'
 
 require 'rubygame'
 require 'json'
-
+require 'forwardable'
 require 'lib/font_loader'
 require 'lib/topo_map'
 require 'lib/hud'
 require 'lib/inventory'
 require 'lib/hero'
 
-require 'forwardable'
+
 
 # Include these modules so we can type "Surface" instead of
 # "Rubygame::Surface", etc. Purely for convenience/readability.
@@ -381,7 +381,7 @@ class InteractionHelper
 
     if this_tile_interacts
       puts "you can interact with the current tile"
-      this_tile_interacts.activate(@player, @universe.current_world, tilex, tiley)
+      this_tile_interacts.activate(game, @player, @universe.current_world, tilex, tiley)
       return
     end
 
@@ -411,7 +411,7 @@ class InteractionHelper
 
     if facing_tile_close_enough and facing_tile_interacts
       puts "you can interact with the facing tile in the #{@facing} direction, it is at #{facing_tilex} #{facing_tiley}"
-      facing_tile_interacts.activate(@player, @universe.current_world, facing_tilex, facing_tiley) #@interactionmap, facing_tilex, facing_tiley, @bgsurface, @topomap, @topo_pallette
+      facing_tile_interacts.activate(game,@player, @universe.current_world, facing_tilex, facing_tiley) #@interactionmap, facing_tilex, facing_tiley, @bgsurface, @topomap, @topo_pallette
       return
     end
 
@@ -819,6 +819,11 @@ class Party
     @members.each {|member| member.gain_experience(pts) }
   end
 
+  def dead?
+    living_members = @members.select {|m| !m.dead?}
+    living_members.empty?
+  end
+
   include JsonHelper
   def json_params
     [ @members, @inventory]
@@ -835,7 +840,7 @@ class Player
   
   def_delegators :@animated_sprite_helper, :image, :rect
   def_delegators :@coordinate_helper, :update_tile_coords, :px, :py
-  def_delegators :@party, :add_readiness, :gain_experience, :gain_inventory, :inventory
+  def_delegators :@party, :add_readiness, :gain_experience, :gain_inventory, :inventory, :dead?
   def_delegator :@party, :add_item, :add_inventory
 
   attr_reader :filename, :hero_x_dim, :hero_y_dim
@@ -924,10 +929,11 @@ class Treasure
     @name = name
   end
 
-  def activate(player, worldstate, tilex, tiley)
+  def activate(game, player, worldstate, tilex, tiley)
     player.universe.play_sound_effect(SoundEffect::TREASURE)
     worldstate.update_interaction_map(tilex, tiley, @@OPEN_TREASURE)
     player.add_inventory(1, @name)
+    game.add_notification(WorldScreenNotification.new("Got #{@name}"))
   end
 
   include JsonHelper
@@ -936,7 +942,7 @@ class Treasure
   end
 end
 class OpenTreasure < Treasure
-  def activate( player, worldstate, tilex, tiley)
+  def activate(game,  player, worldstate, tilex, tiley)
     puts "Nothing to do, already opened"
   end
 end
@@ -954,7 +960,7 @@ class WarpPoint
     @destination_y = dest_y
   end
 
-  def activate(player, worldstate, tilex, tiley)
+  def activate(game, player, worldstate, tilex, tiley)
     uni = player.universe
     player.universe.fade_out_bg_music
     player.universe.play_sound_effect(SoundEffect::WARP)
@@ -1072,7 +1078,6 @@ class DialogLayer < AbstractLayer
   def displayed
     #TODO other logic like next page, gifts, etc goes here
     @active = false
-    puts "dialog done"
   end
 end
 class MenuLayer < AbstractLayer
@@ -1094,8 +1099,8 @@ class MenuLayer < AbstractLayer
     sections = [MenuSection.new("Status", [MenuAction.new("status info line 1"), MenuAction.new("status info line 2")]),
       MenuSection.new("Inventory", [MenuAction.new("inventory contents:"), MenuAction.new("TODO real data")]),
       MenuSection.new("Equip", [MenuAction.new("head equipment:"), MenuAction.new("arm equipment: "), MenuAction.new("etc")]),
-      MenuSection.new("Save", [SaveAction.new("Slot 1")]),
-      MenuSection.new("Load", [LoadAction.new("Slot 1")])
+      MenuSection.new("Save", [SaveMenuAction.new("Slot 1")]),
+      MenuSection.new("Load", [LoadMenuAction.new("Slot 1")])
     ]
     @menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
   end
@@ -1126,8 +1131,8 @@ class BattleLayer < AbstractLayer
     @text_rendering_helper = TextRenderingHelper.new(@layer, @font)
     @battle = nil
     @menu_helper = nil
-    sections = [MenuSection.new("Exp",[EndBattleAction.new("Confirm", self)]),
-      MenuSection.new("Items", [EndBattleAction.new("Confirm", self)])]
+    sections = [MenuSection.new("Exp",[EndBattleMenuAction.new("Confirm", self)]),
+      MenuSection.new("Items", [EndBattleMenuAction.new("Confirm", self)])]
     @end_of_battle_menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
     make_magic_hooks({ClockTicked => :update})
   end
@@ -1139,7 +1144,7 @@ class BattleLayer < AbstractLayer
   def start_battle(game, universe, player, monster)
     @active = true
     @battle = Battle.new(game, universe, player, monster, self)
-    sections = player.party.collect {|hero|  HeroMenuSection.new(hero, [AttackAction.new("Attack", self), ItemAction.new("Item")])}
+    sections = player.party.collect {|hero|  HeroMenuSection.new(hero, [AttackMenuAction.new("Attack", self), ItemMenuAction.new("Item")])}
     @menu_helper = BattleMenuHelper.new(@battle, @screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
   end
   def end_battle
@@ -1169,7 +1174,12 @@ class BattleLayer < AbstractLayer
   def draw()
     @layer.fill(:orange)
     if @battle.over?
-      @end_of_battle_menu_helper.draw(end_battle_menu_layer_config)
+      if @battle.player_alive?
+        @end_of_battle_menu_helper.draw(end_battle_menu_layer_config)
+      else
+        puts "you died ... game should be over... whatever"
+        @end_of_battle_menu_helper.draw(end_battle_menu_layer_config)
+      end
     else
       @battle.monster.draw_to(@layer)
       @menu_helper.draw(menu_layer_config)
@@ -1233,59 +1243,82 @@ class MenuLayerConfig
   attr_accessor :main_menu_text, :section_menu_text, :in_section_cursor, :main_cursor, :layer_inset_on_screen
 end
 
+class NoopAction
+  def perform(src,dest)
+    puts "nothing to do, noop action" #TODO consume readiness?
+  end
+end
+
+
 class MenuAction
   attr_reader :text
-  def initialize(text, action_cost=@@DEFAULT_ACTION_COST)
+  def initialize(text, action=NoopAction.new)
     @text = text
-    @action_cost = action_cost
+    @action = action
   end
 
   def activate(main_menu_idx, game, submenu_idx)
     puts "This is a no-op action: #{@text}"
   end
 end
-class AttackAction < MenuAction
+
+class DamageCalculationHelper
+  def calculate_damage(src,dest)
+    puts "uh oh, #{src} does 0 damage " if src.damage == 0
+    src.damage #TODO take dest defense into account etc
+  end
+end
+
+
+class AttackAction
+  def initialize(action_cost=@@ATTACK_ACTION_COST)
+    @action_cost = action_cost
+  end
+  def perform(src, dest)
+    dest.take_damage(DamageCalculationHelper.new.calculate_damage(src, dest))
+    src.consume_readiness(@action_cost)
+  end
+end
+class AttackMenuAction < MenuAction
   def initialize(text, battle_layer)
-    super(text, @@ATTACK_ACTION_COST)
+    super(text, AttackAction.new)
     @battle_layer = battle_layer
   end
 
   def activate(party_member_index, game, submenu_idx)
     battle = @battle_layer.battle
-    
+
     hero = battle.player.party.members[party_member_index]
-    battle.monster.take_damage(hero.damage)
-    hero.consume_readiness(@action_cost)
+    @action.perform(hero, battle.monster)
     msg = "attacked for #{hero.damage} damage"
 #    msg += "hero #{hero} killed #{battle.monster}" if battle.monster.dead?
     game.add_notification(BattleScreenNotification.new("Attacked for #{}"))
   end
 end
-class ItemAction < MenuAction
+class ItemMenuAction < MenuAction
   def activate(party_member_index, game, submenu_idx)
     battle = @battle_layer.battle
     puts "TODO itemaction"
   end
 end
-class EndBattleAction < MenuAction
+class EndBattleMenuAction < MenuAction
   def initialize(text, battle_layer)
     super(text)
     @battle_layer = battle_layer
   end
 
   def activate(menu_idx, game, submenu_idx)
-    puts "ending battle from menu #{menu_idx}"
     @battle_layer.end_battle
   end
 end
 
-class SaveLoadAction < MenuAction
+class SaveLoadMenuAction < MenuAction
   def save_slot(idx)
     "save-slot-#{idx}.json"
   end
 end
 
-class SaveAction < SaveLoadAction
+class SaveMenuAction < SaveLoadMenuAction
   def activate(menu_idx, game, submenu_idx)
     puts "saving: #{game.player}"
     json = JSON.generate(game.player)
@@ -1335,7 +1368,7 @@ module ScreenOffsetHelper
   end
 end
 
-class LoadAction < SaveLoadAction
+class LoadMenuAction < SaveLoadMenuAction
   def activate(menu_idx, game, submenu_idx)
     slot = save_slot(submenu_idx)
     puts "load from #{slot}"
@@ -1481,8 +1514,13 @@ class TargetMatcher
     @target.downcase.include?("enemy")
   end
 
+  def is_enemy_of?(src,target)
+    src.class != target.class
+  end
   def matches?(src,target)
-    
+    if target_is_enemy?
+      return is_enemy_of?(src,target)
+    end
     puts "target #{@target} matches #{target}?"
     true
   end
@@ -1499,12 +1537,16 @@ class ConditionMatcher
 end
 
 class ActionInvoker
-  def initialize(action)
-    @action = action
+  def initialize(action_desc)
+    @action = build_from(action_desc)
   end
 
-  def perform_on(src, actor)
-    puts "perform #{@action} on #{actor} by #{src}"
+  def build_from(action_desc)
+    return AttackAction.new if action_desc.downcase.include?("attack")
+  end
+
+  def perform_on(src, dest)
+    @action.perform(src,dest)
   end
 end
 class BattleTactic
@@ -1573,7 +1615,7 @@ class Monster
   extend Forwardable
   def_delegators :@coordinate_helper, :px, :py, :collides_on_x?, :collides_on_y?
 
-  def_delegators :@character_attribution, :take_damage, :experience, :dead?
+  def_delegators :@character_attribution, :take_damage, :experience, :dead?, :damage
   def_delegators :@readiness_helper, :consume_readiness
   
 
@@ -1711,7 +1753,7 @@ end
 
 class Battle
   extend Forwardable
-  def_delegators :@player, :party
+  def_delegators :@player, :party, :dead?
   
   attr_reader :monster, :player
   def initialize(game, universe, player, monster, battle_layer)
@@ -1729,11 +1771,15 @@ class Battle
 
   def participants
     #TODO check to see class of actor, for now only monsters use AI battle strategies
-    [@monster, @player]
+    [@monster] + @player.party.members
   end
 
   def over?
-    @monster.dead?
+    @monster.dead? or @player.dead?
+  end
+
+  def player_alive?
+    !@player.dead?
   end
 
   def end_battle
@@ -2064,8 +2110,8 @@ class GameInternalsFactory
   end
   def make_player(screen, universe)
     #@player = Ship.new( @screen.w/2, @screen.h/2, @topomap, pallette, @terrainmap, terrain_pallette, @interactmap, interaction_pallette, @bgsurface )
-    hero = Hero.new("hero",  @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(10, 5, 1, 0, 0, 0, 0, 0))))
-    hero2 = Hero.new("cohort", @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(10, 5, 1, 0, 0, 0, 0, 0))))
+    hero = Hero.new("hero",  @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(5, 5, 1, 0, 0, 0, 0, 0))))
+    hero2 = Hero.new("cohort", @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(5, 5, 1, 0, 0, 0, 0, 0))))
     party_inventory = Inventory.new(255) #TODO revisit inventory -- should it have a maximum? probably should not be stored on hero as well...
     party = Party.new([hero, hero2], party_inventory)
     hero_x_dim = 48
@@ -2086,7 +2132,7 @@ class GameInternalsFactory
   def make_monster(player,universe)
     monster_inv = Inventory.new(255)
     monster_inv.add_item(1, "potion")
-    monattrib = CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(3, 0, 0, 0, 0, 0, 0, 0)))
+    monattrib = CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(3, 0, 1, 0, 0, 0, 0, 0)))
     monai = ArtificialIntelligence.new(RepeatingPathFollower.new("DRUL", 80), BattleStrategy.new([BattleTactic.new("Enemy: Any -> Attack")]))
     Monster.new(player,universe,"monster.png", 400,660, @@MONSTER_X, @@MONSTER_Y, monster_inv, monattrib, monai)
   end
