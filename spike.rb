@@ -55,6 +55,14 @@ include Rubygame::EventTriggers
 @@NOTIFICATION_LAYER_INSET_Y = 2 * @@SCREEN_Y/3
 @@TICKS_TO_DISPLAY_NOTIFICATIONS = 125
 @@GAME_TITLE = "splatwars"
+
+@@STATUS_WIDTH = 100
+@@STATUS_HEIGHT = 300
+@@MENU_DETAILS_INSET_X = 300
+@@MENU_DETAILS_INSET_Y = 25
+
+
+
 module JsonHelper
   def self.included(kmod)
     kmod.class_eval <<-EOF
@@ -697,11 +705,14 @@ class TextRenderingHelper
     @font = font
   end
   def render_lines_to_layer(text_lines, conf)
+    render_lines_to(@layer, text_lines, conf)
+  end
+
+  def render_lines_to(layer, text_lines, conf)
     text_lines.each_with_index do |text, index|
       text_surface = @font.render text.to_s, true, [16,222,16]
-      text_surface.blit @layer, [conf.xc + conf.xf * index,conf.yc + conf.yf * index]
+      text_surface.blit layer, [conf.xc + conf.xf * index,conf.yc + conf.yf * index]
     end
-
   end
 
 end
@@ -709,14 +720,13 @@ class MenuHelper
   def initialize(screen, layer,text_helper, sections, cursor_x, cursor_y, cursor_main_color=:blue, cursor_inactive_color=:white)
     @layer = layer
     @text_rendering_helper = text_helper
-    @menu_sections = sections
-    @text_lines = @menu_sections.collect{|ms|ms.text}
     @cursor = Surface.new([cursor_x, cursor_y])
     @cursor_main_color = cursor_main_color
     @cursor_inactive_color = cursor_inactive_color
     @cursor.fill(@cursor_inactive_color)
     @screen = screen
     reset_indices
+    replace_sections(sections)
   end
 
   def color_for_current_section_cursor
@@ -750,17 +760,33 @@ class MenuHelper
 
   end
   def cancel_action
-    @show_section = false
-    @section_position = 0
+    reset_indices
+  end
+  def replace_sections(sections)
+    @menu_sections = sections
+    @text_lines = @menu_sections.collect{|ms|ms.text}
+  end
+
+  #TODO this is odd to have in the api for this class... reconsider
+  def render_text_to_layer(text, conf)
+    @text_rendering_helper.render_lines_to_layer( text, conf)
+  end
+  def render_text_to(surface, text, conf)
+    @text_rendering_helper.render_lines_to(surface, text, conf)
   end
 
   def draw(menu_layer_config)
-    @text_rendering_helper.render_lines_to_layer( @text_lines, menu_layer_config.main_menu_text)
+    render_text_to_layer( @text_lines, menu_layer_config.main_menu_text)
     @cursor.fill(color_for_current_section_cursor)
     if @show_section
-      @text_rendering_helper.render_lines_to_layer(active_section.text_contents, menu_layer_config.section_menu_text)
+      render_text_to_layer(active_section.text_contents, menu_layer_config.section_menu_text)
       conf = menu_layer_config.in_section_cursor
       @cursor.blit(@layer, [conf.xc + conf.xf * @section_position, conf.yc + conf.yf * @section_position])
+      if subsection_active?(@section_position)
+        puts "give extra info on #{active_section.content_at(@section_position).details}"
+        surf = active_section.content_at(@section_position).details
+        surf.blit(@layer, menu_layer_config.details_inset_on_layer)
+      end
     else
       conf = menu_layer_config.main_cursor
       @cursor.blit(@layer, [conf.xc + conf.xf * @cursor_position, conf.yc + conf.yf * @cursor_position])
@@ -768,7 +794,15 @@ class MenuHelper
     @layer.blit(@screen, menu_layer_config.layer_inset_on_screen)
   end
 
+  def subsection_active?(position)
+    @active_position == position
+  end
+  def set_active_subsection(position)
+    @active_position = position
+  end
+
   def reset_indices
+    @active_subsection = nil
     @cursor_position = 0
     @section_position = 0
     @show_section = false
@@ -842,6 +876,7 @@ class Player
   def_delegators :@coordinate_helper, :update_tile_coords, :px, :py
   def_delegators :@party, :add_readiness, :gain_experience, :gain_inventory, :inventory, :dead?
   def_delegator :@party, :add_item, :add_inventory
+  def_delegator :@party, :members, :party_members
 
   attr_reader :filename, :hero_x_dim, :hero_y_dim
   def initialize( px, py,  universe, party, filename, hx, hy, sx, sy)
@@ -1004,6 +1039,37 @@ class BattleScreenNotification < Notification
   end
 end
 
+
+class StatusDisplayAction
+  extend Forwardable
+  def_delegators :@actor
+  def initialize(actor, menu_helper)
+    @actor = actor
+    @menu_helper = menu_helper
+  end
+
+  def text
+    @actor.name
+  end
+
+  def activate(cursor_position, game, section_position)
+    @menu_helper.set_active_subsection(section_position)
+    
+  end
+
+
+  def details
+    info_lines = @actor.status_info
+    s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
+    s.fill(:green)
+    puts "status info should be: "
+    info_lines.each {|line| puts "#{line}" }
+    puts "------------------------"
+    @menu_helper.render_text_to(s, info_lines, TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
+    s
+  end
+end
+
 class AbstractLayer
   include FontLoader #TODO unify resource loading
   attr_accessor :active
@@ -1092,20 +1158,29 @@ class MenuLayer < AbstractLayer
   def_delegators :@menu_helper, :enter_current_cursor_location, :move_cursor_down,
     :move_cursor_up, :cancel_action, :reset_indices
 
-  def initialize(screen)
+  def initialize(screen, game)
     super(screen, (screen.w) - 2*@@MENU_LAYER_INSET, (screen.h) - 2*@@MENU_LAYER_INSET)
     @layer.fill(:red)
     @layer.alpha = 192
-    sections = [MenuSection.new("Status", [MenuAction.new("status info line 1"), MenuAction.new("status info line 2")]),
+    @game = game
+    @menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, [], @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
+  end
+
+  def menu_sections_for(chars)
+    [MenuSection.new("Status", chars),
       MenuSection.new("Inventory", [MenuAction.new("inventory contents:"), MenuAction.new("TODO real data")]),
       MenuSection.new("Equip", [MenuAction.new("head equipment:"), MenuAction.new("arm equipment: "), MenuAction.new("etc")]),
       MenuSection.new("Save", [SaveMenuAction.new("Slot 1")]),
       MenuSection.new("Load", [LoadMenuAction.new("Slot 1")])
     ]
-    @menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
   end
 
 
+  def rebuild_menu_sections
+    chars = [MenuAction.new("status info line 1"), MenuAction.new("status info line 2")]
+    chars = @game.party_members.collect {|m| StatusDisplayAction.new(m, @menu_helper)}
+    menu_sections_for(chars)
+  end
   def menu_layer_config
 
     mlc = MenuLayerConfig.new
@@ -1114,11 +1189,13 @@ class MenuLayer < AbstractLayer
     mlc.in_section_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
     mlc.main_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + @@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
     mlc.layer_inset_on_screen = [@@MENU_LAYER_INSET,@@MENU_LAYER_INSET]
+    mlc.details_inset_on_layer = [@@MENU_DETAILS_INSET_X, @@MENU_DETAILS_INSET_Y]
     mlc
   end
 
   def draw()
     @layer.fill(:red)
+    @menu_helper.replace_sections(rebuild_menu_sections)
     @menu_helper.draw(menu_layer_config)
   end
 end
@@ -1218,7 +1295,9 @@ class MenuSection
     @text = text
     @content = content
   end
-
+  def content_at(i)
+    @content[i]
+  end
   def text_contents
     @content.collect {|ma| ma.text}
   end
@@ -1240,7 +1319,7 @@ class TextRenderingConfig
   end
 end
 class MenuLayerConfig
-  attr_accessor :main_menu_text, :section_menu_text, :in_section_cursor, :main_cursor, :layer_inset_on_screen
+  attr_accessor :main_menu_text, :section_menu_text, :in_section_cursor, :main_cursor, :layer_inset_on_screen, :details_inset_on_layer
 end
 
 class NoopAction
@@ -1403,7 +1482,8 @@ end
 
 class CharacterState
   attr_accessor :current_hp, :current_mp, :status_effects, :experience
-
+  extend Forwardable
+  def_delegators :@attributes, :hp, :mp
   def initialize(attributes, exp=nil, chp=nil, cmp=nil, statii=nil)
     @attributes = attributes
     @current_hp = chp.nil? ? attributes.hp : chp
@@ -1443,6 +1523,9 @@ class CharacterAttribution
     @state = state
   end
 
+  def status_info
+    ["HP: #{@state.current_hp}/#{@state.hp}", "MP: #{@state.current_mp}/#{@state.mp}", "EXP: #{@state.experience}"]
+  end
   include JsonHelper
   def json_params
     [ @state]
@@ -2087,8 +2170,8 @@ class GameInternalsFactory
     queue
   end
 
-  def make_game_layers(screen)
-    GameLayers.new(make_dialog_layer(screen), make_menu_layer(screen), make_battle_layer(screen), make_notifications_layer(screen))
+  def make_game_layers(screen, game)
+    GameLayers.new(make_dialog_layer(screen), make_menu_layer(screen,game), make_battle_layer(screen), make_notifications_layer(screen))
   end
   def make_battle_layer(screen)
     BattleLayer.new(screen)
@@ -2099,8 +2182,8 @@ class GameInternalsFactory
   def make_dialog_layer(screen)
     DialogLayer.new(screen)
   end
-  def make_menu_layer(screen)
-    MenuLayer.new(screen)
+  def make_menu_layer(screen,game)
+    MenuLayer.new(screen,game)
   end
   def make_universe(worldstates, layers, sound_effects, game)
     Universe.new(0, worldstates , layers, sound_effects, game)
@@ -2230,7 +2313,7 @@ class Game
     @queue = @factory.make_queue
     world1 = @factory.make_world1
     world2 = @factory.make_world2
-    @universe = @factory.make_universe([world1, world2], @factory.make_game_layers(@screen), @factory.make_sound_effects, self) #XXX might be bad to pass self and make loops in the obj graph
+    @universe = @factory.make_universe([world1, world2], @factory.make_game_layers(@screen, self), @factory.make_sound_effects, self) #XXX might be bad to pass self and make loops in the obj graph
     @universe.toggle_bg_music
 
     @player = @factory.make_player(@screen, @universe)
@@ -2309,6 +2392,7 @@ class Game
   def_delegator :@event_helper, :non_menu_hooks, :non_battle_hooks
 
   def_delegator :@player, :update_tile_coords, :update_player_tile_coords
+  def_delegators :@player, :party_members
 
 
   def toggle_battle_hooks(in_battle=false)
