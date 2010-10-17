@@ -41,6 +41,7 @@ include Rubygame::EventTriggers
 @@READINESS_POINTS_NEEDED_TO_ACT = 3000
 @@DEFAULT_ACTION_COST = 2500
 @@ATTACK_ACTION_COST = 2000
+@@ITEM_ACTION_COST = 1500
 @@NOOP_ACTION_COST = 1000
 
 @@OPEN_TREASURE = 'O'
@@ -61,7 +62,10 @@ include Rubygame::EventTriggers
 @@MENU_OPTIONS_INSET_Y = 25
 
 
-
+@@BATTLE_INVENTORY_XC = 400
+@@BATTLE_INVENTORY_XF = 0
+@@BATTLE_INVENTORY_YC = 25
+@@BATTLE_INVENTORY_YF = 25
 module JsonHelper
   def self.included(kmod)
     kmod.class_eval <<-EOF
@@ -747,23 +751,28 @@ class MenuHelper
     (value + delta) % maxsize
   end
 
+  def size_or_one(target)
+    target.size
+    #target.respond_to?(:size) ? target.size : 1
+  end
+
   def move_cursor(dir)
     if @show_section
        if subsection_active?(@section_position)
          if @needs_option
-           puts "moving at option layer"
-           @option_position = clamping_delta(@option_position, active_option.size, dir)
+           puts "moving at option layer: #{@option_position} of #{size_or_one(active_option)}"
+           @option_position = clamping_delta(@option_position, size_or_one(active_option), dir)
          else
            puts "moving at subsection layer"
-          @subsection_position = clamping_delta(@subsection_position, active_subsection.size, dir)
+          @subsection_position = clamping_delta(@subsection_position, size_or_one(active_subsection), dir)
          end
       else
         puts "moving at section layer"
-        @section_position = clamping_delta(@section_position, active_section.content.size, dir)
+        @section_position = clamping_delta(@section_position, size_or_one(active_section.content), dir)
        end
     else
       puts "moving at top layer"
-      @cursor_position = clamping_delta(@cursor_position, @text_lines.size, dir)
+      @cursor_position = clamping_delta(@cursor_position, size_or_one(@text_lines), dir)
     end
   end
 
@@ -812,7 +821,6 @@ class MenuHelper
     @menu_sections = sections
     @text_lines = @menu_sections.collect{|ms|ms.text}
   end
-
   #TODO this is odd to have in the api for this class... reconsider
   def render_text_to_layer(text, conf)
     @text_rendering_helper.render_lines_to_layer( text, conf)
@@ -820,11 +828,9 @@ class MenuHelper
   def render_text_to(surface, text, conf)
     @text_rendering_helper.render_lines_to(surface, text, conf)
   end
-
   def active_subsection
     active_section.content_at(@section_position)
   end
-
   def active_option
     active_subsection.option_at(@option_position)
   end
@@ -846,18 +852,19 @@ class MenuHelper
         if @needs_option
           conf = menu_layer_config.in_option_section_cursor
           optsurf = active_subsection.surface_for(@subsection_position)
-          optsurf.blit(@layer, menu_layer_config.options_inset_on_layer)
-          @cursor.blit(@layer, conf.cursor_offsets_at(@option_position, game))
+          optsurf.blit(@layer, menu_layer_config.options_inset_on_layer) if optsurf
+          @cursor.blit(@layer, conf.cursor_offsets_at(@option_position, game, active_subsection))
         else
-          @cursor.blit(@layer, conf.cursor_offsets_at(@subsection_position, game))
+          @cursor.blit(@layer, conf.cursor_offsets_at(@subsection_position, game, active_subsection))
         end
-
       else
-        @cursor.blit(@layer, conf.cursor_offsets_at(@section_position, game))
+        @cursor.blit(@layer, conf.cursor_offsets_at(@section_position, game, active_subsection))
       end
     else
+
       conf = menu_layer_config.main_cursor
-      @cursor.blit(@layer, conf.cursor_offsets_at(@cursor_position, game))
+#      puts "top level: #{active_section}"
+      @cursor.blit(@layer, conf.cursor_offsets_at(@cursor_position, game, active_section))
     end
     @layer.blit(@screen, menu_layer_config.layer_inset_on_screen)
   end
@@ -906,7 +913,7 @@ end
 
 class Party
   extend Forwardable
-  def_delegators :@inventory, :add_item, :gain_inventory, :inventory_info
+  def_delegators :@inventory, :add_item, :gain_inventory, :inventory_info, :inventory_item_at
 
   attr_reader :members, :inventory
   def initialize(members, inventory)
@@ -946,7 +953,7 @@ class Player
   
   def_delegators :@animated_sprite_helper, :image, :rect
   def_delegators :@coordinate_helper, :update_tile_coords, :px, :py
-  def_delegators :@party, :add_readiness, :gain_experience, :gain_inventory, :inventory, :dead?, :inventory_info
+  def_delegators :@party, :add_readiness, :gain_experience, :gain_inventory, :inventory, :dead?, :inventory_info, :inventory_item_at
   def_delegator :@party, :add_item, :add_inventory
   def_delegator :@party, :members, :party_members
 
@@ -1199,7 +1206,7 @@ class InventoryDisplayAction
     if !option_position.nil?
       item = info[subsection_position]
       target = party_members[option_position]
-      target.consume_item(item)
+      target.consume_item(item) #TODO this is similar to ItemAction refactor
     elsif subsection_position.nil?
       @menu_helper.set_active_subsection(section_position)
     end
@@ -1376,6 +1383,7 @@ end
 class BattleLayer < AbstractLayer
   extend Forwardable
   def_delegators :@battle, :participants, :current_battle_participant_offset
+  def_delegators :@game, :inventory
   attr_reader :battle
   include EventHandler::HasEventHandler
   def initialize(screen, game)
@@ -1401,7 +1409,7 @@ class BattleLayer < AbstractLayer
     
     @menu_helper = BattleMenuHelper.new(@battle, @screen, @layer, @text_rendering_helper, [], @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
 
-    sections = player.party.collect {|hero|  HeroMenuSection.new(hero, [AttackMenuAction.new("Attack", self, @menu_helper), ItemMenuAction.new("Item")])}
+    sections = player.party.collect {|hero|  HeroMenuSection.new(hero, [AttackMenuAction.new("Attack", self, @menu_helper), ItemMenuAction.new("Item", self, @menu_helper, @game)])}
     @menu_helper.replace_sections(sections)
   end
   def end_battle
@@ -1414,8 +1422,8 @@ class BattleLayer < AbstractLayer
     mlc.main_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, @layer.h - 50, 0)
     mlc.section_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, @layer.h - 150, 0)
     mlc.in_section_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH, @layer.h - 200, 0)
-    mlc.in_subsection_cursor = CustomCursorTextRenderingConfig.new(2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
-    mlc.in_option_section_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
+    mlc.in_subsection_cursor = BattleParticipantCursorTextRenderingConfig.new([AttackMenuAction], 2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
+    mlc.in_option_section_cursor = BattleParticipantCursorTextRenderingConfig.new([ItemMenuAction], 2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
     mlc.main_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH, @layer.h - 100, 0)
     mlc.layer_inset_on_screen = [@@LAYER_INSET,@@LAYER_INSET]
     mlc.details_inset_on_layer = [@@MENU_DETAILS_INSET_X, @@MENU_DETAILS_INSET_Y]
@@ -1503,14 +1511,29 @@ class TextRenderingConfig
     @yf = yf
   end
 
-  def cursor_offsets_at(position, game)
+  def cursor_offsets_at(position, game, menu_action)
     [@xc + @xf * position, @yc + @yf * position]
   end
 end
 
-class CustomCursorTextRenderingConfig < TextRenderingConfig
-  def cursor_offsets_at(position, game)
-    offset = game.current_battle_participant_offset(position)
+class BattleParticipantCursorTextRenderingConfig < TextRenderingConfig
+
+  def initialize(klasses, xc,xf,yc,yf)
+    super(xc,xf,yc,yf)
+    @klasses = klasses
+  end
+
+  def matches_menu_action?(ma)
+    @klasses.include?(ma.class)
+  end
+
+  def cursor_offsets_at(position, game, menu_action)
+    if matches_menu_action?(menu_action)
+      offset = game.current_battle_participant_offset(position)
+    else
+      puts "trouble brewin" if position.nil?
+      offset = [@@BATTLE_INVENTORY_XC + @@BATTLE_INVENTORY_XF * position, @@BATTLE_INVENTORY_YC + @@BATTLE_INVENTORY_YF * position]
+    end
     offset
   end
 end
@@ -1574,7 +1597,7 @@ class AttackMenuAction < MenuAction
     hero = battle.player.party.members[party_member_index]
     target = battle.current_battle_participant(subsection_position)
     puts "I am going to attack #{target}"
-    @action.perform(hero, battle.monster)
+    @action.perform(hero, target)
     msg = "attacked for #{hero.damage} damage"
 #    msg += "hero #{hero} killed #{battle.monster}" if battle.monster.dead?
     game.add_notification(BattleScreenNotification.new("Attacked for #{hero.damage}"))
@@ -1589,11 +1612,67 @@ class AttackMenuAction < MenuAction
     false
   end
 end
-class ItemMenuAction < MenuAction
-  def activate(party_member_index, game, submenu_idx)
-    battle = @battle_layer.battle
-    puts "TODO itemaction"
+
+class ItemAction
+  def initialize(action_cost=@@ITEM_ACTION_COST)
+    @action_cost = action_cost
   end
+  def perform(src, dest, item)
+    dest.consume_item(item)
+    src.consume_readiness(@action_cost)
+  end
+end
+
+class ItemMenuAction < MenuAction
+  def initialize(text, battle_layer, menu_helper, game)
+    super(text, ItemAction.new)
+    @battle_layer = battle_layer
+    @menu_helper = menu_helper
+    @game = game
+  end
+
+  def activate(party_member_index, game, action_idx, subsection_position=nil, option_position=nil)
+    @menu_helper.set_active_subsection(action_idx)
+
+    return false unless subsection_position
+    return true unless option_position
+    
+    battle = @battle_layer.battle
+    hero = battle.player.party.members[party_member_index]
+    item = battle.inventory_item_at(subsection_position)
+    target = battle.current_battle_participant(option_position)
+    puts "target is: #{option_position}->#{target}"
+    @action.perform(hero, target, item)
+    game.add_notification(BattleScreenNotification.new("Item used: #{item}"))
+    false
+  end
+
+  def option_at(idx)
+    @battle_layer.participants
+  end
+
+  def size
+    @battle_layer.inventory.size
+  end
+
+  def info
+    @game.inventory_info
+  end
+
+  def surface_for(posn)
+    false
+  end
+
+
+  def details
+    info_lines = info.collect {|item| item.to_info}
+    s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
+    s.fill(:purple)
+    @menu_helper.render_text_to(s, info_lines, TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
+    s
+  end
+
+
 end
 class EndBattleMenuAction < MenuAction
   def initialize(text, battle_layer)
@@ -1964,7 +2043,7 @@ class Monster
   extend Forwardable
   def_delegators :@coordinate_helper, :px, :py, :collides_on_x?, :collides_on_y?
 
-  def_delegators :@character_attribution, :take_damage, :experience, :dead?, :damage
+  def_delegators :@character_attribution, :take_damage, :experience, :dead?, :damage, :consume_item
   def_delegators :@readiness_helper, :consume_readiness
   
 
@@ -2102,7 +2181,7 @@ end
 
 class Battle
   extend Forwardable
-  def_delegators :@player, :party, :dead?
+  def_delegators :@player, :party, :dead?, :inventory_item_at
   
   attr_reader :monster, :player
   def initialize(game, universe, player, monster, battle_layer)
@@ -2134,6 +2213,7 @@ class Battle
   def current_battle_participant(idx)
     participants[idx]
   end
+
 
   def current_battle_participant_offset(idx)
 

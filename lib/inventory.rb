@@ -63,6 +63,10 @@ class Inventory
     keys.collect {|key| @items[key]}
   end
 
+  def inventory_item_at(idx)
+    inventory_info[idx]
+  end
+
   def gain_inventory(inventory)
     inventory.keys.each do |key|
       puts "key: #{key}"
@@ -77,6 +81,10 @@ class Inventory
   end
   def has_item?(item)
     !@items[item].nil?
+  end
+
+  def size
+    keys.size
   end
 
   def quantity_of(item)
