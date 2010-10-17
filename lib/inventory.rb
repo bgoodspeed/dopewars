@@ -6,10 +6,21 @@ class InsufficientItemsToRemoveException < Exception
 end
 
 class InventoryItem
+  extend Forwardable
+  def_delegators :item, :effects
+
   attr_accessor :quantity, :item
   def initialize(quantity, item)
     @quantity = quantity
     @item = item
+  end
+
+  def to_info
+    "#{@item} : #{@quantity}"
+  end
+
+  def consumed
+    @quantity -= 1
   end
 
   def to_json(*a)
@@ -49,7 +60,7 @@ class Inventory
   end
 
   def inventory_info #TODO this should respect sort orders
-    keys.collect {|key| "#{key} : #{@items[key]}"}
+    keys.collect {|key| @items[key]}
   end
 
   def gain_inventory(inventory)

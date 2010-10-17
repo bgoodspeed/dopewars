@@ -60,6 +60,8 @@ include Rubygame::EventTriggers
 @@STATUS_HEIGHT = 300
 @@MENU_DETAILS_INSET_X = 300
 @@MENU_DETAILS_INSET_Y = 25
+@@MENU_OPTIONS_INSET_X = 400
+@@MENU_OPTIONS_INSET_Y = 25
 
 
 
@@ -716,6 +718,8 @@ class TextRenderingHelper
   end
 
 end
+
+#TODO this class should be broken up
 class MenuHelper
   def initialize(screen, layer,text_helper, sections, cursor_x, cursor_y, cursor_main_color=:blue, cursor_inactive_color=:white)
     @layer = layer
@@ -738,36 +742,56 @@ class MenuHelper
   end
 
   def move_cursor_down
-    if @show_section
-      if subsection_active?(@section_position)
-        puts "should send input to activated submenu"
-      else
-        @section_position = (@section_position + 1) % active_section.content.size
-      end
-    else
-      @cursor_position = (@cursor_position + 1) % @text_lines.size
-    end
+    move_cursor(1)
   end
-  def move_cursor_up
+
+  def clamping_delta(value, maxsize, delta=1)
+    (value + delta) % maxsize
+  end
+
+  def move_cursor(dir)
     if @show_section
        if subsection_active?(@section_position)
-        puts "should send input to activated submenu"
+
+         if @needs_option
+           @option_position = clamping_delta(@option_position, active_option.size, dir)
+         else
+          @subsection_position = clamping_delta(@subsection_position, active_subsection.size, dir)
+         end
       else
-        @section_position = (@section_position - 1) % active_section.content.size
+        @section_position = clamping_delta(@section_position, active_section.content.size, dir)
        end
     else
-      @cursor_position = (@cursor_position - 1) % @text_lines.size
+      @cursor_position = clamping_delta(@cursor_position, @text_lines.size, dir)
     end
+  end
+
+  def move_cursor_up
+    move_cursor(-1)
   end
   def enter_current_cursor_location(game)
     if @show_section
-      active_section.content[@section_position].activate(@cursor_position, game, @section_position)
+      if subsection_active?(@section_position)
+        puts "activating option with #{@section_position}"
+        if @needs_option
+          active_subsection.activate(@cursor_position, game, @section_position, @subsection_position, @option_position)
+        else
+          @needs_option = active_subsection.activate(@cursor_position, game, @section_position, @subsection_position)
+        end
+        
+      else
+        active_subsection.activate(@cursor_position, game, @section_position)
+      end
+      
     else
       @show_section = true
     end
 
   end
   def cancel_action
+    if @needs_option
+      @needs_option = false
+    end
     if subsection_active?(@section_position)
       @active_position = nil
       return
@@ -793,16 +817,36 @@ class MenuHelper
     @text_rendering_helper.render_lines_to(surface, text, conf)
   end
 
+  def active_subsection
+    active_section.content_at(@section_position)
+  end
+
+  def active_option
+    active_subsection.option_at(@option_position)
+  end
+
   def draw(menu_layer_config)
     render_text_to_layer( @text_lines, menu_layer_config.main_menu_text)
     @cursor.fill(color_for_current_section_cursor)
     if @show_section
       render_text_to_layer(active_section.text_contents, menu_layer_config.section_menu_text)
       conf = menu_layer_config.in_section_cursor
-      @cursor.blit(@layer, [conf.xc + conf.xf * @section_position, conf.yc + conf.yf * @section_position])
+      
       if subsection_active?(@section_position)
-        surf = active_section.content_at(@section_position).details
+        surf = active_subsection.details
         surf.blit(@layer, menu_layer_config.details_inset_on_layer)
+        @cursor.fill(:black)
+        
+        if @needs_option
+          optsurf = active_subsection.surface_for(@subsection_position)
+          optsurf.blit(@layer, menu_layer_config.options_inset_on_layer)
+          @cursor.blit(@layer, [conf.xc + conf.xf * @option_position, 3*conf.yc + conf.yf * @option_position])
+        else
+          @cursor.blit(@layer, [conf.xc + conf.xf * @subsection_position, 2*conf.yc + conf.yf * @subsection_position])
+        end
+
+      else
+        @cursor.blit(@layer, [conf.xc + conf.xf * @section_position, conf.yc + conf.yf * @section_position])
       end
     else
       conf = menu_layer_config.main_cursor
@@ -823,7 +867,10 @@ class MenuHelper
     @active_position = nil
     @cursor_position = 0
     @section_position = 0
+    @option_position = 0
+    @subsection_position = 0
     @show_section = false
+    @needs_option = false
   end
 end
 class BattleMenuHelper < MenuHelper
@@ -1069,9 +1116,12 @@ class StatusDisplayAction
   def text
     @actor.name
   end
-
-  def activate(cursor_position, game, section_position)
+  def size
+    1
+  end
+  def activate(cursor_position, game, section_position, subsection_position=nil, option_position=nil)
     @menu_helper.set_active_subsection(section_position)
+    false
   end
 
 
@@ -1107,18 +1157,51 @@ class InventoryDisplayAction
     @text = text
     @game = game
     @menu_helper = menu_helper
+    @selected_option = nil
   end
 
-  def activate(cursor_position, game, section_position)
-    @menu_helper.set_active_subsection(section_position)
+  def activate(cursor_position, game, section_position, subsection_position=nil, option_position=nil)
+    if !option_position.nil?
+      item = info[subsection_position]
+      target = party_members[option_position]
+      target.consume_item(item)
+    elsif subsection_position.nil?
+      @menu_helper.set_active_subsection(section_position)
+    end
+    return !subsection_position.nil?
+  end
+  def surface_for(posn)
+    item = info[posn]
+    s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
+    s.fill(:white)
+    member_names = party_members.collect {|m| m.name}
+    @menu_helper.render_text_to(s,member_names , TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
+    s
+
+  end
+
+  def option_at(idx)
+    party_members
+  end
+
+  def party_members
+    @game.party_members
+  end
+
+  def info
+    @game.inventory_info
   end
 
   def details
-    info_lines = @game.inventory_info
+    info_lines = info.collect {|item| item.to_info}
     s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
     s.fill(:yellow)
     @menu_helper.render_text_to(s, info_lines, TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
     s
+  end
+
+  def size
+    info.size
   end
 end
 
@@ -1243,6 +1326,7 @@ class MenuLayer < AbstractLayer
     mlc.main_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + @@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
     mlc.layer_inset_on_screen = [@@MENU_LAYER_INSET,@@MENU_LAYER_INSET]
     mlc.details_inset_on_layer = [@@MENU_DETAILS_INSET_X, @@MENU_DETAILS_INSET_Y]
+    mlc.options_inset_on_layer = [@@MENU_OPTIONS_INSET_X, @@MENU_OPTIONS_INSET_Y]
     mlc
   end
 
@@ -1372,7 +1456,8 @@ class TextRenderingConfig
   end
 end
 class MenuLayerConfig
-  attr_accessor :main_menu_text, :section_menu_text, :in_section_cursor, :main_cursor, :layer_inset_on_screen, :details_inset_on_layer
+  attr_accessor :main_menu_text, :section_menu_text, :in_section_cursor, 
+    :main_cursor, :layer_inset_on_screen, :details_inset_on_layer, :options_inset_on_layer
 end
 
 class NoopAction
@@ -1561,6 +1646,13 @@ class CharacterState
     @experience += pts
   end
 
+  def add_effects(other_state)
+    @current_hp += other_state.current_hp
+    @current_mp += other_state.current_mp
+    #TODO status effects, core attributes, etc
+    
+  end
+
   include JsonHelper
   def json_params
     [ @attributes, @experience, @current_hp, @current_mp, @status_effects]
@@ -1574,6 +1666,12 @@ class CharacterAttribution
 
   def initialize(state)
     @state = state
+  end
+
+  def consume_item(item)
+    @state.add_effects(item.effects)
+    item.consumed
+    
   end
 
   def status_info
@@ -2200,6 +2298,28 @@ class EventHelper
   end
 end
 
+class ItemAttributes < CharacterAttributes
+  def self.none
+    ItemAttributes.new(0,0,0,0,0,0,0,0)
+  end
+end
+
+class ItemState < CharacterState
+  
+end
+class GameItem
+  attr_reader :state
+  alias_method :effects,:state
+  def initialize(name, state)
+    @name = name
+    @state = state
+  end
+
+  def to_s
+    @name
+  end
+end
+
 class GameInternalsFactory
   def make_screen
     #@screen = Screen.open( [640, 480] )
@@ -2248,8 +2368,9 @@ class GameInternalsFactory
     #@player = Ship.new( @screen.w/2, @screen.h/2, @topomap, pallette, @terrainmap, terrain_pallette, @interactmap, interaction_pallette, @bgsurface )
     hero = Hero.new("hero",  @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(5, 5, 1, 0, 0, 0, 0, 0))))
     hero2 = Hero.new("cohort", @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(5, 5, 1, 0, 0, 0, 0, 0))))
-    party_inventory = Inventory.new(255) #TODO revisit inventory -- should it have a maximum? probably should not be stored on hero as well...
-    party_inventory.add_item(1, "potion")
+    party_inventory = Inventory.new(255) #TODO revisit inventory -- should it have a maximum? 
+    party_inventory.add_item(1, GameItem.new("potion", ItemState.new( ItemAttributes.none, 0, 10 )))
+    party_inventory.add_item(1, GameItem.new("antidote", ItemState.new(ItemAttributes.none, 0, 20 ))) #TODO how to model status effects
     party = Party.new([hero, hero2], party_inventory)
     hero_x_dim = 48
     hero_y_dim = 64
@@ -2446,7 +2567,7 @@ class Game
   def_delegator :@event_helper, :non_menu_hooks, :non_battle_hooks
 
   def_delegator :@player, :update_tile_coords, :update_player_tile_coords
-  def_delegators :@player, :party_members, :inventory_info
+  def_delegators :@player, :party_members, :inventory_info, :inventory_at, :inventory
 
 
   def toggle_battle_hooks(in_battle=false)
