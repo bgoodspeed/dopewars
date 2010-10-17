@@ -48,6 +48,10 @@ class Inventory
     end
   end
 
+  def inventory_info #TODO this should respect sort orders
+    keys.collect {|key| "#{key} : #{@items[key]}"}
+  end
+
   def gain_inventory(inventory)
     inventory.keys.each do |key|
       puts "key: #{key}"

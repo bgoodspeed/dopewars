@@ -739,14 +739,22 @@ class MenuHelper
 
   def move_cursor_down
     if @show_section
-      @section_position = (@section_position + 1) % active_section.content.size
+      if subsection_active?(@section_position)
+        puts "should send input to activated submenu"
+      else
+        @section_position = (@section_position + 1) % active_section.content.size
+      end
     else
       @cursor_position = (@cursor_position + 1) % @text_lines.size
     end
   end
   def move_cursor_up
     if @show_section
-      @section_position = (@section_position - 1) % active_section.content.size
+       if subsection_active?(@section_position)
+        puts "should send input to activated submenu"
+      else
+        @section_position = (@section_position - 1) % active_section.content.size
+       end
     else
       @cursor_position = (@cursor_position - 1) % @text_lines.size
     end
@@ -760,6 +768,16 @@ class MenuHelper
 
   end
   def cancel_action
+    if subsection_active?(@section_position)
+      @active_position = nil
+      return
+    end
+    if @show_section
+      @show_section = false
+      @section_position = 0
+      return
+    end
+
     reset_indices
   end
   def replace_sections(sections)
@@ -783,7 +801,6 @@ class MenuHelper
       conf = menu_layer_config.in_section_cursor
       @cursor.blit(@layer, [conf.xc + conf.xf * @section_position, conf.yc + conf.yf * @section_position])
       if subsection_active?(@section_position)
-        puts "give extra info on #{active_section.content_at(@section_position).details}"
         surf = active_section.content_at(@section_position).details
         surf.blit(@layer, menu_layer_config.details_inset_on_layer)
       end
@@ -795,14 +812,15 @@ class MenuHelper
   end
 
   def subsection_active?(position)
-    @active_position == position
+    (@active_position == position) && !@active_position.nil?
   end
   def set_active_subsection(position)
+    puts "activated with #{position}"
     @active_position = position
   end
 
   def reset_indices
-    @active_subsection = nil
+    @active_position = nil
     @cursor_position = 0
     @section_position = 0
     @show_section = false
@@ -834,7 +852,7 @@ end
 
 class Party
   extend Forwardable
-  def_delegators :@inventory, :add_item, :gain_inventory
+  def_delegators :@inventory, :add_item, :gain_inventory, :inventory_info
 
   attr_reader :members, :inventory
   def initialize(members, inventory)
@@ -874,7 +892,7 @@ class Player
   
   def_delegators :@animated_sprite_helper, :image, :rect
   def_delegators :@coordinate_helper, :update_tile_coords, :px, :py
-  def_delegators :@party, :add_readiness, :gain_experience, :gain_inventory, :inventory, :dead?
+  def_delegators :@party, :add_readiness, :gain_experience, :gain_inventory, :inventory, :dead?, :inventory_info
   def_delegator :@party, :add_item, :add_inventory
   def_delegator :@party, :members, :party_members
 
@@ -1054,7 +1072,6 @@ class StatusDisplayAction
 
   def activate(cursor_position, game, section_position)
     @menu_helper.set_active_subsection(section_position)
-    
   end
 
 
@@ -1062,14 +1079,51 @@ class StatusDisplayAction
     info_lines = @actor.status_info
     s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
     s.fill(:green)
-    puts "status info should be: "
-    info_lines.each {|line| puts "#{line}" }
-    puts "------------------------"
     @menu_helper.render_text_to(s, info_lines, TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
     s
   end
 end
 
+
+class SortInventoryAction
+  attr_reader :text
+  def initialize(text, game, menu_helper)
+    @text = text
+    @game = game
+    @menu_helper = menu_helper
+  end
+  def activate(cursor_position, game, section_position)
+    puts "TODO re-sort inventory"
+  end
+
+
+
+end
+
+
+class InventoryDisplayAction
+  attr_reader :text
+  def initialize(text, game, menu_helper)
+    @text = text
+    @game = game
+    @menu_helper = menu_helper
+  end
+
+  def activate(cursor_position, game, section_position)
+    @menu_helper.set_active_subsection(section_position)
+  end
+
+  def details
+    info_lines = @game.inventory_info
+    s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
+    s.fill(:yellow)
+    @menu_helper.render_text_to(s, info_lines, TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
+    s
+  end
+end
+
+class KeyInventoryDisplayAction < InventoryDisplayAction
+end
 class AbstractLayer
   include FontLoader #TODO unify resource loading
   attr_accessor :active
@@ -1168,7 +1222,7 @@ class MenuLayer < AbstractLayer
 
   def menu_sections_for(chars)
     [MenuSection.new("Status", chars),
-      MenuSection.new("Inventory", [MenuAction.new("inventory contents:"), MenuAction.new("TODO real data")]),
+      MenuSection.new("Inventory", [InventoryDisplayAction.new("All Items", @game, @menu_helper), KeyInventoryDisplayAction.new("Key Items", @game, @menu_helper), SortInventoryAction.new("Sort", @game, @menu_helper)]),
       MenuSection.new("Equip", [MenuAction.new("head equipment:"), MenuAction.new("arm equipment: "), MenuAction.new("etc")]),
       MenuSection.new("Save", [SaveMenuAction.new("Slot 1")]),
       MenuSection.new("Load", [LoadMenuAction.new("Slot 1")])
@@ -1177,7 +1231,6 @@ class MenuLayer < AbstractLayer
 
 
   def rebuild_menu_sections
-    chars = [MenuAction.new("status info line 1"), MenuAction.new("status info line 2")]
     chars = @game.party_members.collect {|m| StatusDisplayAction.new(m, @menu_helper)}
     menu_sections_for(chars)
   end
@@ -2196,6 +2249,7 @@ class GameInternalsFactory
     hero = Hero.new("hero",  @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(5, 5, 1, 0, 0, 0, 0, 0))))
     hero2 = Hero.new("cohort", @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(5, 5, 1, 0, 0, 0, 0, 0))))
     party_inventory = Inventory.new(255) #TODO revisit inventory -- should it have a maximum? probably should not be stored on hero as well...
+    party_inventory.add_item(1, "potion")
     party = Party.new([hero, hero2], party_inventory)
     hero_x_dim = 48
     hero_y_dim = 64
@@ -2392,7 +2446,7 @@ class Game
   def_delegator :@event_helper, :non_menu_hooks, :non_battle_hooks
 
   def_delegator :@player, :update_tile_coords, :update_player_tile_coords
-  def_delegators :@player, :party_members
+  def_delegators :@player, :party_members, :inventory_info
 
 
   def toggle_battle_hooks(in_battle=false)
