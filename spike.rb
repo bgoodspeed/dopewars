@@ -1510,9 +1510,7 @@ end
 
 class CustomCursorTextRenderingConfig < TextRenderingConfig
   def cursor_offsets_at(position, game)
-    puts "figure out where the nth participant's cursor should og"
     offset = game.current_battle_participant_offset(position)
-    puts "i think it is #{offset}"
     offset
   end
 end
@@ -1574,6 +1572,8 @@ class AttackMenuAction < MenuAction
     battle = @battle_layer.battle
 
     hero = battle.player.party.members[party_member_index]
+    target = battle.current_battle_participant(subsection_position)
+    puts "I am going to attack #{target}"
     @action.perform(hero, battle.monster)
     msg = "attacked for #{hero.damage} damage"
 #    msg += "hero #{hero} killed #{battle.monster}" if battle.monster.dead?
@@ -2131,9 +2131,13 @@ class Battle
     monsters + heroes
   end
 
+  def current_battle_participant(idx)
+    participants[idx]
+  end
+
   def current_battle_participant_offset(idx)
 
-    member = participants[idx]
+    member = current_battle_participant(idx)
 
     if member.is_a? Monster
       rv = [15 + 15 * idx, 15]
