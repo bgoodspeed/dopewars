@@ -772,18 +772,21 @@ class MenuHelper
   def enter_current_cursor_location(game)
     if @show_section
       if subsection_active?(@section_position)
-        puts "activating option with #{@section_position}"
         if @needs_option
+          puts "activating at option layer"
           active_subsection.activate(@cursor_position, game, @section_position, @subsection_position, @option_position)
         else
+          puts "activating at subsection layer"
           @needs_option = active_subsection.activate(@cursor_position, game, @section_position, @subsection_position)
         end
         
       else
+        puts "activating at section layer"
         active_subsection.activate(@cursor_position, game, @section_position)
       end
       
     else
+      puts "showing section in lieu of activation at top layer"
       @show_section = true
     end
 
@@ -834,7 +837,8 @@ class MenuHelper
       
       if subsection_active?(@section_position)
         surf = active_subsection.details
-        surf.blit(@layer, menu_layer_config.details_inset_on_layer)
+
+        surf.blit(@layer, menu_layer_config.details_inset_on_layer) if surf
         @cursor.fill(:black)
         
         if @needs_option
@@ -1119,7 +1123,7 @@ end
 class LevelUpAction < AbstractActorAction
 
   def size
-    2
+    2 #TODO this should come from the size of the attribute set
   end
 
 
@@ -1365,6 +1369,8 @@ class MenuLayer < AbstractLayer
   end
 end
 class BattleLayer < AbstractLayer
+  extend Forwardable
+  def_delegators :@battle, :participants
   attr_reader :battle
   include EventHandler::HasEventHandler
   def initialize(screen)
@@ -1386,8 +1392,11 @@ class BattleLayer < AbstractLayer
   def start_battle(game, universe, player, monster)
     @active = true
     @battle = Battle.new(game, universe, player, monster, self)
-    sections = player.party.collect {|hero|  HeroMenuSection.new(hero, [AttackMenuAction.new("Attack", self), ItemMenuAction.new("Item")])}
-    @menu_helper = BattleMenuHelper.new(@battle, @screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
+    
+    @menu_helper = BattleMenuHelper.new(@battle, @screen, @layer, @text_rendering_helper, [], @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
+
+    sections = player.party.collect {|hero|  HeroMenuSection.new(hero, [AttackMenuAction.new("Attack", self, @menu_helper), ItemMenuAction.new("Item")])}
+    @menu_helper.replace_sections(sections)
   end
   def end_battle
     @active = false
@@ -1525,19 +1534,32 @@ class AttackAction
   end
 end
 class AttackMenuAction < MenuAction
-  def initialize(text, battle_layer)
+  def initialize(text, battle_layer, menu_helper)
     super(text, AttackAction.new)
     @battle_layer = battle_layer
+    @menu_helper = menu_helper
   end
 
-  def activate(party_member_index, game, submenu_idx)
+  def activate(party_member_index, game, action_idx, subsection_position=nil, option_position=nil)
+    @menu_helper.set_active_subsection(action_idx)
+
+    return false unless subsection_position
     battle = @battle_layer.battle
 
     hero = battle.player.party.members[party_member_index]
     @action.perform(hero, battle.monster)
     msg = "attacked for #{hero.damage} damage"
 #    msg += "hero #{hero} killed #{battle.monster}" if battle.monster.dead?
-    game.add_notification(BattleScreenNotification.new("Attacked for #{}"))
+    game.add_notification(BattleScreenNotification.new("Attacked for #{hero.damage}"))
+    false
+  end
+
+  def size
+    @battle_layer.participants.size
+  end
+
+  def details
+    false
   end
 end
 class ItemMenuAction < MenuAction
