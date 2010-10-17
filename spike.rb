@@ -16,9 +16,6 @@ require 'lib/hero'
 
 
 
-# Include these modules so we can type "Surface" instead of
-# "Rubygame::Surface", etc. Purely for convenience/readability.
-
 include Rubygame
 include Rubygame::Events
 include Rubygame::EventActions
@@ -752,16 +749,19 @@ class MenuHelper
   def move_cursor(dir)
     if @show_section
        if subsection_active?(@section_position)
-
          if @needs_option
+           puts "moving at option layer"
            @option_position = clamping_delta(@option_position, active_option.size, dir)
          else
+           puts "moving at subsection layer"
           @subsection_position = clamping_delta(@subsection_position, active_subsection.size, dir)
          end
       else
+        puts "moving at section layer"
         @section_position = clamping_delta(@section_position, active_section.content.size, dir)
        end
     else
+      puts "moving at top layer"
       @cursor_position = clamping_delta(@cursor_position, @text_lines.size, dir)
     end
   end
@@ -1104,21 +1104,49 @@ class BattleScreenNotification < Notification
   end
 end
 
-
-class StatusDisplayAction
+class AbstractActorAction
   extend Forwardable
-  def_delegators :@actor
   def initialize(actor, menu_helper)
     @actor = actor
     @menu_helper = menu_helper
   end
-
   def text
     @actor.name
   end
+
+end
+
+class LevelUpAction < AbstractActorAction
+
+  def size
+    2
+  end
+
+
+  def details
+    info_lines = @actor.status_info
+    s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
+    s.fill(:green)
+    @menu_helper.render_text_to(s, info_lines, TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
+    s
+  end
+
+  def activate(cursor_position, game, section_position, subsection_position=nil, option_position=nil)
+    @menu_helper.set_active_subsection(section_position)
+    if !subsection_position.nil?
+      @actor.consume_level_up(subsection_position)
+    end
+    false
+  end
+
+
+end
+class StatusDisplayAction< AbstractActorAction
   def size
     1
   end
+
+
   def activate(cursor_position, game, section_position, subsection_position=nil, option_position=nil)
     @menu_helper.set_active_subsection(section_position)
     false
@@ -1304,8 +1332,9 @@ class MenuLayer < AbstractLayer
   end
 
   def menu_sections_for(chars)
-    [MenuSection.new("Status", chars),
+    [MenuSection.new("Status", chars.collect {|m| StatusDisplayAction.new(m, @menu_helper)}),
       MenuSection.new("Inventory", [InventoryDisplayAction.new("All Items", @game, @menu_helper), KeyInventoryDisplayAction.new("Key Items", @game, @menu_helper), SortInventoryAction.new("Sort", @game, @menu_helper)]),
+      MenuSection.new("Levelup", chars.collect {|m| LevelUpAction.new(m, @menu_helper)}),
       MenuSection.new("Equip", [MenuAction.new("head equipment:"), MenuAction.new("arm equipment: "), MenuAction.new("etc")]),
       MenuSection.new("Save", [SaveMenuAction.new("Slot 1")]),
       MenuSection.new("Load", [LoadMenuAction.new("Slot 1")])
@@ -1314,8 +1343,7 @@ class MenuLayer < AbstractLayer
 
 
   def rebuild_menu_sections
-    chars = @game.party_members.collect {|m| StatusDisplayAction.new(m, @menu_helper)}
-    menu_sections_for(chars)
+    menu_sections_for(@game.party_members)
   end
   def menu_layer_config
 
@@ -1612,6 +1640,17 @@ class CharacterAttributes
     @luck = luck
   end
 
+  def add_attributes(other)
+    @hp += other.hp
+    @mp += other.mp
+    @strength += other.strength
+    @defense += other.defense
+    @magic_power += other.magic_power
+    @magic_defense += other.magic_defense
+    @agility += other.agility
+    @luck += other.luck
+  end
+
   include JsonHelper
   def json_params
     [@hp,@mp, @strength, @defense, @magic_power, @magic_defense, @agility, @luck ]
@@ -1619,15 +1658,16 @@ class CharacterAttributes
 end
 
 class CharacterState
-  attr_accessor :current_hp, :current_mp, :status_effects, :experience
+  attr_accessor :current_hp, :current_mp, :status_effects, :experience, :level_points
   extend Forwardable
-  def_delegators :@attributes, :hp, :mp
-  def initialize(attributes, exp=nil, chp=nil, cmp=nil, statii=nil)
+  def_delegators :@attributes, :hp, :mp, :add_attributes
+  def initialize(attributes, exp=nil, chp=nil, cmp=nil, statii=nil, lvp=nil)
     @attributes = attributes
     @current_hp = chp.nil? ? attributes.hp : chp
     @current_mp = cmp.nil? ? attributes.mp : cmp
     @status_effects = statii.nil? ? [] : statii
     @experience = exp.nil? ? 0 : exp
+    @level_points = lvp.nil? ? 0 : lvp
   end
 
   def dead?
@@ -1646,6 +1686,9 @@ class CharacterState
     @experience += pts
   end
 
+  def subtract_level_points(pts)
+    @level_points -= pts
+  end
   def add_effects(other_state)
     @current_hp += other_state.current_hp
     @current_mp += other_state.current_mp
@@ -1671,11 +1714,34 @@ class CharacterAttribution
   def consume_item(item)
     @state.add_effects(item.effects)
     item.consumed
-    
+  end
+
+  def consume_level_up(attr_idx) #TODO this might not be the best way to pass this?
+    bonus = 1
+    cost = 1
+    #TODO 1:1 level-stat tradeoff is not valid
+
+    arr = 0.upto(7).collect {|n| n == attr_idx ? bonus : 0}
+    @state.add_attributes(CharacterAttributes.new(*arr))
+    @state.subtract_level_points(cost)
+  end
+
+
+  def stats_ordering
+    [:hp, :mp, :exp, :lvp]
+  end
+
+  def stats_mapping
+    m = {}
+    m[:hp] = "HP: #{@state.current_hp}/#{@state.hp}"
+    m[:mp] = "MP: #{@state.current_mp}/#{@state.mp}"
+    m[:exp] = "EXP: #{@state.experience}"
+    m[:lvp] = "LVP: #{@state.level_points}"
+    m
   end
 
   def status_info
-    ["HP: #{@state.current_hp}/#{@state.hp}", "MP: #{@state.current_mp}/#{@state.mp}", "EXP: #{@state.experience}"]
+    stats_ordering.collect {|sk| stats_mapping[sk]}
   end
   include JsonHelper
   def json_params
