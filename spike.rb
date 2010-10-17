@@ -88,6 +88,7 @@ class GameLayers
   def_delegator :@battle_layer, :move_cursor_down, :battle_move_cursor_down
   def_delegator :@battle_layer, :cancel_action, :battle_cancel_action
   def_delegators :@notifications_layer, :add_notification
+  def_delegators :@battle_layer, :current_battle_participant_offset
 
 
 
@@ -177,7 +178,7 @@ class Universe
   def_delegators :@game_layers, :dialog_layer, :menu_layer, :battle_layer, :notifications_layer, 
     :draw_game_layers_if_active, :menu_move_cursor_up, :menu_move_cursor_down, :menu_cancel_action,
     :battle_cancel_action, :battle_move_cursor_down, :battle_move_cursor_up, :add_notification,
-    :reset_menu_positions
+    :reset_menu_positions, :current_battle_participant_offset
 
   def initialize(current_world_idx, worlds, game_layers=nil, sound_effects=nil, game=nil)
     raise "must have at least one world" if worlds.empty?
@@ -828,7 +829,7 @@ class MenuHelper
     active_subsection.option_at(@option_position)
   end
 
-  def draw(menu_layer_config)
+  def draw(menu_layer_config, game)
     render_text_to_layer( @text_lines, menu_layer_config.main_menu_text)
     @cursor.fill(color_for_current_section_cursor)
     if @show_section
@@ -837,24 +838,26 @@ class MenuHelper
       
       if subsection_active?(@section_position)
         surf = active_subsection.details
+        conf = menu_layer_config.in_subsection_cursor
 
         surf.blit(@layer, menu_layer_config.details_inset_on_layer) if surf
         @cursor.fill(:black)
         
         if @needs_option
+          conf = menu_layer_config.in_option_section_cursor
           optsurf = active_subsection.surface_for(@subsection_position)
           optsurf.blit(@layer, menu_layer_config.options_inset_on_layer)
-          @cursor.blit(@layer, [conf.xc + conf.xf * @option_position, 3*conf.yc + conf.yf * @option_position])
+          @cursor.blit(@layer, conf.cursor_offsets_at(@option_position, game))
         else
-          @cursor.blit(@layer, [conf.xc + conf.xf * @subsection_position, 2*conf.yc + conf.yf * @subsection_position])
+          @cursor.blit(@layer, conf.cursor_offsets_at(@subsection_position, game))
         end
 
       else
-        @cursor.blit(@layer, [conf.xc + conf.xf * @section_position, conf.yc + conf.yf * @section_position])
+        @cursor.blit(@layer, conf.cursor_offsets_at(@section_position, game))
       end
     else
       conf = menu_layer_config.main_cursor
-      @cursor.blit(@layer, [conf.xc + conf.xf * @cursor_position, conf.yc + conf.yf * @cursor_position])
+      @cursor.blit(@layer, conf.cursor_offsets_at(@cursor_position, game))
     end
     @layer.blit(@screen, menu_layer_config.layer_inset_on_screen)
   end
@@ -1260,7 +1263,7 @@ class AbstractLayer
   alias_method :toggle_visibility, :toggle_activity
 end
 class NotificationsLayer < AbstractLayer
-  def initialize(screen)
+  def initialize(screen, game)
     super(screen, @@NOTIFICATION_LAYER_WIDTH, @@NOTIFICATION_LAYER_HEIGHT)
     @notifications = []
     @config = TextRenderingConfig.new(@@NOTIFICATION_TEXT_INSET, 0, @@NOTIFICATION_TEXT_INSET, @@NOTIFICATION_LINE_SPACING)
@@ -1293,7 +1296,7 @@ class DialogLayer < AbstractLayer
   attr_accessor :visible, :text
   include FontLoader #TODO unify resource loading
 
-  def initialize(screen)
+  def initialize(screen, game)
     super(screen, screen.w/2 - @@LAYER_INSET, screen.h/2 - @@LAYER_INSET)
     @layer.fill(:red)
     @layer.alpha = 192
@@ -1354,6 +1357,8 @@ class MenuLayer < AbstractLayer
     mlc = MenuLayerConfig.new
     mlc.main_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
     mlc.section_menu_text = TextRenderingConfig.new(3 * @@MENU_TEXT_INSET + @@MENU_TEXT_WIDTH + @@MENU_LINE_SPACING, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
+    mlc.in_subsection_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, 2 * @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
+    mlc.in_option_section_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, 3 * @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
     mlc.in_section_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
     mlc.main_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + @@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
     mlc.layer_inset_on_screen = [@@MENU_LAYER_INSET,@@MENU_LAYER_INSET]
@@ -1365,20 +1370,21 @@ class MenuLayer < AbstractLayer
   def draw()
     @layer.fill(:red)
     @menu_helper.replace_sections(rebuild_menu_sections)
-    @menu_helper.draw(menu_layer_config)
+    @menu_helper.draw(menu_layer_config, @game)
   end
 end
 class BattleLayer < AbstractLayer
   extend Forwardable
-  def_delegators :@battle, :participants
+  def_delegators :@battle, :participants, :current_battle_participant_offset
   attr_reader :battle
   include EventHandler::HasEventHandler
-  def initialize(screen)
+  def initialize(screen, game)
     super(screen, screen.w - 50, screen.h - 50)
     @layer.fill(:orange)
     @text_rendering_helper = TextRenderingHelper.new(@layer, @font)
     @battle = nil
     @menu_helper = nil
+    @game = game
     sections = [MenuSection.new("Exp",[EndBattleMenuAction.new("Confirm", self)]),
       MenuSection.new("Items", [EndBattleMenuAction.new("Confirm", self)])]
     @end_of_battle_menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
@@ -1408,8 +1414,13 @@ class BattleLayer < AbstractLayer
     mlc.main_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, @layer.h - 50, 0)
     mlc.section_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, @layer.h - 150, 0)
     mlc.in_section_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH, @layer.h - 200, 0)
+    mlc.in_subsection_cursor = CustomCursorTextRenderingConfig.new(2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
+    mlc.in_option_section_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
     mlc.main_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH, @layer.h - 100, 0)
     mlc.layer_inset_on_screen = [@@LAYER_INSET,@@LAYER_INSET]
+    mlc.details_inset_on_layer = [@@MENU_DETAILS_INSET_X, @@MENU_DETAILS_INSET_Y]
+    mlc.options_inset_on_layer = [@@MENU_OPTIONS_INSET_X, @@MENU_OPTIONS_INSET_Y]
+
     mlc
   end
   def end_battle_menu_layer_config
@@ -1426,14 +1437,14 @@ class BattleLayer < AbstractLayer
     @layer.fill(:orange)
     if @battle.over?
       if @battle.player_alive?
-        @end_of_battle_menu_helper.draw(end_battle_menu_layer_config)
+        @end_of_battle_menu_helper.draw(end_battle_menu_layer_config, @game)
       else
         puts "you died ... game should be over... whatever"
-        @end_of_battle_menu_helper.draw(end_battle_menu_layer_config)
+        @end_of_battle_menu_helper.draw(end_battle_menu_layer_config, @game)
       end
     else
       @battle.monster.draw_to(@layer)
-      @menu_helper.draw(menu_layer_config)
+      @menu_helper.draw(menu_layer_config, @game)
     end
   end
 
@@ -1491,10 +1502,26 @@ class TextRenderingConfig
     @yc = yc
     @yf = yf
   end
+
+  def cursor_offsets_at(position, game)
+    [@xc + @xf * position, @yc + @yf * position]
+  end
 end
+
+class CustomCursorTextRenderingConfig < TextRenderingConfig
+  def cursor_offsets_at(position, game)
+    puts "figure out where the nth participant's cursor should og"
+    offset = game.current_battle_participant_offset(position)
+    puts "i think it is #{offset}"
+    offset
+  end
+end
+
 class MenuLayerConfig
   attr_accessor :main_menu_text, :section_menu_text, :in_section_cursor, 
-    :main_cursor, :layer_inset_on_screen, :details_inset_on_layer, :options_inset_on_layer
+    :main_cursor, :layer_inset_on_screen, :details_inset_on_layer, 
+    :options_inset_on_layer, :in_subsection_cursor, :in_option_section_cursor
+
 end
 
 class NoopAction
@@ -2091,9 +2118,30 @@ class Battle
     @monster.add_readiness(points, self)
   end
 
+  def monsters
+    [@monster]
+  end
+
+  def heroes
+    @player.party.members
+  end
+
   def participants
     #TODO check to see class of actor, for now only monsters use AI battle strategies
-    [@monster] + @player.party.members
+    monsters + heroes
+  end
+
+  def current_battle_participant_offset(idx)
+
+    member = participants[idx]
+
+    if member.is_a? Monster
+      rv = [15 + 15 * idx, 15]
+    else
+      rv = [ 15 + 65 * (idx - monsters.size), 400]
+    end
+    #TODO return the cursor offsets for this guy
+    rv
   end
 
   def over?
@@ -2432,16 +2480,16 @@ class GameInternalsFactory
   end
 
   def make_game_layers(screen, game)
-    GameLayers.new(make_dialog_layer(screen), make_menu_layer(screen,game), make_battle_layer(screen), make_notifications_layer(screen))
+    GameLayers.new(make_dialog_layer(screen, game), make_menu_layer(screen,game), make_battle_layer(screen, game), make_notifications_layer(screen, game))
   end
-  def make_battle_layer(screen)
-    BattleLayer.new(screen)
+  def make_battle_layer(screen, game)
+    BattleLayer.new(screen, game)
   end
-  def make_notifications_layer(screen)
-    NotificationsLayer.new(screen)
+  def make_notifications_layer(screen, game)
+    NotificationsLayer.new(screen, game)
   end
-  def make_dialog_layer(screen)
-    DialogLayer.new(screen)
+  def make_dialog_layer(screen, game)
+    DialogLayer.new(screen, game)
   end
   def make_menu_layer(screen,game)
     MenuLayer.new(screen,game)
@@ -2647,7 +2695,7 @@ class Game
   def_delegator :@universe, :battle_cancel_action, :battle_cancel
   def_delegator :@universe, :toggle_dialog_visibility, :toggle_dialog_layer
   def_delegators :@universe, :battle_layer, :npcs, :menu_layer, 
-    :reset_menu_positions, :add_notification, :toggle_bg_music
+    :reset_menu_positions, :add_notification, :toggle_bg_music, :current_battle_participant_offset
 
   def_delegators :@event_helper, :non_menu_hooks, :rebuild_event_hooks
   def_delegator :@event_helper, :menu_active_hooks, :menu_hooks
