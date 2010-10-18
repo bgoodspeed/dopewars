@@ -1314,7 +1314,7 @@ class NotificationsLayer < AbstractLayer
   def initialize(screen, game)
     super(screen, @@NOTIFICATION_LAYER_WIDTH, @@NOTIFICATION_LAYER_HEIGHT)
     @notifications = []
-    @config = TextRenderingConfig.new(@@NOTIFICATION_TEXT_INSET, 0, @@NOTIFICATION_TEXT_INSET, @@NOTIFICATION_LINE_SPACING)
+    @config = TextRenderingConfig.new(@@NOTIFICATION_TEXT_INSET, 0, @@NOTIFICATION_TEXT_INSET, @@NOTIFICATION_LINE_SPACING )
   end
 
   def add_notification(notification)
@@ -1322,17 +1322,28 @@ class NotificationsLayer < AbstractLayer
     @active = true
   end
 
+  def config_for(idx)
+    TextRenderingConfig.new(@@NOTIFICATION_TEXT_INSET, 0, @@NOTIFICATION_TEXT_INSET, @@NOTIFICATION_LINE_SPACING * idx)
+  end
+
   def draw
     @layer.fill(:black)
-    @notifications.each do |notif|
-      @text_rendering_helper.render_lines_to_layer( notif.message, @config) #TODO this is where the ugly pop text is formatted
-      notif.displayed
-    end
-    
+
     @notifications.delete_if do |notif|
       notif.dead?
     end
 
+    puts "drawing #{@notifications.size} notifs"
+    msgs = @notifications.collect {|n| n.message}
+    @text_rendering_helper.render_lines_to_layer(msgs, @config)
+    @notifications.each {|n| n.displayed}
+#    @notifications.each_with_index do |notif, idx|
+#      conf = config_for(idx)
+#      puts "for #{idx} offset is #{conf.yf}"
+#      @text_rendering_helper.render_lines_to_layer( notif.message, conf) #TODO this is where the ugly pop text is formatted
+#      notif.displayed
+#    end
+    
     unless @notifications.empty?
       @layer.blit(@screen, @notifications[0].location)
     end
