@@ -327,6 +327,10 @@ class KeyHolder
   def add_key(key)
     @keys += [key]
   end
+
+  def clear_keys
+    @keys.clear
+  end
 end
 class AlwaysDownMonsterKeyHolder < KeyHolder
   @@DOWNKEY = :always_down
@@ -954,6 +958,7 @@ class Player
   def_delegators :@animated_sprite_helper, :image, :rect
   def_delegators :@coordinate_helper, :update_tile_coords, :px, :py
   def_delegators :@party, :add_readiness, :gain_experience, :gain_inventory, :inventory, :dead?, :inventory_info, :inventory_item_at
+  def_delegators :@keys, :clear_keys
   def_delegator :@party, :add_item, :add_inventory
   def_delegator :@party, :members, :party_members
 
@@ -2793,7 +2798,9 @@ class Game
   end
   def battle_completed
     toggle_battle_hooks(true)
+    @player.clear_keys
   end
+
 
 
   def rebuild_hud
