@@ -1385,16 +1385,9 @@ class NotificationsLayer < AbstractLayer
       notif.dead?
     end
 
-    puts "drawing #{@notifications.size} notifs"
     msgs = @notifications.collect {|n| n.message}
     @text_rendering_helper.render_lines_to_layer(msgs, @config)
     @notifications.each {|n| n.displayed}
-#    @notifications.each_with_index do |notif, idx|
-#      conf = config_for(idx)
-#      puts "for #{idx} offset is #{conf.yf}"
-#      @text_rendering_helper.render_lines_to_layer( notif.message, conf) #TODO this is where the ugly pop text is formatted
-#      notif.displayed
-#    end
     
     unless @notifications.empty?
       @layer.blit(@screen, @notifications[0].location)
@@ -2561,15 +2554,25 @@ class SurfaceBackedPallette < Pallette
   end
 end
 
+
 class ISBPEntry
   attr_reader :offsets, :actionable
   def initialize(offsets, actionable)
     @offsets = offsets
+
     @actionable = actionable
   end
 
 end
 
+class CISBPEntry < ISBPEntry
+  attr_reader :filename
+  def initialize(conf, actionable)
+    super(conf.slice(1,2), actionable)
+    @filename = conf[0]
+  end
+
+end
 
 class SBPEntry < ISBPEntry
   alias_method :walkable, :actionable
@@ -2611,6 +2614,30 @@ class SBPResult < ISBPResult
 
   def is_blocking?
     @actionable
+  end
+
+end
+
+
+class CompositeInteractableSurfaceBackedPallette
+  def initialize(configs)
+    @backing = {}
+    configs.each {|config|
+      filename = config[0]
+      @backing[filename] = InteractableSurfaceBackedPallette.new(filename, config[1], config[2])
+    }
+  end
+
+  def []=(key, value)
+    @backing[value.filename][key] = value
+  end
+
+  def [](key)
+    @backing.each {|k,v|
+      r = v[key]
+      return r unless r.nil?
+    }
+    nil
   end
 
 end
@@ -2843,15 +2870,15 @@ class GameInternalsFactory
   end
   
   def interaction_pallette
-    pal = InteractableSurfaceBackedPallette.new("treasure-boxes.png", 32,32)
+    pal = CompositeInteractableSurfaceBackedPallette.new([["treasure-boxes.png", 32,32], ["weapons-32x32.png", 32,32]])
+#XXX note this does not work well, mixing sizes in a composite..
+    pal['O'] = CISBPEntry.new(["treasure-boxes.png",4,7],OpenTreasure.new("O"))
+    pal['T'] = CISBPEntry.new(["treasure-boxes.png",4,4],Treasure.new(GameItemFactory.potion))
+    pal['E'] = CISBPEntry.new(["weapons-32x32.png", 1,0],Treasure.new(GameItemFactory.sword))
+    pal['F'] = CISBPEntry.new(["treasure-boxes.png",4,4],Treasure.new(GameItemFactory.sword))
+    pal['m'] = CISBPEntry.new(["treasure-boxes.png",1,1],WarpPoint.new(1, 120, 700))
 
-    pal['O'] = ISBPEntry.new([4,7],OpenTreasure.new("O"))
-    pal['T'] = ISBPEntry.new([4,4],Treasure.new(GameItemFactory.potion))
-    pal['E'] = ISBPEntry.new([4,4],Treasure.new(GameItemFactory.sword))
-    pal['F'] = ISBPEntry.new([4,4],Treasure.new(GameItemFactory.sword))
-    pal['m'] = ISBPEntry.new([1,1],WarpPoint.new(1, 120, 700))
-
-    pal['w'] = ISBPEntry.new([1,1],WarpPoint.new(1, 1020, 700))
+    pal['w'] = CISBPEntry.new(["treasure-boxes.png",1,1],WarpPoint.new(1, 1020, 700))
 #    pal['W'] = ISBPEntry.new([1,1],WarpPoint.new(0, 1200, 880))
 
     pal
