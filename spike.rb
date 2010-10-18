@@ -918,7 +918,7 @@ end
 class Party
   extend Forwardable
   def_delegators :@inventory, :add_item, :gain_inventory, :inventory_info, :inventory_item_at
-
+  def_delegators :leader, :world_weapon
   attr_reader :members, :inventory
   def initialize(members, inventory)
     @members = members
@@ -929,6 +929,9 @@ class Party
     @members.collect {|member| yield member}
   end
 
+  def leader
+    @members.first
+  end
   def add_readiness(pts)
     @members.each {|member| member.add_readiness(pts) }
   end
@@ -947,6 +950,87 @@ class Party
   end
 end
 
+class WorldWeapon
+  
+  attr_reader :ticks
+  def initialize(pallette, max_ticks=50)
+    @pallette = pallette
+    @ticks = 0
+    @max_ticks = max_ticks
+  end
+  def displayed
+    @ticks += 1
+  end
+
+  def die
+    @ticks = 0
+  end
+  def fired_from(px, py,facing)
+    @startx = px
+    @starty = py
+    @facing = facing
+  end
+
+  def consumed?
+    @ticks >= @max_ticks
+  end
+
+  def draw_weapon(screen)
+    puts "starting at #{@startx},#{@starty} pointing #{@facing} "
+    puts "draw the weapon animation based on #{@ticks}"
+  end
+end
+
+class SwungWorldWeapon < WorldWeapon
+  def draw_weapon(screen)
+    surface = @pallette['E']
+    puts "surface: #{surface}"
+    surface.blit_onto(screen,[0,0, surface.w, surface.h])
+    puts "starting at #{@startx},#{@starty} pointing #{@facing} "
+    puts "draw the weapon animation based on #{@ticks}"
+  end
+
+end
+
+class ShotWorldWeapon < WorldWeapon
+end
+
+
+class WorldWeaponHelper
+
+  extend Forwardable
+  def_delegators :@weapon, :draw_weapon
+
+  def initialize(player)
+    @player = player
+    @weapon = nil
+  end
+
+  def use_weapon
+    if using_weapon?
+      puts "world weapon already in use!"
+    else
+      @weapon = @player.world_weapon
+      @weapon.fired_from(@player.px, @player.py, @player.facing)
+    end
+  end
+
+  def using_weapon?
+    !@weapon.nil?
+  end
+
+  def update_weapon_if_active()
+    return unless using_weapon?
+    @weapon.displayed
+    if @weapon.consumed?
+      @weapon.die
+      @weapon = nil
+    end
+  end
+
+
+end
+
 class Player
   include Sprites::Sprite
   include EventHandler::HasEventHandler
@@ -955,9 +1039,12 @@ class Player
 
   extend Forwardable
   
+  def_delegators :@interaction_helper, :facing
   def_delegators :@animated_sprite_helper, :image, :rect
   def_delegators :@coordinate_helper, :update_tile_coords, :px, :py
-  def_delegators :@party, :add_readiness, :gain_experience, :gain_inventory, :inventory, :dead?, :inventory_info, :inventory_item_at
+  def_delegators :@weapon_helper, :use_weapon, :using_weapon?, :draw_weapon
+  def_delegators :@party, :add_readiness, :gain_experience, :gain_inventory, 
+    :inventory, :dead?, :inventory_info, :inventory_item_at, :world_weapon
   def_delegators :@keys, :clear_keys
   def_delegator :@party, :add_item, :add_inventory
   def_delegator :@party, :members, :party_members
@@ -972,7 +1059,7 @@ class Player
     @keys = KeyHolder.new
     @coordinate_helper = CoordinateHelper.new(px, py, @keys, @universe, @hero_x_dim, @hero_y_dim)
     @animation_helper = AnimationHelper.new(@keys)
-    
+    @weapon_helper = WorldWeaponHelper.new(self)
     @animated_sprite_helper = AnimatedSpriteHelper.new(filename, sx, sy, @hero_x_dim, @hero_y_dim)
     @party = party
 
@@ -982,6 +1069,7 @@ class Player
       ClockTicked => :update
     )
   end
+
 
 
   def interact_with_facing(game)
@@ -1028,6 +1116,7 @@ class Player
     @coordinate_helper.update_accel
     @coordinate_helper.update_vel( dt )
     @coordinate_helper.update_pos( dt )
+    @weapon_helper.update_weapon_if_active
   end
 
   def x_ext
@@ -2586,6 +2675,7 @@ class ISBPResult
   end
   extend Forwardable
   def_delegators :@actionable, :activate
+  def_delegators :@surface, :w,:h
   #  def activate(player, worldstate, tilex, tiley)
   #    @actionable.activate(player, worldstate, tilex, tiley)
   #  end
@@ -2602,6 +2692,9 @@ class ISBPResult
     @surface.blit(screen, screen_position_relative_to(px,py,xi,yi, screen.w/2, screen.h/2))
   end
 
+  def blit_onto(screen, args)
+    @surface.blit(screen, args)
+  end
   def is_blocking?
     @actionable.is_blocking?
   end
@@ -2801,10 +2894,10 @@ class GameInternalsFactory
   end
   def make_player(screen, universe)
     #@player = Ship.new( @screen.w/2, @screen.h/2, @topomap, pallette, @terrainmap, terrain_pallette, @interactmap, interaction_pallette, @bgsurface )
-    hero = Hero.new("hero",  @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(
+    hero = Hero.new("hero",  SwungWorldWeapon.new(interaction_pallette), @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(
         CharacterState.new(CharacterAttributes.new(5, 5, 1, 0, 0, 0, 0, 0)),
         EquipmentHolder.new))
-    hero2 = Hero.new("cohort", @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(
+    hero2 = Hero.new("cohort", ShotWorldWeapon.new(interaction_pallette), @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(
         CharacterState.new(CharacterAttributes.new(5, 5, 1, 0, 0, 0, 0, 0)),
         EquipmentHolder.new))
     party_inventory = Inventory.new(255) #TODO revisit inventory -- should it have a maximum? 
@@ -3019,7 +3112,8 @@ class Game
   def_delegator :@event_helper, :non_menu_hooks, :non_battle_hooks
 
   def_delegator :@player, :update_tile_coords, :update_player_tile_coords
-  def_delegators :@player, :party_members, :inventory_info, :inventory_at, :inventory
+  def_delegators :@player, :party_members, :inventory_info, :inventory_at, 
+    :inventory, :use_weapon
 
 
   def toggle_battle_hooks(in_battle=false)
@@ -3102,6 +3196,9 @@ class Game
   end
   def blit_player
     @player.draw(@screen)
+    if @player.using_weapon?
+      @player.draw_weapon(@screen)
+    end
   end
   def blit_hud
     @hud.draw

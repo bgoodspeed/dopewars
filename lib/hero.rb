@@ -13,15 +13,14 @@ class Hero
     :hp_ratio, :equipment_info, :equip_in_slot_index
   def_delegators :@readiness_helper, :consume_readiness, :add_readiness, :ready?, :ready_ratio
 
-  attr_reader :money, :inventory, :name 
-  def initialize(name="MAIN DUDE", helper_start=1, helper_rate=1, attrib=nil)
+  attr_reader :money, :inventory, :name , :world_weapon
+  def initialize(name="MAIN DUDE", world_weapon=nil, helper_start=1, helper_rate=1, attrib=nil)
     @name = name
     @readiness_helper = BattleReadinessHelper.new(helper_start, helper_rate)
     @character_attribution = attrib
+    @world_weapon = world_weapon
   end
 
-
-  
 
   def free_inventory_slots
     @inventory.free_slots
