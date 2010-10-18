@@ -7,7 +7,7 @@ end
 
 class InventoryItem
   extend Forwardable
-  def_delegators :item, :effects
+  def_delegators :item, :effects, :name
 
   attr_accessor :quantity, :item
   def initialize(quantity, item)

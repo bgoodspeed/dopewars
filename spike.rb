@@ -1185,16 +1185,23 @@ class UpdateEquipmentAction < AbstractActorAction
 
   def activate(cursor_position, game, section_position, subsection_position=nil, option_position=nil)
     @menu_helper.set_active_subsection(section_position)
-    
+    unless option_position.nil?
+      new_gear = inventory[option_position]
+      
+      @actor.equip_in_slot_index(subsection_position, new_gear)
+    end
+    true
   end
 
   def option_at(idx)
     inventory
   end
 
-
+  def equipment
+    @actor.equipment_info
+  end
   def details
-    info_lines = @actor.equipment_info
+    info_lines = equipment
     s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
     s.fill(:yellow)
     @menu_helper.render_text_to(s, info_lines, TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
@@ -1206,7 +1213,7 @@ class UpdateEquipmentAction < AbstractActorAction
   end
 
   def surface_for(posn)
-    info_lines = inventory
+    info_lines = inventory.collect {|i| i.to_info}
     s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
     s.fill(:yellow)
     @menu_helper.render_text_to(s, info_lines, TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
@@ -1933,21 +1940,38 @@ class CharacterState
 
 end
 
-class EmptyEquipmentSlot
-  
+class EquipmentInfo
+  def initialize(slot, equipped)
+    @slot = slot
+    @equipped = equipped
+  end
+
+  def to_s
+    equipment_name = @equipped.nil? ? "empty" : @equipped.name
+    "#{@slot}: #{equipment_name}"
+  end
 end
+
 
 class EquipmentHolder
   def initialize
-    @equipped = Hash.new(EmptyEquipmentSlot.new)
+    @equipped = Hash.new
   end
 
   def equipped_on(slot)
     @equipped[slot]
   end
 
+  def equip_on(slot, gear)
+    @equipped[slot] = gear
+  end
+
+  def equip_in_slot_index(idx, gear)
+    equip_on(slots[idx], gear)
+  end
+
   def equipment_info
-    slots.collect {|slot| equipped_on(slot)}
+    slots.collect {|slot| EquipmentInfo.new(slot, equipped_on(slot))}
   end
 
   def slots
@@ -1958,7 +1982,7 @@ end
 class CharacterAttribution
   extend Forwardable
   def_delegators :@state, :dead?, :take_damage, :damage, :gain_experience, :experience, :current_hp, :hp, :hp_ratio
-  def_delegators :@equipment, :equipment_info
+  def_delegators :@equipment, :equipment_info, :equip_in_slot_index
 
   def initialize(state, equipment)
     @state = state
@@ -2683,7 +2707,7 @@ class EquippableGameItem
 
 end
 class GameItem
-  attr_reader :state
+  attr_reader :state, :name
   alias_method :effects,:state
   def initialize(name, state)
     @name = name
