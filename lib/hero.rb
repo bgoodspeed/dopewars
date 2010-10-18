@@ -9,7 +9,7 @@ class Hero
   extend Forwardable
   
   def_delegators :@character_attribution, :damage, :take_damage, :gain_experience, 
-    :dead?, :status_info, :consume_item, :consume_level_up, :current_hp, :hp, :hp_ratio
+    :dead?, :status_info, :consume_item, :consume_level_up, :current_hp, :hp, :hp_ratio, :equipment_info
   def_delegators :@readiness_helper, :consume_readiness, :add_readiness, :ready?, :ready_ratio
 
   attr_reader :money, :inventory, :name 

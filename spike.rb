@@ -1176,6 +1176,51 @@ class AbstractActorAction
 
 end
 
+class UpdateEquipmentAction < AbstractActorAction
+
+  def initialize(actor, menu_helper, game)
+    super(actor, menu_helper)
+    @game = game
+  end
+
+  def activate(cursor_position, game, section_position, subsection_position=nil, option_position=nil)
+    @menu_helper.set_active_subsection(section_position)
+    
+  end
+
+  def option_at(idx)
+    inventory
+  end
+
+
+  def details
+    info_lines = @actor.equipment_info
+    s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
+    s.fill(:yellow)
+    @menu_helper.render_text_to(s, info_lines, TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
+    s
+  end
+
+  def inventory
+    @game.inventory.inventory_info
+  end
+
+  def surface_for(posn)
+    info_lines = inventory
+    s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
+    s.fill(:yellow)
+    @menu_helper.render_text_to(s, info_lines, TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
+    s
+  end
+
+  def size
+    @actor.equipment_info.size
+  end
+
+
+end
+
+
 class LevelUpAction < AbstractActorAction
 
   def size
@@ -1401,7 +1446,7 @@ class MenuLayer < AbstractLayer
     [MenuSection.new("Status", chars.collect {|m| StatusDisplayAction.new(m, @menu_helper)}),
       MenuSection.new("Inventory", [InventoryDisplayAction.new("All Items", @game, @menu_helper), KeyInventoryDisplayAction.new("Key Items", @game, @menu_helper), SortInventoryAction.new("Sort", @game, @menu_helper)]),
       MenuSection.new("Levelup", chars.collect {|m| LevelUpAction.new(m, @menu_helper)}),
-      MenuSection.new("Equip", [MenuAction.new("head equipment:"), MenuAction.new("arm equipment: "), MenuAction.new("etc")]),
+      MenuSection.new("Equip", chars.collect {|m| UpdateEquipmentAction.new(m, @menu_helper, @game)}),
       MenuSection.new("Save", [SaveMenuAction.new("Slot 1")]),
       MenuSection.new("Load", [LoadMenuAction.new("Slot 1")])
     ]
@@ -1888,12 +1933,36 @@ class CharacterState
 
 end
 
+class EmptyEquipmentSlot
+  
+end
+
+class EquipmentHolder
+  def initialize
+    @equipped = Hash.new(EmptyEquipmentSlot.new)
+  end
+
+  def equipped_on(slot)
+    @equipped[slot]
+  end
+
+  def equipment_info
+    slots.collect {|slot| equipped_on(slot)}
+  end
+
+  def slots
+    [:head, :body, :feet, :left_hand, :right_hand]
+  end
+end
+
 class CharacterAttribution
   extend Forwardable
   def_delegators :@state, :dead?, :take_damage, :damage, :gain_experience, :experience, :current_hp, :hp, :hp_ratio
+  def_delegators :@equipment, :equipment_info
 
-  def initialize(state)
+  def initialize(state, equipment)
     @state = state
+    @equipment = equipment
   end
 
   def consume_item(item)
@@ -2588,6 +2657,31 @@ end
 class ItemState < CharacterState
   
 end
+
+class GameItemFactory
+  def self.potion
+    GameItem.new("potion", ItemState.new( ItemAttributes.none, 0, 10 ))
+  end
+
+  def self.antidote
+    GameItem.new("antidote", ItemState.new(ItemAttributes.none, 0, 20 ))
+  end
+
+  def self.sword
+    GameItem.new("sword", ItemState.new(ItemAttributes.new(0,0,1,0,0,0,0,0), 0, 20 ))
+  end
+
+end
+
+class EquippableGameItem
+  def equippable?
+    true
+  end
+  def consumeable?
+    false
+  end
+
+end
 class GameItem
   attr_reader :state
   alias_method :effects,:state
@@ -2599,6 +2693,15 @@ class GameItem
   def to_s
     @name
   end
+
+  def equippable?
+    false
+  end
+
+  def consumeable?
+    true
+  end
+
 end
 
 class GameInternalsFactory
@@ -2647,11 +2750,16 @@ class GameInternalsFactory
   end
   def make_player(screen, universe)
     #@player = Ship.new( @screen.w/2, @screen.h/2, @topomap, pallette, @terrainmap, terrain_pallette, @interactmap, interaction_pallette, @bgsurface )
-    hero = Hero.new("hero",  @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(5, 5, 1, 0, 0, 0, 0, 0))))
-    hero2 = Hero.new("cohort", @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(5, 5, 1, 0, 0, 0, 0, 0))))
+    hero = Hero.new("hero",  @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(
+        CharacterState.new(CharacterAttributes.new(5, 5, 1, 0, 0, 0, 0, 0)),
+        EquipmentHolder.new))
+    hero2 = Hero.new("cohort", @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(
+        CharacterState.new(CharacterAttributes.new(5, 5, 1, 0, 0, 0, 0, 0)),
+        EquipmentHolder.new))
     party_inventory = Inventory.new(255) #TODO revisit inventory -- should it have a maximum? 
-    party_inventory.add_item(1, GameItem.new("potion", ItemState.new( ItemAttributes.none, 0, 10 )))
-    party_inventory.add_item(1, GameItem.new("antidote", ItemState.new(ItemAttributes.none, 0, 20 ))) #TODO how to model status effects
+    party_inventory.add_item(1, GameItemFactory.potion)
+    party_inventory.add_item(1, GameItemFactory.antidote) #TODO how to model status effects
+    party_inventory.add_item(1, GameItemFactory.sword) #TODO how to model status effects
     party = Party.new([hero, hero2], party_inventory)
     hero_x_dim = 48
     hero_y_dim = 64
@@ -2670,14 +2778,18 @@ class GameInternalsFactory
 
   def make_monster(player,universe)
     monster_inv = Inventory.new(255)
-    monster_inv.add_item(1, "potion")
-    monattrib = CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(3, 0, 1, 0, 0, 0, 0, 0)))
+    monster_inv.add_item(1, GameItemFactory.potion)
+    monattrib = CharacterAttribution.new(
+      CharacterState.new(CharacterAttributes.new(3, 0, 1, 0, 0, 0, 0, 0)),
+      EquipmentHolder.new)
     monai = ArtificialIntelligence.new(RepeatingPathFollower.new("DRUL", 80), BattleStrategy.new([BattleTactic.new("Enemy: Any -> Attack")]))
     Monster.new(player,universe,"monster.png", 400,660, @@MONSTER_X, @@MONSTER_Y, monster_inv, monattrib, monai)
   end
 
   def make_npc(player, universe)
-    npcattrib = CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(3, 0, 0, 0, 0, 0, 0, 0)))
+    npcattrib = CharacterAttribution.new(
+        CharacterState.new(CharacterAttributes.new(3, 0, 0, 0, 0, 0, 0, 0)),
+        EquipmentHolder.new)
     npcai = ArtificialIntelligence.new(RepeatingPathFollower.new("LURD", 80), nil) #TODO maybe make a noop battle strategy just in case?
     #npcai = StaticPathFollower.new
     TalkingNPC.new(player, universe, "i am an npc", "gogo-npc.png", 600, 200,48,64, Inventory.new(255), npcattrib, npcai)
@@ -2685,6 +2797,9 @@ class GameInternalsFactory
 
   def make_world2
     WorldStateFactory.build_world_state("world2_bg","world2_interaction", pallette_160,  interaction_pallette_160, @@BGX, @@BGY, [], BackgroundMusic.new("bonobo-gypsy.mp3"))
+  end
+  def make_world3
+    WorldStateFactory.build_world_state("world3_bg","world3_interaction", pallette,  interaction_pallette, @@BGX, @@BGY, [], BackgroundMusic.new("bonobo-gypsy.mp3"))
   end
 
   def make_event_hooks(game, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
@@ -2707,12 +2822,13 @@ class GameInternalsFactory
     pal = InteractableSurfaceBackedPallette.new("treasure-boxes.png", 32,32)
 
     pal['O'] = ISBPEntry.new([4,7],OpenTreasure.new("O"))
-    pal['T'] = ISBPEntry.new([4,4],Treasure.new("T"))
-    pal['1'] = ISBPEntry.new([4,4],Treasure.new("1"))
-    pal['2'] = ISBPEntry.new([4,4],Treasure.new("2"))
-    pal['3'] = ISBPEntry.new([4,4],Treasure.new("3"))
+    pal['T'] = ISBPEntry.new([4,4],Treasure.new(GameItemFactory.potion))
+    pal['E'] = ISBPEntry.new([4,4],Treasure.new(GameItemFactory.sword))
+    pal['F'] = ISBPEntry.new([4,4],Treasure.new(GameItemFactory.sword))
+    pal['m'] = ISBPEntry.new([1,1],WarpPoint.new(1, 120, 700))
+
     pal['w'] = ISBPEntry.new([1,1],WarpPoint.new(1, 1020, 700))
-    pal['W'] = ISBPEntry.new([1,1],WarpPoint.new(0, 1200, 880))
+#    pal['W'] = ISBPEntry.new([1,1],WarpPoint.new(0, 1200, 880))
 
     pal
   end
@@ -2720,10 +2836,10 @@ class GameInternalsFactory
     pal = InteractableSurfaceBackedPallette.new("treasure-boxes-160.png", 160,160)
 
     pal['O'] = ISBPEntry.new([4,7],OpenTreasure.new("O"))
-    pal['T'] = ISBPEntry.new([4,4],Treasure.new("T"))
-    pal['1'] = ISBPEntry.new([4,4],Treasure.new("1"))
-    pal['2'] = ISBPEntry.new([4,4],Treasure.new("2"))
-    pal['3'] = ISBPEntry.new([4,4],Treasure.new("3"))
+    pal['1'] = ISBPEntry.new([4,4],Treasure.new(GameItemFactory.potion))
+    pal['2'] = ISBPEntry.new([4,4],Treasure.new(GameItemFactory.antidote))
+    pal['3'] = ISBPEntry.new([4,4],Treasure.new(GameItemFactory.potion))
+    pal['J'] = ISBPEntry.new([1,1],WarpPoint.new(2, 120, 700))
     pal['w'] = ISBPEntry.new([1,1],WarpPoint.new(1, 1020, 700))
     pal['W'] = ISBPEntry.new([1,1],WarpPoint.new(0, 1200, 880))
 
@@ -2769,7 +2885,8 @@ class Game
     @queue = @factory.make_queue
     world1 = @factory.make_world1
     world2 = @factory.make_world2
-    @universe = @factory.make_universe([world1, world2], @factory.make_game_layers(@screen, self), @factory.make_sound_effects, self) #XXX might be bad to pass self and make loops in the obj graph
+    world3 = @factory.make_world3
+    @universe = @factory.make_universe([world1, world2, world3], @factory.make_game_layers(@screen, self), @factory.make_sound_effects, self) #XXX might be bad to pass self and make loops in the obj graph
     @universe.toggle_bg_music
 
     @player = @factory.make_player(@screen, @universe)
