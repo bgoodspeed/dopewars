@@ -1118,6 +1118,47 @@ class BattleScreenNotification < Notification
   end
 end
 
+
+class BattleHud
+  def initialize(screen, text_rendering_helper, layer)
+    @screen = screen
+    @text_rendering_helper = text_rendering_helper
+    @layer = layer
+
+  end
+
+  def map_to_colors(rate)
+    r = rate.to_i
+    1.upto(10).collect {|i| i <= r ? :blue : :red }
+  end
+
+  def draw(menu_layer_config, game, battle)
+    heroes = battle.heroes
+    health_rates = heroes.collect {|h| h.hp_ratio * 10}
+    ready_rates = heroes.collect {|h| h.ready_ratio * 10}
+
+    s = Surface.new([500, 50])
+    s.fill(:green)
+
+    health_rates.each_with_index do |hr, hi|
+      sub = Surface.new([10, 10])
+      colors = map_to_colors(hr)
+      ready_colors = map_to_colors(ready_rates[hi])
+      colors.each_with_index do |color, idx|
+        sub.fill(color)
+        sub.blit(s, [hi * 100 + idx * 10, 5])
+        sub.fill(ready_colors[idx])
+        sub.blit(s, [hi * 100 + idx * 10, 25])
+      end
+      
+
+    end
+    s.blit(@screen, [40,400])
+
+  end
+
+end
+
 class AbstractActorAction
   extend Forwardable
   def initialize(actor, menu_helper)
@@ -1175,8 +1216,6 @@ class StatusDisplayAction< AbstractActorAction
     s
   end
 end
-
-
 class SortInventoryAction
   attr_reader :text
   def initialize(text, game, menu_helper)
@@ -1191,8 +1230,6 @@ class SortInventoryAction
 
 
 end
-
-
 class InventoryDisplayAction
   attr_reader :text
   def initialize(text, game, menu_helper)
@@ -1246,7 +1283,6 @@ class InventoryDisplayAction
     info.size
   end
 end
-
 class KeyInventoryDisplayAction < InventoryDisplayAction
 end
 class AbstractLayer
@@ -1393,6 +1429,7 @@ class BattleLayer < AbstractLayer
     @battle = nil
     @menu_helper = nil
     @game = game
+    @battle_hud = BattleHud.new(@screen, @text_rendering_helper, @layer)
     sections = [MenuSection.new("Exp",[EndBattleMenuAction.new("Confirm", self)]),
       MenuSection.new("Items", [EndBattleMenuAction.new("Confirm", self)])]
     @end_of_battle_menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
@@ -1419,9 +1456,9 @@ class BattleLayer < AbstractLayer
   def menu_layer_config
 
     mlc = MenuLayerConfig.new
-    mlc.main_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, @layer.h - 50, 0)
+    mlc.main_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, @layer.h - 125, 0)
     mlc.section_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, @layer.h - 150, 0)
-    mlc.in_section_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH, @layer.h - 200, 0)
+    mlc.in_section_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH, @layer.h - 175, 0)
     mlc.in_subsection_cursor = BattleParticipantCursorTextRenderingConfig.new([AttackMenuAction], 2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
     mlc.in_option_section_cursor = BattleParticipantCursorTextRenderingConfig.new([ItemMenuAction], 2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
     mlc.main_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH, @layer.h - 100, 0)
@@ -1453,6 +1490,7 @@ class BattleLayer < AbstractLayer
     else
       @battle.monster.draw_to(@layer)
       @menu_helper.draw(menu_layer_config, @game)
+      @battle_hud.draw(menu_layer_config, @game, @battle)
     end
   end
 
@@ -1813,6 +1851,9 @@ class CharacterState
   def gain_experience(pts)
     @experience += pts
   end
+  def hp_ratio
+    @current_hp.to_f/@attributes.hp.to_f
+  end
 
   def subtract_level_points(pts)
     @level_points -= pts
@@ -1833,7 +1874,7 @@ end
 
 class CharacterAttribution
   extend Forwardable
-  def_delegators :@state, :dead?, :take_damage, :damage, :gain_experience, :experience
+  def_delegators :@state, :dead?, :take_damage, :damage, :gain_experience, :experience, :current_hp, :hp, :hp_ratio
 
   def initialize(state)
     @state = state
@@ -2164,6 +2205,10 @@ class BattleReadinessHelper
 
   def ready?
     @points >= @points_needed_for_ready
+  end
+
+  def ready_ratio
+    @points.to_f/@points_needed_for_ready.to_f
   end
 end
 
@@ -2721,7 +2766,8 @@ class Game
       QuitRequested => :quit,
       :c => :capture_ss,
       :d => :toggle_dialog_layer,
-      :m => :toggle_menu
+      :m => :toggle_menu,
+      :p => :pause
     }
     menu_killed_hooks = { :i => :interact_with_facing, :space => :use_weapon, :p => :toggle_bg_music }
     menu_active_hooks = { :left => :menu_left, :right => :menu_right, :up => :menu_up, :down => :menu_down, :i => :menu_enter, :b => :menu_cancel }
@@ -2793,7 +2839,6 @@ class Game
   def toggle_battle_hooks(in_battle=false)
     EventManager.new.swap_event_sets(self, in_battle, non_battle_hooks, battle_hooks)
   end
-
   def toggle_menu
     #puts "tm: #{@event_helper.menu_active_hooks}"
     EventManager.new.swap_event_sets(self, menu_layer.active?, non_menu_hooks, menu_hooks)
@@ -2831,19 +2876,20 @@ class Game
 
   def step
     
-    fill_bg
+      fill_bg
 
-    blit_universe
-    tick = tick_clock
-    update_hud(tick)
+      blit_universe
+      fetch_events
+      tick = tick_clock
+      update_hud(tick)
+      process_events
 
-    process_events
-
-    blit_player
-    blit_hud
-    blit_game_layers
+      blit_player
+      blit_hud
+      blit_game_layers
     
-    refresh_screen
+      refresh_screen
+    
   end
   
   def fill_bg
@@ -2852,8 +2898,10 @@ class Game
   def blit_universe
     @universe.blit_world(@screen, @player)
   end
-  def tick_clock
+  def fetch_events
     @queue.fetch_sdl_events
+  end
+  def tick_clock
     tick = @clock.tick
     @queue << tick
     tick
@@ -2863,7 +2911,7 @@ class Game
   end
   def process_events
     @queue.each do |event|
-      handle( event )
+      handle( event ) #if !@paused
     end
   end
   def blit_player

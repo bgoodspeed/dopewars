@@ -9,8 +9,8 @@ class Hero
   extend Forwardable
   
   def_delegators :@character_attribution, :damage, :take_damage, :gain_experience, 
-    :dead?, :status_info, :consume_item, :consume_level_up
-  def_delegators :@readiness_helper, :consume_readiness, :add_readiness, :ready?
+    :dead?, :status_info, :consume_item, :consume_level_up, :current_hp, :hp, :hp_ratio
+  def_delegators :@readiness_helper, :consume_readiness, :add_readiness, :ready?, :ready_ratio
 
   attr_reader :money, :inventory, :name 
   def initialize(name="MAIN DUDE", helper_start=1, helper_rate=1, attrib=nil)
