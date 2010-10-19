@@ -1,6 +1,7 @@
 
 class RepeatingPathFollower
 
+  attr_reader :ticks_seen, :ticks_per_path_unit, :path_idx
   def initialize(path, ticks_per_char)
     @path = path
     @ticks_per_path_unit = ticks_per_char

@@ -1,9 +1,6 @@
 # To change this template, choose Tools | Templates
 # and open the template in the editor.
 
-require 'lib/game_settings'
-require 'lib/processes/attack_action'
-require 'lib/ai/action_invoker'
 require 'spec/rspec_helper'
 
 

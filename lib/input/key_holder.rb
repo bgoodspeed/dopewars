@@ -5,7 +5,7 @@ class KeyHolder
   end
 
   extend Forwardable
-  def_delegators :@keys, :include?, :empty?
+  def_delegators :@keys, :include?, :empty?, :size
 
   def delete_key(key)
     @keys -= [key]

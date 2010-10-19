@@ -1,3 +1,13 @@
+require 'rubygems'
+
+require 'rubygame'
+require 'json'
+require 'forwardable'
+
+require 'lib/game_settings'
+require 'lib/game_requirements'
+
+
 module DelegationMatchers
   class DelegateToMatcher
     def initialize(sym_and_args, config)

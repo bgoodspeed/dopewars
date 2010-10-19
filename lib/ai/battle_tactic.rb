@@ -2,7 +2,7 @@ class BattleTactic
   extend Forwardable
   def_delegators :@action, :perform_on
 
-  attr_reader :target, :condition, :action
+  attr_accessor :target, :condition, :action
   def initialize(desc)
     parse(desc)
   end
