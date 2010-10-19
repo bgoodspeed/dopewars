@@ -80,56 +80,39 @@ require 'lib/notifications/notification'
 require 'lib/notifications/world_screen_notification'
 require 'lib/notifications/battle_screen_notification'
 
+require 'lib/menu/noop_action'
+require 'lib/menu/menu_action'
+require 'lib/menu/menu_section'
+require 'lib/menu/abstract_actor_menu_action'
+require 'lib/menu/hero_menu_section'
+require 'lib/menu/inventory_display_action'
+require 'lib/menu/key_inventory_display_action'
+require 'lib/menu/level_up_action'
+require 'lib/menu/sort_inventory_action'
+require 'lib/menu/status_display_action'
+require 'lib/menu/update_equipment_action'
+
+require 'lib/text/text_rendering_config'
+require 'lib/text/text_rendering_helper'
+
 require 'lib/world_weapons/world_weapon'
 require 'lib/world_weapons/swung_world_weapon'
 require 'lib/world_weapons/shot_world_weapon'
+require 'lib/world_weapons/world_weapon_helper'
+
+require 'lib/battle/battle_hud'
+
+require 'lib/layers/game_layers'
+require 'lib/layers/abstract_layer'
+require 'lib/layers/battle_layer'
+require 'lib/layers/dialog_layer'
+require 'lib/layers/menu_layer'
+require 'lib/layers/notifications_layer'
 
 include Rubygame
 include Rubygame::Events
 include Rubygame::EventActions
 include Rubygame::EventTriggers
-
-class GameLayers
-  extend Forwardable
-  def_delegator :@menu_layer, :move_cursor_up, :menu_move_cursor_up
-  def_delegator :@menu_layer, :move_cursor_down, :menu_move_cursor_down
-  def_delegator :@menu_layer, :cancel_action, :menu_cancel_action
-  def_delegator :@battle_layer, :move_cursor_up, :battle_move_cursor_up
-  def_delegator :@battle_layer, :move_cursor_down, :battle_move_cursor_down
-  def_delegator :@battle_layer, :cancel_action, :battle_cancel_action
-  def_delegators :@notifications_layer, :add_notification
-  def_delegators :@battle_layer, :current_battle_participant_offset
-
-
-
-  attr_reader :dialog_layer, :menu_layer, :battle_layer, :notifications_layer
-  def initialize(dialog_layer=nil, menu_layer=nil, battle_layer=nil, notif_layer=nil)
-    @dialog_layer = dialog_layer
-    @menu_layer = menu_layer
-    @battle_layer = battle_layer
-    @notifications_layer = notif_layer
-  end
-
-  def draw_game_layers_if_active
-    if @dialog_layer.active?
-      @dialog_layer.draw
-    end
-    if @menu_layer.active?
-      @menu_layer.draw
-    end
-    if @battle_layer.active?
-      @battle_layer.draw
-    end
-    if @notifications_layer.active?
-      @notifications_layer.draw
-    end
-  end
-
-  def reset_menu_positions
-    @menu_layer.reset_indices
-  end
-end
-
 
 class Universe
   attr_reader :worlds, :current_world,  :current_world_idx, :game_layers, :sound_effects, :game
@@ -722,24 +705,6 @@ class AnimatedSpriteHelper
 
  
 end
-class TextRenderingHelper
-  def initialize(layer, font)
-    @layer = layer
-    @font = font
-  end
-  def render_lines_to_layer(text_lines, conf)
-    render_lines_to(@layer, text_lines, conf)
-  end
-
-  def render_lines_to(layer, text_lines, conf)
-    text_lines.each_with_index do |text, index|
-      text_surface = @font.render text.to_s, true, [16,222,16]
-      text_surface.blit layer, [conf.xc + conf.xf * index,conf.yc + conf.yf * index]
-    end
-  end
-
-end
-
 #TODO this class should be broken up
 class MenuHelper
   def initialize(screen, layer,text_helper, sections, cursor_x, cursor_y, cursor_main_color=:blue, cursor_inactive_color=:white)
@@ -965,46 +930,6 @@ class Party
   end
 end
 
-class WorldWeaponHelper
-
-  extend Forwardable
-  def_delegators :@weapon, :draw_weapon
-  def_delegators :@interaction_helper, :facing, :facing=
-
-  def initialize(player, universe)
-    @player = player
-    @weapon = nil
-    @universe = universe
-    @interaction_helper = WorldWeaponInteractionHelper.new(@player, @universe, InteractionPolicy.process_all)
-  end
-
-  def use_weapon
-    if using_weapon?
-      puts "world weapon already in use!"
-    else
-      @weapon = @player.world_weapon
-      @weapon.fired_from(@player.px, @player.py, @player.facing)
-    end
-  end
-
-  def using_weapon?
-    !@weapon.nil?
-  end
-
-  def update_weapon_if_active()
-    return unless using_weapon?
-    @weapon.displayed
-    if @weapon.consumed?
-      @weapon.die
-      @weapon = nil
-    else
-      @interaction_helper.interact_with_facing(@universe.game, @player.px, @player.py)
-    end
-  end
-
-
-end
-
 class Player
   include Sprites::Sprite
   include EventHandler::HasEventHandler
@@ -1103,491 +1028,6 @@ class Player
 
 end
 
-
-class BattleHud
-  def initialize(screen, text_rendering_helper, layer)
-    @screen = screen
-    @text_rendering_helper = text_rendering_helper
-    @layer = layer
-
-  end
-
-  def map_to_colors(rate)
-    r = rate.to_i
-    1.upto(10).collect {|i| i <= r ? :blue : :red }
-  end
-
-  def draw(menu_layer_config, game, battle)
-    heroes = battle.heroes
-    health_rates = heroes.collect {|h| h.hp_ratio * 10}
-    ready_rates = heroes.collect {|h| h.ready_ratio * 10}
-
-    s = Surface.new([500, 50])
-    s.fill(:green)
-
-    health_rates.each_with_index do |hr, hi|
-      sub = Surface.new([10, 10])
-      colors = map_to_colors(hr)
-      ready_colors = map_to_colors(ready_rates[hi])
-      colors.each_with_index do |color, idx|
-        sub.fill(color)
-        sub.blit(s, [hi * 100 + idx * 10, 5])
-        sub.fill(ready_colors[idx])
-        sub.blit(s, [hi * 100 + idx * 10, 25])
-      end
-      
-
-    end
-    s.blit(@screen, [40,400])
-
-  end
-
-end
-
-class AbstractActorMenuAction
-  extend Forwardable
-  def initialize(actor, menu_helper)
-    @actor = actor
-    @menu_helper = menu_helper
-  end
-  def text
-    @actor.name
-  end
-  def display_actor_status_info
-    info_lines = @actor.status_info
-    s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
-    s.fill(:green)
-    @menu_helper.render_text_to(s, info_lines, TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
-    s
-  end
-
-end
-
-class UpdateEquipmentAction < AbstractActorMenuAction
-
-  def initialize(actor, menu_helper, game)
-    super(actor, menu_helper)
-    @game = game
-  end
-
-  def activate(cursor_position, game, section_position, subsection_position=nil, option_position=nil)
-    @menu_helper.set_active_subsection(section_position)
-    unless option_position.nil?
-      new_gear = inventory[option_position]
-      
-      @actor.equip_in_slot_index(subsection_position, new_gear)
-    end
-    true
-  end
-
-  def option_at(idx)
-    inventory
-  end
-
-  def equipment
-    @actor.equipment_info
-  end
-  def details
-    info_lines = equipment
-    s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
-    s.fill(:yellow)
-    @menu_helper.render_text_to(s, info_lines, TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
-    s
-  end
-
-  def inventory
-    @game.inventory.inventory_info
-  end
-
-  def surface_for(posn)
-    info_lines = inventory.collect {|i| i.to_info}
-    s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
-    s.fill(:yellow)
-    @menu_helper.render_text_to(s, info_lines, TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
-    s
-  end
-
-  def size
-    @actor.equipment_info.size
-  end
-
-
-end
-
-
-class LevelUpAction < AbstractActorMenuAction
-
-  def size
-    2 #TODO this should come from the size of the attribute set
-  end
-
-  alias_method :details, :display_actor_status_info
- 
-  def activate(cursor_position, game, section_position, subsection_position=nil, option_position=nil)
-    @menu_helper.set_active_subsection(section_position)
-    if !subsection_position.nil?
-      @actor.consume_level_up(subsection_position)
-    end
-    false
-  end
-
-
-end
-class StatusDisplayAction< AbstractActorMenuAction
-  def size
-    1
-  end
-
-
-  def activate(cursor_position, game, section_position, subsection_position=nil, option_position=nil)
-    @menu_helper.set_active_subsection(section_position)
-    false
-  end
-
-  alias_method :details, :display_actor_status_info
-end
-class SortInventoryAction
-  attr_reader :text
-  def initialize(text, game, menu_helper)
-    @text = text
-    @game = game
-    @menu_helper = menu_helper
-  end
-  def activate(cursor_position, game, section_position)
-    puts "TODO re-sort inventory"
-  end
-
-
-
-end
-class InventoryDisplayAction
-  attr_reader :text
-  def initialize(text, game, menu_helper)
-    @text = text
-    @game = game
-    @menu_helper = menu_helper
-    @selected_option = nil
-  end
-
-  def activate(cursor_position, game, section_position, subsection_position=nil, option_position=nil)
-    if !option_position.nil?
-      item = info[subsection_position]
-      target = party_members[option_position]
-      target.consume_item(item) #TODO this is similar to ItemAction refactor
-    elsif subsection_position.nil?
-      @menu_helper.set_active_subsection(section_position)
-    end
-    return !subsection_position.nil?
-  end
-  def surface_for(posn)
-    item = info[posn]
-    s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
-    s.fill(:white)
-    member_names = party_members.collect {|m| m.name}
-    @menu_helper.render_text_to(s,member_names , TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
-    s
-
-  end
-
-  def option_at(idx)
-    party_members
-  end
-
-  def party_members
-    @game.party_members
-  end
-
-  def info
-    @game.inventory_info
-  end
-
-  def details
-    info_lines = info.collect {|item| item.to_info}
-    s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
-    s.fill(:yellow)
-    @menu_helper.render_text_to(s, info_lines, TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
-    s
-  end
-
-  def size
-    info.size
-  end
-end
-class KeyInventoryDisplayAction < InventoryDisplayAction
-end
-class AbstractLayer
-  include FontLoader #TODO unify resource loading
-  attr_accessor :active
-
-  def initialize(screen, layer_width, layer_height)
-    @screen = screen
-    @active = false
-    @layer = Surface.new([layer_width, layer_height])
-    @font = load_font("FreeSans.ttf")
-    @text_rendering_helper = TextRenderingHelper.new(@layer, @font)
-  end
-
-  def toggle_activity
-    @active = !@active
-  end
-
-  alias_method :active?, :active
-  alias_method :visible, :active
-  alias_method :toggle_visibility, :toggle_activity
-end
-class NotificationsLayer < AbstractLayer
-  def initialize(screen, game)
-    super(screen, @@NOTIFICATION_LAYER_WIDTH, @@NOTIFICATION_LAYER_HEIGHT)
-    @notifications = []
-    @config = TextRenderingConfig.new(@@NOTIFICATION_TEXT_INSET, 0, @@NOTIFICATION_TEXT_INSET, @@NOTIFICATION_LINE_SPACING )
-  end
-
-  def add_notification(notification)
-    @notifications << notification
-    @active = true
-  end
-
-  def config_for(idx)
-    TextRenderingConfig.new(@@NOTIFICATION_TEXT_INSET, 0, @@NOTIFICATION_TEXT_INSET, @@NOTIFICATION_LINE_SPACING * idx)
-  end
-
-  def draw
-    @layer.fill(:black)
-
-    @notifications.delete_if do |notif|
-      notif.dead?
-    end
-
-    msgs = @notifications.collect {|n| n.message}
-    @text_rendering_helper.render_lines_to_layer(msgs, @config)
-    @notifications.each {|n| n.displayed}
-    
-    unless @notifications.empty?
-      @layer.blit(@screen, @notifications[0].location)
-    end
-    
-    @active = false if @notifications.empty?
-  end
-end
-class DialogLayer < AbstractLayer
-  attr_accessor :visible, :text
-  include FontLoader #TODO unify resource loading
-
-  def initialize(screen, game)
-    super(screen, screen.w/2 - @@LAYER_INSET, screen.h/2 - @@LAYER_INSET)
-    @layer.fill(:red)
-    @layer.alpha = 192
-    @text = "UNSET"
-  end
-
-  def toggle_visibility
-    @visible = !@visible
-  end
-
-  def draw
-    text_surface = @font.render @text.to_s, true, [16,222,16]
-    text_surface.blit @layer, [@@TEXT_INSET,@@TEXT_INSET]
-    @layer.blit(@screen, [@@LAYER_INSET,@@LAYER_INSET])
-  end
-
-  def displayed
-    #TODO other logic like next page, gifts, etc goes here
-    @active = false
-  end
-end
-class MenuLayer < AbstractLayer
-  include FontLoader #TODO unify resource loading
-  attr_accessor :active
-
-  alias_method :active?, :active
-  alias_method :visible, :active
-  alias_method :toggle_visibility, :toggle_activity
-
-  extend Forwardable
-  def_delegators :@menu_helper, :enter_current_cursor_location, :move_cursor_down,
-    :move_cursor_up, :cancel_action, :reset_indices
-
-  def initialize(screen, game)
-    super(screen, (screen.w) - 2*@@MENU_LAYER_INSET, (screen.h) - 2*@@MENU_LAYER_INSET)
-    @layer.fill(:red)
-    @layer.alpha = 192
-    @game = game
-    @menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, [], @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
-  end
-
-  def menu_sections_for(chars)
-    [MenuSection.new("Status", chars.collect {|m| StatusDisplayAction.new(m, @menu_helper)}),
-      MenuSection.new("Inventory", [InventoryDisplayAction.new("All Items", @game, @menu_helper), KeyInventoryDisplayAction.new("Key Items", @game, @menu_helper), SortInventoryAction.new("Sort", @game, @menu_helper)]),
-      MenuSection.new("Levelup", chars.collect {|m| LevelUpAction.new(m, @menu_helper)}),
-      MenuSection.new("Equip", chars.collect {|m| UpdateEquipmentAction.new(m, @menu_helper, @game)}),
-      MenuSection.new("Save", [SaveMenuAction.new("Slot 1")]),
-      MenuSection.new("Load", [LoadMenuAction.new("Slot 1")])
-    ]
-  end
-
-
-  def rebuild_menu_sections
-    menu_sections_for(@game.party_members)
-  end
-  def menu_layer_config
-
-    mlc = MenuLayerConfig.new
-    mlc.main_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
-    mlc.section_menu_text = TextRenderingConfig.new(3 * @@MENU_TEXT_INSET + @@MENU_TEXT_WIDTH + @@MENU_LINE_SPACING, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
-    mlc.in_subsection_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, 2 * @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
-    mlc.in_option_section_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, 3 * @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
-    mlc.in_section_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
-    mlc.main_cursor = TextRenderingConfig.new(2 * @@MENU_TEXT_INSET + @@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
-    mlc.layer_inset_on_screen = [@@MENU_LAYER_INSET,@@MENU_LAYER_INSET]
-    mlc.details_inset_on_layer = [@@MENU_DETAILS_INSET_X, @@MENU_DETAILS_INSET_Y]
-    mlc.options_inset_on_layer = [@@MENU_OPTIONS_INSET_X, @@MENU_OPTIONS_INSET_Y]
-    mlc
-  end
-
-  def draw()
-    @layer.fill(:red)
-    @menu_helper.replace_sections(rebuild_menu_sections)
-    @menu_helper.draw(menu_layer_config, @game)
-  end
-end
-class BattleLayer < AbstractLayer
-  extend Forwardable
-  def_delegators :@battle, :participants, :current_battle_participant_offset
-  def_delegators :@game, :inventory
-  attr_reader :battle
-  include EventHandler::HasEventHandler
-  def initialize(screen, game)
-    super(screen, screen.w - 50, screen.h - 50)
-    @layer.fill(:orange)
-    @text_rendering_helper = TextRenderingHelper.new(@layer, @font)
-    @battle = nil
-    @menu_helper = nil
-    @game = game
-    @battle_hud = BattleHud.new(@screen, @text_rendering_helper, @layer)
-    sections = [MenuSection.new("Exp",[EndBattleMenuAction.new("Confirm", self)]),
-      MenuSection.new("Items", [EndBattleMenuAction.new("Confirm", self)])]
-    @end_of_battle_menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
-    make_magic_hooks({ClockTicked => :update})
-  end
-  def update( event )
-    return unless @battle and !@battle.over?
-    dt = event.seconds # Time since last update
-    @battle.accumulate_readiness(dt)
-  end
-  def start_battle(game, universe, player, monster)
-    @active = true
-    @battle = Battle.new(game, universe, player, monster, self)
-    
-    @menu_helper = BattleMenuHelper.new(@battle, @screen, @layer, @text_rendering_helper, [], @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
-
-    sections = player.party.collect {|hero|  HeroMenuSection.new(hero, [AttackMenuAction.new("Attack", self, @menu_helper), ItemMenuAction.new("Item", self, @menu_helper, @game)])}
-    @menu_helper.replace_sections(sections)
-  end
-  def end_battle
-    @active = false
-    @battle.end_battle
-  end
-  def menu_layer_config
-
-    mlc = MenuLayerConfig.new
-    mlc.main_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, @layer.h - 125, 0)
-    mlc.section_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, @layer.h - 150, 0)
-    mlc.in_section_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH, @layer.h - 175, 0)
-    mlc.in_subsection_cursor = BattleParticipantCursorTextRenderingConfig.new([AttackMenuAction], 2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
-    mlc.in_option_section_cursor = BattleParticipantCursorTextRenderingConfig.new([ItemMenuAction], 2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
-    mlc.main_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH, @layer.h - 100, 0)
-    mlc.layer_inset_on_screen = [@@LAYER_INSET,@@LAYER_INSET]
-    mlc.details_inset_on_layer = [@@MENU_DETAILS_INSET_X, @@MENU_DETAILS_INSET_Y]
-    mlc.options_inset_on_layer = [@@MENU_OPTIONS_INSET_X, @@MENU_OPTIONS_INSET_Y]
-
-    mlc
-  end
-  def end_battle_menu_layer_config
-
-    mlc = MenuLayerConfig.new
-    mlc.main_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, 50, 0)
-    mlc.section_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, 150, 0)
-    mlc.in_section_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH,200, 0)
-    mlc.main_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH,100, 0)
-    mlc.layer_inset_on_screen = [@@LAYER_INSET,@@LAYER_INSET]
-    mlc
-  end
-  def draw()
-    @layer.fill(:orange)
-    if @battle.over?
-      if @battle.player_alive?
-        @end_of_battle_menu_helper.draw(end_battle_menu_layer_config, @game)
-      else
-        puts "you died ... game should be over... whatever"
-        @end_of_battle_menu_helper.draw(end_battle_menu_layer_config, @game)
-      end
-    else
-      @battle.monster.draw_to(@layer)
-      @menu_helper.draw(menu_layer_config, @game)
-      @battle_hud.draw(menu_layer_config, @game, @battle)
-    end
-  end
-
-  def enter_current_cursor_location(game)
-    if @battle.over?
-      @end_of_battle_menu_helper.enter_current_cursor_location(game)
-    else
-      @menu_helper.enter_current_cursor_location(game)
-    end
-  end
-  
-  def move_cursor_down
-    send_action_to_target(:move_cursor_down)
-  end
-  def move_cursor_up
-    send_action_to_target(:move_cursor_up)
-  end
-
-  def cancel_action
-    send_action_to_target(:cancel_action)
-  end
-
-  def send_action_to_target(sym)
-    target = @battle.over? ? @end_of_battle_menu_helper : @menu_helper
-    target.send(sym)
-  end
-end
-
-class MenuSection
-
-  attr_reader :text, :content
-  def initialize(text, content)
-    @text = text
-    @content = content
-  end
-  def content_at(i)
-    @content[i]
-  end
-  def text_contents
-    @content.collect {|ma| ma.text}
-  end
-end
-class HeroMenuSection < MenuSection
-  def initialize(hero, content)
-    super(hero.name, content)
-    @hero = hero
-  end
-end
-
-class TextRenderingConfig
-  attr_reader :xc,:xf,:yc,:yf
-  def initialize(xc,xf,yc,yf)
-    @xc = xc
-    @xf = xf
-    @yc = yc
-    @yf = yf
-  end
-
-  def cursor_offsets_at(position, game, menu_action)
-    [@xc + @xf * position, @yc + @yf * position]
-  end
-end
-
 class BattleParticipantCursorTextRenderingConfig < TextRenderingConfig
 
   def initialize(klasses, xc,xf,yc,yf)
@@ -1615,25 +1055,6 @@ class MenuLayerConfig
     :main_cursor, :layer_inset_on_screen, :details_inset_on_layer, 
     :options_inset_on_layer, :in_subsection_cursor, :in_option_section_cursor
 
-end
-
-class NoopAction
-  def perform(src,dest)
-    puts "nothing to do, noop action" #TODO consume readiness?
-  end
-end
-
-
-class MenuAction
-  attr_reader :text
-  def initialize(text, action=NoopAction.new)
-    @text = text
-    @action = action
-  end
-
-  def activate(main_menu_idx, game, submenu_idx)
-    puts "This is a no-op action: #{@text}"
-  end
 end
 
 class DamageCalculationHelper

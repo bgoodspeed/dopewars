@@ -1,0 +1,3 @@
+
+class KeyInventoryDisplayAction < InventoryDisplayAction
+end
