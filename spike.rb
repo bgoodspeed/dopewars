@@ -669,12 +669,21 @@ class MonsterCoordinateHelper < CoordinateHelper
     #NOOP
   end
 end
+
+module ColorKeyHelper
+
+  def set_colorkey_from_corner(s)
+    s.colorkey = s.get_at(0,0)
+  end
+end
+
 class AnimatedSpriteHelper
   attr_reader :image, :rect, :px, :py
-
+  include ColorKeyHelper
   def initialize(filename, px, py, avatar_x_dim, avatar_y_dim)
     @all_char_postures = Surface.load(filename)
-    @all_char_postures.colorkey = @all_char_postures.get_at(0,0)
+
+    set_colorkey_from_corner(@all_char_postures)
     @all_char_postures.alpha = 255
 
     @px = px
@@ -953,7 +962,7 @@ end
 class WorldWeapon
   
   attr_reader :ticks
-  def initialize(pallette, max_ticks=50)
+  def initialize(pallette, max_ticks=25)
     @pallette = pallette
     @ticks = 0
     @max_ticks = max_ticks
@@ -971,6 +980,10 @@ class WorldWeapon
     @facing = facing
   end
 
+  def consumption_ratio
+    @ticks.to_f/@max_ticks.to_f
+  end
+
   def consumed?
     @ticks >= @max_ticks
   end
@@ -982,10 +995,58 @@ class WorldWeapon
 end
 
 class SwungWorldWeapon < WorldWeapon
+  include ColorKeyHelper
+
+  @@WEAPON_UP_OFFSET_X = -15
+  @@WEAPON_UP_OFFSET_Y = -45
+  @@WEAPON_DOWN_OFFSET_X = -15
+  @@WEAPON_DOWN_OFFSET_Y = 20
+  @@WEAPON_LEFT_OFFSET_X = -45
+  @@WEAPON_LEFT_OFFSET_Y = -15
+  @@WEAPON_RIGHT_OFFSET_X = 0
+  @@WEAPON_RIGHT_OFFSET_Y = -10
+  @@WEAPON_UP_ANGLE = 270
+  @@WEAPON_DOWN_ANGLE = 120
+  @@WEAPON_LEFT_ANGLE = -10
+  @@WEAPON_RIGHT_ANGLE = 180
+  @@WEAPON_ROTATION = 90
+
+  def screen_config
+    c = {}
+    c[:up] = { :screen => [@@WEAPON_UP_OFFSET_X, @@WEAPON_UP_OFFSET_Y], :rotate => @@WEAPON_UP_ANGLE}
+    c[:down] = { :screen => [@@WEAPON_DOWN_OFFSET_X, @@WEAPON_DOWN_OFFSET_Y], :rotate => @@WEAPON_DOWN_ANGLE}
+    c[:left] = { :screen => [@@WEAPON_LEFT_OFFSET_X, @@WEAPON_LEFT_OFFSET_Y], :rotate => @@WEAPON_LEFT_ANGLE}
+    c[:right] = { :screen => [@@WEAPON_RIGHT_OFFSET_X, @@WEAPON_RIGHT_OFFSET_Y], :rotate => @@WEAPON_RIGHT_ANGLE}
+    c
+  end
+
+  def screen_offsets_for(facing)
+    screen_config[facing][:screen]
+  end
+
+  def base_screen_offsets(screen)
+    [screen.w/2, screen.h/2]
+  end
+
+  def effective_offsets(screen, facing)
+    rv = base_screen_offsets(screen)
+    so = screen_offsets_for(facing)
+    rv[0] += so[0]
+    rv[1] += so[1]
+    rv
+  end
+  def starting_angle_for_facing(facing)
+    screen_config[facing][:rotate]
+  end
   def draw_weapon(screen)
-    surface = @pallette['E']
+    surf = @pallette['E'].surface
+    surface = surf.rotozoom(consumption_ratio * @@WEAPON_ROTATION + starting_angle_for_facing(@facing), 1)
+    set_colorkey_from_corner(surface)
     puts "surface: #{surface}"
-    surface.blit_onto(screen,[0,0, surface.w, surface.h])
+
+    offs = effective_offsets(screen, @facing)
+    surface.blit(screen,[ offs[0], offs[1], surface.w, surface.h])
+
     puts "starting at #{@startx},#{@starty} pointing #{@facing} "
     puts "draw the weapon animation based on #{@ticks}"
   end
@@ -2668,6 +2729,8 @@ class SBPEntry < ISBPEntry
 end
 class ISBPResult
   include ScreenOffsetHelper
+
+  attr_reader :surface
   def initialize(sdl_surface, actionable, wrapped_surface)
     @surface=  sdl_surface
     @actionable = actionable
@@ -2964,7 +3027,7 @@ class GameInternalsFactory
   
   def interaction_pallette
     pal = CompositeInteractableSurfaceBackedPallette.new([["treasure-boxes.png", 32,32], ["weapons-32x32.png", 32,32]])
-#XXX note this does not work well, mixing sizes in a composite..
+#XXX note mixing sizes in a composite does not work well, ..
     pal['O'] = CISBPEntry.new(["treasure-boxes.png",4,7],OpenTreasure.new("O"))
     pal['T'] = CISBPEntry.new(["treasure-boxes.png",4,4],Treasure.new(GameItemFactory.potion))
     pal['E'] = CISBPEntry.new(["weapons-32x32.png", 1,0],Treasure.new(GameItemFactory.sword))
@@ -3195,10 +3258,11 @@ class Game
     end
   end
   def blit_player
-    @player.draw(@screen)
+    
     if @player.using_weapon?
       @player.draw_weapon(@screen)
     end
+    @player.draw(@screen)
   end
   def blit_hud
     @hud.draw
