@@ -14,6 +14,10 @@ require 'lib/hud'
 require 'lib/inventory'
 require 'lib/hero'
 
+# untested \/
+require 'lib/sound/background_music'
+require 'lib/sound/sound_effect'
+require 'lib/sound/sound_effect_set'
 
 
 include Rubygame
@@ -124,55 +128,7 @@ class GameLayers
   end
 end
 
-class BackgroundMusic
-  def initialize(filename)
-    @filename = filename
-    @music = Music.load(@filename)
-  end
 
-  def play_pause
-    if @music.playing?
-      @music.pause
-    else
-      @music.play
-    end
-  end
-  def fade_out_bg_music
-    @music.fade_out(2)
-  end
-  def fade_in_bg_music
-    @music.play({:fade_in => 2})
-  end
-end
-
-class SoundEffect
-  WEAPON = "weapon"
-  WARP = "warp"
-  BATTLE_START = "battle"
-  TREASURE = "treasure"
-end
-
-class SoundEffectSet
-  def initialize(filenames)
-    @effects = {}
-    filenames.each do |filename|
-      @effects[filename] = Sound.load(filename)
-    end
-  end
-
-  def mapping
-    pal = {}
-    pal[SoundEffect::TREASURE] = "treasure-open.ogg"
-    pal[SoundEffect::WEAPON] = "laser.ogg"
-    pal[SoundEffect::WARP] = "warp.ogg"
-    pal[SoundEffect::BATTLE_START] = "battle-start.ogg"
-    pal
-  end
-
-  def play_sound_effect(which)
-    @effects[mapping[which]].play
-  end
-end
 class Universe
   attr_reader :worlds, :current_world,  :current_world_idx, :game_layers, :sound_effects, :game
 
@@ -411,7 +367,7 @@ class InteractionHelper
     @universe.dialog_layer.toggle_activity
   end
 
-  def interact_with_facing_tile(game, facing_tilex, facing_tiley)
+  def interact_with_facing_tile(game, facing_tilex, facing_tiley, facing_tile_interacts)
     facing_tile_interacts.activate(game,@player, @universe.current_world, facing_tilex, facing_tiley) 
   end
 
@@ -465,7 +421,7 @@ class InteractionHelper
 
     if facing_tile_close_enough and facing_tile_interacts
       puts "you can interact with the facing tile in the #{@facing} direction, it is at #{facing_tilex} #{facing_tiley}"
-      interact_with_facing_tile(game, facing_tilex, facing_tiley)
+      interact_with_facing_tile(game, facing_tilex, facing_tiley, facing_tile_interacts)
       
       return if @policy.return_after_facing
     end
@@ -487,7 +443,7 @@ class WorldWeaponInteractionHelper < InteractionHelper
     puts "noop dialog"
   end
 
-  def interact_with_facing_tile(game, facing_tilex, facing_tiley)
+  def interact_with_facing_tile(game, facing_tilex, facing_tiley, facing_tile)
     puts "noop facing"
   end
 
@@ -2929,20 +2885,11 @@ class GameItemFactory
   end
 
   def self.sword
-    GameItem.new("sword", ItemState.new(ItemAttributes.new(0,0,1,0,0,0,0,0), 0, 20 ))
+    EquippableGameItem.new("sword", ItemState.new(ItemAttributes.new(0,0,1,0,0,0,0,0), 0, 20 ))
   end
 
 end
 
-class EquippableGameItem
-  def equippable?
-    true
-  end
-  def consumeable?
-    false
-  end
-
-end
 class GameItem
   attr_reader :state, :name
   alias_method :effects,:state
@@ -2961,6 +2908,15 @@ class GameItem
 
   def consumeable?
     true
+  end
+
+end
+class EquippableGameItem < GameItem
+  def equippable?
+    true
+  end
+  def consumeable?
+    false
   end
 
 end
@@ -3331,6 +3287,12 @@ class Game
 
 end
 
-Game.new.go
+g = Game.new
+
+puts "maybe stick the intro screen here"
+#require 'drx'
+#g.universe.menu_layer.see
+
+g.go
 
 Rubygame.quit()
