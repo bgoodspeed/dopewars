@@ -48,4 +48,14 @@ module ResourceLoader
 
     Sound.load(filename)
   end
+
+  def map_path
+    File.join(Dir.pwd, 'resources', 'worlds')
+  end
+
+
+  def load_mapfile(name)
+    filename = File.join(map_path, name)
+    IO.readlines(filename)
+  end
 end

@@ -1,8 +1,11 @@
 
 
 class TopoMapFactory
+  extend ResourceLoader
+
+
   def self.build_map(filename,bgx, bgy)
-    lines = IO.readlines(filename)
+    lines = self.load_mapfile(filename)
     data = []
     lines.each {|line| data += line.strip.split(//)}
 
