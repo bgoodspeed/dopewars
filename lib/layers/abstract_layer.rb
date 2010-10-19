@@ -1,6 +1,6 @@
 
 class AbstractLayer
-  include FontLoader #TODO unify resource loading
+  include ResourceLoader
   attr_accessor :active
 
   def initialize(screen, layer_width, layer_height)

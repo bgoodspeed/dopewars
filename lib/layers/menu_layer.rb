@@ -1,6 +1,5 @@
 
 class MenuLayer < AbstractLayer
-  include FontLoader #TODO unify resource loading
   attr_accessor :active
 
   alias_method :active?, :active

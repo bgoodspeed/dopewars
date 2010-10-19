@@ -58,9 +58,10 @@ require 'forwardable'
 @@BATTLE_INVENTORY_YF = 25
 
 
-require 'lib/font_loader'
+
 
 # untested \/
+require 'lib/helpers/resource_loader'
 require 'lib/helpers/color_key_helper'
 require 'lib/helpers/json_helper'
 require 'lib/helpers/screen_offset_helper'

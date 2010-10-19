@@ -1,7 +1,6 @@
 
 class DialogLayer < AbstractLayer
   attr_accessor :visible, :text
-  include FontLoader #TODO unify resource loading
 
   def initialize(screen, game)
     super(screen, screen.w/2 - @@LAYER_INSET, screen.h/2 - @@LAYER_INSET)

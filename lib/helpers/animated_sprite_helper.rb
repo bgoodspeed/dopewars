@@ -3,8 +3,10 @@ class AnimatedSpriteHelper
   include Rubygame
   attr_reader :image, :rect, :px, :py
   include ColorKeyHelper
+  include ResourceLoader
+  
   def initialize(filename, px, py, avatar_x_dim, avatar_y_dim)
-    @all_char_postures = Surface.load(filename)
+    @all_char_postures = load_surface(filename)
 
     set_colorkey_from_corner(@all_char_postures)
     @all_char_postures.alpha = 255

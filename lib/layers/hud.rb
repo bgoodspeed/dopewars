@@ -2,7 +2,7 @@
 class Hud
 include Rubygame
 include Rubygame::Events
-include FontLoader
+include ResourceLoader
 
   # construct the HUD
   def initialize options

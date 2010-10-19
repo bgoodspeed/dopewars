@@ -2,11 +2,11 @@
 class SurfaceBackedPallette < Pallette
 
   include Rubygame
-
+  include ResourceLoader
   attr_reader :tile_x, :tile_y
   def initialize(filename, x, y, pal=nil)
     super(nil,pal)
-    @surface = Surface.load(filename)
+    @surface = load_surface(filename)
     @tile_x = x
     @tile_y = y
   end
