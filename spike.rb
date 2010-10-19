@@ -372,21 +372,59 @@ class AnimationHelper
   end
   
 end
+
+class InteractionPolicy
+  def self.immediate_return
+    InteractionPolicy.new(true,true,true,true)
+  end
+  def self.process_all
+    InteractionPolicy.new(false, false, false, false)
+  end
+
+  attr_reader :dialog, :current, :facing, :npcs
+  alias_method :return_after_dialog,:dialog
+  alias_method :return_after_current, :current
+  alias_method :return_after_facing, :facing
+  alias_method :return_after_npcs, :npcs
+  def initialize(dialog, current, facing, npcs)
+    @dialog, @current, @facing, @npcs = dialog, current, facing, npcs
+  end
+
+end
+
 class InteractionHelper
   @@INTERACTION_DISTANCE_THRESHOLD = 80 #XXX tweak this, currently set to 1/2 a tile
 
   attr_accessor :facing
-  def initialize(player, universe)
+  def initialize(player, universe, policy)
     @player = player
     @universe = universe
     @facing = :down
+    @policy = policy
+  end
+
+  def interact_with_current_tile(game, tilex, tiley)
+    this_tile_interacts.activate(game, @player, @universe.current_world, tilex, tiley)
+  end
+
+  def interact_with_dialog
+    @universe.dialog_layer.toggle_activity
+  end
+
+  def interact_with_facing_tile(game, facing_tilex, facing_tiley)
+    facing_tile_interacts.activate(game,@player, @universe.current_world, facing_tilex, facing_tiley) 
+  end
+
+  def interact_with_npc(game, interactable_npcs)
+    npc = interactable_npcs[0] #TODO what if there are multiple npcs to interact w/? one at a time? all of them?
+    npc.interact(game, @universe, @player)
   end
 
   def interact_with_facing(game, px,py)
     if @universe.dialog_layer.active
       puts "confirming/closing/paging dialog"
-      @universe.dialog_layer.toggle_activity
-      return #XXX check this return policy (ie currently first matching action is the only one run
+      interact_with_dialog
+      return if @policy.return_after_dialog
     end
 
     puts "you are facing #{@facing}"
@@ -397,8 +435,8 @@ class InteractionHelper
 
     if this_tile_interacts
       puts "you can interact with the current tile"
-      this_tile_interacts.activate(game, @player, @universe.current_world, tilex, tiley)
-      return
+      interact_with_current_tile(game, tilex, tiley)
+      return if @policy.return_after_current
     end
 
     if @facing == :down
@@ -427,20 +465,36 @@ class InteractionHelper
 
     if facing_tile_close_enough and facing_tile_interacts
       puts "you can interact with the facing tile in the #{@facing} direction, it is at #{facing_tilex} #{facing_tiley}"
-      facing_tile_interacts.activate(game,@player, @universe.current_world, facing_tilex, facing_tiley) #@interactionmap, facing_tilex, facing_tiley, @bgsurface, @topomap, @topo_pallette
-      return
+      interact_with_facing_tile(game, facing_tilex, facing_tiley)
+      
+      return if @policy.return_after_facing
     end
 
     interactable_npcs = @universe.current_world.npcs.select {|npc| npc.nearby?(px,py, @@INTERACTION_DISTANCE_THRESHOLD, @@INTERACTION_DISTANCE_THRESHOLD)  }
     unless interactable_npcs.empty?
       puts "you can interact with the npc: #{interactable_npcs[0]}"
-      npc = interactable_npcs[0] #TODO what if there are multiple npcs to interact w/? one at a time? all of them?
-      npc.interact(game, @universe, @player)
+      interact_with_npc(game, interactable_npcs)
     end
 
   end
 end
+class WorldWeaponInteractionHelper < InteractionHelper
+  def interact_with_current_tile(game, tilex, tiley)
+    puts "noop current"
+  end
 
+  def interact_with_dialog
+    puts "noop dialog"
+  end
+
+  def interact_with_facing_tile(game, facing_tilex, facing_tiley)
+    puts "noop facing"
+  end
+
+  def interact_with_npc(game, interactable_npcs)
+    puts "noop npc"
+  end
+end
 class TileCoordinateSet
   attr_reader :minx, :maxx, :miny, :maxy
   def initialize(minx, maxx, miny, maxy)
@@ -989,8 +1043,6 @@ class WorldWeapon
   end
 
   def draw_weapon(screen)
-    puts "starting at #{@startx},#{@starty} pointing #{@facing} "
-    puts "draw the weapon animation based on #{@ticks}"
   end
 end
 
@@ -1042,13 +1094,9 @@ class SwungWorldWeapon < WorldWeapon
     surf = @pallette['E'].surface
     surface = surf.rotozoom(consumption_ratio * @@WEAPON_ROTATION + starting_angle_for_facing(@facing), 1)
     set_colorkey_from_corner(surface)
-    puts "surface: #{surface}"
 
     offs = effective_offsets(screen, @facing)
     surface.blit(screen,[ offs[0], offs[1], surface.w, surface.h])
-
-    puts "starting at #{@startx},#{@starty} pointing #{@facing} "
-    puts "draw the weapon animation based on #{@ticks}"
   end
 
 end
@@ -1061,10 +1109,13 @@ class WorldWeaponHelper
 
   extend Forwardable
   def_delegators :@weapon, :draw_weapon
+  def_delegators :@interaction_helper, :facing, :facing=
 
-  def initialize(player)
+  def initialize(player, universe)
     @player = player
     @weapon = nil
+    @universe = universe
+    @interaction_helper = WorldWeaponInteractionHelper.new(@player, @universe, InteractionPolicy.process_all)
   end
 
   def use_weapon
@@ -1086,6 +1137,8 @@ class WorldWeaponHelper
     if @weapon.consumed?
       @weapon.die
       @weapon = nil
+    else
+      @interaction_helper.interact_with_facing(@universe.game, @player.px, @player.py)
     end
   end
 
@@ -1116,11 +1169,11 @@ class Player
     @filename = filename
     @hero_x_dim = hx
     @hero_y_dim = hy
-    @interaction_helper = InteractionHelper.new(self, @universe)
+    @interaction_helper = InteractionHelper.new(self, @universe, InteractionPolicy.immediate_return)
     @keys = KeyHolder.new
     @coordinate_helper = CoordinateHelper.new(px, py, @keys, @universe, @hero_x_dim, @hero_y_dim)
     @animation_helper = AnimationHelper.new(@keys)
-    @weapon_helper = WorldWeaponHelper.new(self)
+    @weapon_helper = WorldWeaponHelper.new(self, @universe)
     @animated_sprite_helper = AnimatedSpriteHelper.new(filename, sx, sy, @hero_x_dim, @hero_y_dim)
     @party = party
 
@@ -1151,6 +1204,7 @@ class Player
     newkey = event.key
     if [:down, :left,:up, :right].include?(newkey)
       @interaction_helper.facing = newkey
+      @weapon_helper.facing = newkey
     end
     
     if event.key == :down
