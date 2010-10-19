@@ -8,22 +8,8 @@ require 'rubygems'
 require 'rubygame'
 require 'json'
 require 'forwardable'
-require 'lib/font_loader'
-require 'lib/topo_map'
-require 'lib/hud'
-require 'lib/inventory'
-require 'lib/hero'
-
-# untested \/
-require 'lib/sound/background_music'
-require 'lib/sound/sound_effect'
-require 'lib/sound/sound_effect_set'
 
 
-include Rubygame
-include Rubygame::Events
-include Rubygame::EventActions
-include Rubygame::EventTriggers
 
 @@SCREEN_X = 640
 @@SCREEN_Y = 480
@@ -70,22 +56,38 @@ include Rubygame::EventTriggers
 @@BATTLE_INVENTORY_XF = 0
 @@BATTLE_INVENTORY_YC = 25
 @@BATTLE_INVENTORY_YF = 25
-module JsonHelper
-  def self.included(kmod)
-    kmod.class_eval <<-EOF
-  def self.json_create(o)
-    puts "json creating #{kmod}" ; new(*o['data'])
-  end
-    EOF
-  end
-  def to_json(*a)
-    puts "to_json in #{self.class.name}"
-    {
-      'json_class' => self.class.name,
-      'data' => json_params
-    }.to_json(*a)
-  end
-end
+
+
+require 'lib/font_loader'
+require 'lib/topo_map'
+require 'lib/hud'
+require 'lib/inventory'
+require 'lib/hero'
+
+# untested \/
+require 'lib/helpers/color_key_helper'
+require 'lib/helpers/json_helper'
+
+require 'lib/interactables/warp_point'
+require 'lib/interactables/treasure'
+require 'lib/interactables/open_treasure'
+
+require 'lib/sound/background_music'
+require 'lib/sound/sound_effect'
+require 'lib/sound/sound_effect_set'
+
+require 'lib/notifications/notification'
+require 'lib/notifications/world_screen_notification'
+require 'lib/notifications/battle_screen_notification'
+
+require 'lib/world_weapons/world_weapon'
+require 'lib/world_weapons/swung_world_weapon'
+require 'lib/world_weapons/shot_world_weapon'
+
+include Rubygame
+include Rubygame::Events
+include Rubygame::EventActions
+include Rubygame::EventTriggers
 
 class GameLayers
   extend Forwardable
@@ -359,7 +361,7 @@ class InteractionHelper
     @policy = policy
   end
 
-  def interact_with_current_tile(game, tilex, tiley)
+  def interact_with_current_tile(game, tilex, tiley, this_tile_interacts)
     this_tile_interacts.activate(game, @player, @universe.current_world, tilex, tiley)
   end
 
@@ -391,7 +393,7 @@ class InteractionHelper
 
     if this_tile_interacts
       puts "you can interact with the current tile"
-      interact_with_current_tile(game, tilex, tiley)
+      interact_with_current_tile(game, tilex, tiley, this_tile_interacts)
       return if @policy.return_after_current
     end
 
@@ -680,12 +682,6 @@ class MonsterCoordinateHelper < CoordinateHelper
   end
 end
 
-module ColorKeyHelper
-
-  def set_colorkey_from_corner(s)
-    s.colorkey = s.get_at(0,0)
-  end
-end
 
 class AnimatedSpriteHelper
   attr_reader :image, :rect, :px, :py
@@ -969,98 +965,6 @@ class Party
   end
 end
 
-class WorldWeapon
-  
-  attr_reader :ticks
-  def initialize(pallette, max_ticks=25)
-    @pallette = pallette
-    @ticks = 0
-    @max_ticks = max_ticks
-  end
-  def displayed
-    @ticks += 1
-  end
-
-  def die
-    @ticks = 0
-  end
-  def fired_from(px, py,facing)
-    @startx = px
-    @starty = py
-    @facing = facing
-  end
-
-  def consumption_ratio
-    @ticks.to_f/@max_ticks.to_f
-  end
-
-  def consumed?
-    @ticks >= @max_ticks
-  end
-
-  def draw_weapon(screen)
-  end
-end
-
-class SwungWorldWeapon < WorldWeapon
-  include ColorKeyHelper
-
-  @@WEAPON_UP_OFFSET_X = -15
-  @@WEAPON_UP_OFFSET_Y = -45
-  @@WEAPON_DOWN_OFFSET_X = -15
-  @@WEAPON_DOWN_OFFSET_Y = 20
-  @@WEAPON_LEFT_OFFSET_X = -45
-  @@WEAPON_LEFT_OFFSET_Y = -15
-  @@WEAPON_RIGHT_OFFSET_X = 0
-  @@WEAPON_RIGHT_OFFSET_Y = -10
-  @@WEAPON_UP_ANGLE = 270
-  @@WEAPON_DOWN_ANGLE = 120
-  @@WEAPON_LEFT_ANGLE = -10
-  @@WEAPON_RIGHT_ANGLE = 180
-  @@WEAPON_ROTATION = 90
-
-  def screen_config
-    c = {}
-    c[:up] = { :screen => [@@WEAPON_UP_OFFSET_X, @@WEAPON_UP_OFFSET_Y], :rotate => @@WEAPON_UP_ANGLE}
-    c[:down] = { :screen => [@@WEAPON_DOWN_OFFSET_X, @@WEAPON_DOWN_OFFSET_Y], :rotate => @@WEAPON_DOWN_ANGLE}
-    c[:left] = { :screen => [@@WEAPON_LEFT_OFFSET_X, @@WEAPON_LEFT_OFFSET_Y], :rotate => @@WEAPON_LEFT_ANGLE}
-    c[:right] = { :screen => [@@WEAPON_RIGHT_OFFSET_X, @@WEAPON_RIGHT_OFFSET_Y], :rotate => @@WEAPON_RIGHT_ANGLE}
-    c
-  end
-
-  def screen_offsets_for(facing)
-    screen_config[facing][:screen]
-  end
-
-  def base_screen_offsets(screen)
-    [screen.w/2, screen.h/2]
-  end
-
-  def effective_offsets(screen, facing)
-    rv = base_screen_offsets(screen)
-    so = screen_offsets_for(facing)
-    rv[0] += so[0]
-    rv[1] += so[1]
-    rv
-  end
-  def starting_angle_for_facing(facing)
-    screen_config[facing][:rotate]
-  end
-  def draw_weapon(screen)
-    surf = @pallette['E'].surface
-    surface = surf.rotozoom(consumption_ratio * @@WEAPON_ROTATION + starting_angle_for_facing(@facing), 1)
-    set_colorkey_from_corner(surface)
-
-    offs = effective_offsets(screen, @facing)
-    surface.blit(screen,[ offs[0], offs[1], surface.w, surface.h])
-  end
-
-end
-
-class ShotWorldWeapon < WorldWeapon
-end
-
-
 class WorldWeaponHelper
 
   extend Forwardable
@@ -1199,90 +1103,6 @@ class Player
 
 end
 
-class Treasure
-  attr_accessor :name
-  def is_blocking?
-    true
-  end
-  def initialize(name)
-    @name = name
-  end
-
-  def activate(game, player, worldstate, tilex, tiley)
-    player.universe.play_sound_effect(SoundEffect::TREASURE)
-    worldstate.update_interaction_map(tilex, tiley, @@OPEN_TREASURE)
-    player.add_inventory(1, @name)
-    game.add_notification(WorldScreenNotification.new("Got #{@name}"))
-  end
-
-  include JsonHelper
-  def json_params
-    [ @name]
-  end
-end
-class OpenTreasure < Treasure
-  def activate(game,  player, worldstate, tilex, tiley)
-    puts "Nothing to do, already opened"
-  end
-end
-
-class WarpPoint
-  attr_accessor :destination
-
-  def is_blocking?
-    false
-  end
-
-  def initialize(dest_index, dest_x=nil, dest_y=nil)
-    @destination = dest_index
-    @destination_x = dest_x
-    @destination_y = dest_y
-  end
-
-  def activate(game, player, worldstate, tilex, tiley)
-    uni = player.universe
-    player.universe.fade_out_bg_music
-    player.universe.play_sound_effect(SoundEffect::WARP)
-    puts "player was at #{player.px},#{player.py}"
-    player.set_position(@destination_x, @destination_y)
-    puts "warp from  #{worldstate} to #{uni.world_by_index(@destination)}"
-    uni.set_current_world_by_index(@destination)
-    player.universe.fade_in_bg_music
-  end
-  include JsonHelper
-  def json_params
-    [ @destination]
-  end
-end
-
-class Notification
-  attr_reader :message, :time_to_live, :location
-  def initialize(msg, ttl, location)
-    @message = msg
-    @time_to_live = ttl
-    @location = location
-  end
-
-  def displayed
-    @time_to_live -= 1
-  end
-
-  def dead?
-    @time_to_live <= 0
-  end
-end
-
-class WorldScreenNotification < Notification
-  def initialize(msg)
-    super(msg,@@TICKS_TO_DISPLAY_NOTIFICATIONS, [@@NOTIFICATION_LAYER_INSET_X,@@NOTIFICATION_LAYER_INSET_Y ])
-  end
-end
-class BattleScreenNotification < Notification
-  def initialize(msg)
-    super(msg,@@TICKS_TO_DISPLAY_NOTIFICATIONS, [@@NOTIFICATION_LAYER_INSET_X,@@NOTIFICATION_LAYER_INSET_Y/3 ])
-  end
-end
-
 
 class BattleHud
   def initialize(screen, text_rendering_helper, layer)
@@ -1324,7 +1144,7 @@ class BattleHud
 
 end
 
-class AbstractActorAction
+class AbstractActorMenuAction
   extend Forwardable
   def initialize(actor, menu_helper)
     @actor = actor
@@ -1333,10 +1153,17 @@ class AbstractActorAction
   def text
     @actor.name
   end
+  def display_actor_status_info
+    info_lines = @actor.status_info
+    s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
+    s.fill(:green)
+    @menu_helper.render_text_to(s, info_lines, TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
+    s
+  end
 
 end
 
-class UpdateEquipmentAction < AbstractActorAction
+class UpdateEquipmentAction < AbstractActorMenuAction
 
   def initialize(actor, menu_helper, game)
     super(actor, menu_helper)
@@ -1388,21 +1215,14 @@ class UpdateEquipmentAction < AbstractActorAction
 end
 
 
-class LevelUpAction < AbstractActorAction
+class LevelUpAction < AbstractActorMenuAction
 
   def size
     2 #TODO this should come from the size of the attribute set
   end
 
-
-  def details
-    info_lines = @actor.status_info
-    s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
-    s.fill(:green)
-    @menu_helper.render_text_to(s, info_lines, TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
-    s
-  end
-
+  alias_method :details, :display_actor_status_info
+ 
   def activate(cursor_position, game, section_position, subsection_position=nil, option_position=nil)
     @menu_helper.set_active_subsection(section_position)
     if !subsection_position.nil?
@@ -1413,7 +1233,7 @@ class LevelUpAction < AbstractActorAction
 
 
 end
-class StatusDisplayAction< AbstractActorAction
+class StatusDisplayAction< AbstractActorMenuAction
   def size
     1
   end
@@ -1424,14 +1244,7 @@ class StatusDisplayAction< AbstractActorAction
     false
   end
 
-
-  def details
-    info_lines = @actor.status_info
-    s = Surface.new([@@STATUS_WIDTH, @@STATUS_HEIGHT])
-    s.fill(:green)
-    @menu_helper.render_text_to(s, info_lines, TextRenderingConfig.new(0, 0, 0,@@MENU_LINE_SPACING))
-    s
-  end
+  alias_method :details, :display_actor_status_info
 end
 class SortInventoryAction
   attr_reader :text
