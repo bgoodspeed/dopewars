@@ -1,11 +1,11 @@
 class SoundEffectSet
   include Rubygame
-
+  include ResourceLoader
 
   def initialize(filenames)
     @effects = {}
     filenames.each do |filename|
-      @effects[filename] = Sound.load(filename)
+      @effects[filename] = load_sound(filename)
     end
   end
 
