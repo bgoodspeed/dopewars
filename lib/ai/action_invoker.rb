@@ -2,6 +2,7 @@
 
 #TODO rename to process
 class ActionInvoker
+  attr_accessor :action
   def initialize(action_desc)
     @action = build_from(action_desc)
   end
