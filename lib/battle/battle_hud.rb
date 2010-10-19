@@ -1,4 +1,6 @@
 class BattleHud
+  include Rubygame
+
   def initialize(screen, text_rendering_helper, layer)
     @screen = screen
     @text_rendering_helper = text_rendering_helper

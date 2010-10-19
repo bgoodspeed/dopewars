@@ -1,4 +1,7 @@
 class SoundEffectSet
+  include Rubygame
+
+
   def initialize(filenames)
     @effects = {}
     filenames.each do |filename|

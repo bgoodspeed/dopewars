@@ -1,5 +1,8 @@
 
 class BattleLayer < AbstractLayer
+  include Rubygame
+  include Rubygame::Events
+
   extend Forwardable
   def_delegators :@battle, :participants, :current_battle_participant_offset
   def_delegators :@game, :inventory

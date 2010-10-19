@@ -1,5 +1,7 @@
 
 class BackgroundMusic
+  include Rubygame
+
   def initialize(filename)
     @filename = filename
     @music = Music.load(@filename)

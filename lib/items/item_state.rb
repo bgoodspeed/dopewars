@@ -1,0 +1,4 @@
+
+class ItemState < CharacterState
+
+end
