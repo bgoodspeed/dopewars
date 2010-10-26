@@ -19,7 +19,20 @@ class MenuHelper
   end
 
   def current_selected_menu_entry_name
-    @text_lines[@cursor_position]
+    if @show_section
+      if subsection_active?(@section_position)
+        if @needs_option
+          active_subsection.option_at(@option_position).name
+        else
+          active_subsection.info[@subsection_position].name
+        end
+        
+      else
+        active_section.content[@section_position].text
+      end
+    else
+      @text_lines[@cursor_position]
+    end
   end
 
 

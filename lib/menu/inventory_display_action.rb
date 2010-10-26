@@ -1,5 +1,7 @@
 
 class InventoryDisplayAction
+  include Rubygame
+
   attr_reader :text
   def initialize(text, game, menu_helper)
     @text = text
@@ -28,8 +30,12 @@ class InventoryDisplayAction
 
   end
 
-  def option_at(idx)
-    party_members
+  def option_at(idx=nil)
+    if idx.nil?
+      party_members
+    else
+      party_members[idx]
+    end
   end
 
   def party_members

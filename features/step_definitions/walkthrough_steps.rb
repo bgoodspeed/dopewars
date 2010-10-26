@@ -10,8 +10,6 @@ require 'spec/rspec_helper'
 
 called = 0
 Given /^I am at (\d+), (\d+)$/ do |x, y|
-  @g = Game.new
-
   @g.set_player_position(x.to_i,y.to_i)
   @original_item_count = @g.inventory_count
 end
@@ -86,14 +84,17 @@ Then /^I should have (\d+) more items$/ do |arg1|
   @g.inventory_count.should == arg1.to_i + @original_item_count
 end
 
+Given /^I should be on 'All Items'$/ do
+  @g.current_selected_menu_entry_name.should == "All Items"
+end
 
 
-Then /^I should be on (\w+)$/ do |arg1|
+Then /^I should be on '(\w+\.*\w*)'$/ do |arg1|
   @g.current_selected_menu_entry_name.should == arg1
 end
 
 include UtilityMatchers
-Then /^the current menu shows '(\w+)'$/ do |what|
+Then /^the current menu shows '(\.+)'$/ do |what|
   @g.current_menu_entries.should contain? what
 end
 
