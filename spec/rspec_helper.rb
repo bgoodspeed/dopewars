@@ -7,6 +7,14 @@ require 'forwardable'
 require 'lib/game_settings'
 require 'lib/game_requirements'
 
+module MockeryHelp
+  def mocking(conf)
+    m = mock
+    conf.each {|k,v| m.stub!(k).and_return(v) }
+    m
+  end
+end
+
 
 module DelegationMatchers
   class DelegateToMatcher
@@ -37,6 +45,46 @@ module DelegationMatchers
 
   def delegate_to(sym, config)
     DelegateToMatcher.new(sym, config)
+  end
+
+end
+
+
+module WorldMapMatchers
+  class NearEnoughToMatcher
+    @@NEARNESS_THRESHOLD= 0.9
+    def initialize(base)
+      @base = base
+    end
+
+    def cmp_axis(idx, target)
+      error = (@base[idx] - target[idx]).abs
+      error < @@NEARNESS_THRESHOLD
+    end
+
+    def matches?(target)
+      @target = target
+      cmp_axis(0, target) && cmp_axis(1, target)
+    end
+
+    def fmt(array)
+      array.join(",")
+    end
+
+    def failure_msg(is_not="")
+      "#{fmt(@base)} expected #{is_not} to be within #{@@NEARNESS_THRESHOLD} of #{fmt(@target)}"
+    end
+    def failure_message_for_should
+      failure_msg
+    end
+    def failure_message_for_should_not
+      failure_msg("not")
+    end
+
+  end
+
+  def be_near_enough_to(base)
+    NearEnoughToMatcher.new(base)
   end
 
 end

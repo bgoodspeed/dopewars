@@ -11,7 +11,7 @@ class Player
 
   def_delegators :@interaction_helper, :facing
   def_delegators :@animated_sprite_helper, :image, :rect
-  def_delegators :@coordinate_helper, :update_tile_coords, :px, :py
+  def_delegators :@coordinate_helper, :update_tile_coords, :px, :py, :get_position
   def_delegators :@weapon_helper, :use_weapon, :using_weapon?, :draw_weapon
   def_delegators :@party, :add_readiness, :gain_experience, :gain_inventory,
     :inventory, :dead?, :inventory_info, :inventory_item_at, :world_weapon
@@ -40,6 +40,10 @@ class Player
     )
   end
 
+  def set_key_pressed_for(key, ticks)
+    update_facing_if_key_matches(key)
+    @keys.set_timed_keypress(key, ticks)
+  end
 
 
   def interact_with_facing(game)
@@ -54,15 +58,21 @@ class Player
     [ @coordinate_helper.px, @coordinate_helper.py, @universe, @party, @filename,@hero_x_dim, @hero_y_dim, @animated_sprite_helper.px, @animated_sprite_helper.py]
   end
 
+
   private
 
-  def key_pressed( event )
-    newkey = event.key
+  def update_facing_if_key_matches(newkey)
     if [:down, :left,:up, :right].include?(newkey)
       @interaction_helper.facing = newkey
       @weapon_helper.facing = newkey
     end
 
+  end
+
+  def key_pressed( event )
+    newkey = event.key
+    update_facing_if_key_matches(newkey)
+    
     if event.key == :down
       @animated_sprite_helper.set_frame(0)
     elsif event.key == :left
@@ -88,6 +98,7 @@ class Player
     @coordinate_helper.update_vel( dt )
     @coordinate_helper.update_pos( dt )
     @weapon_helper.update_weapon_if_active
+    @keys.update_timed_keys(dt)
   end
 
   def x_ext

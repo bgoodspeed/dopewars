@@ -51,6 +51,16 @@ class Game
     end
   end
 
+  def quit
+    puts "Quitting!"
+    throw :quit
+  end
+
+  def step_until(ticks)
+    ticks.times do
+      step
+    end
+  end
   def battle_begun(universe, player)
     toggle_battle_hooks(false)
   end
@@ -90,7 +100,8 @@ class Game
   def_delegator :@universe, :battle_cancel_action, :battle_cancel
   def_delegator :@universe, :toggle_dialog_visibility, :toggle_dialog_layer
   def_delegators :@universe, :battle_layer, :npcs, :menu_layer,
-    :reset_menu_positions, :add_notification, :toggle_bg_music, :current_battle_participant_offset
+    :reset_menu_positions, :add_notification, :toggle_bg_music, 
+    :current_battle_participant_offset, :world_number
 
   def_delegators :@event_helper, :non_menu_hooks, :rebuild_event_hooks
   def_delegator :@event_helper, :menu_active_hooks, :menu_hooks
@@ -98,8 +109,10 @@ class Game
   def_delegator :@event_helper, :non_menu_hooks, :non_battle_hooks
 
   def_delegator :@player, :update_tile_coords, :update_player_tile_coords
+  def_delegator :@player, :set_position, :set_player_position
+  def_delegator :@player, :get_position, :get_player_position
   def_delegators :@player, :party_members, :inventory_info, :inventory_at,
-    :inventory, :use_weapon
+    :inventory, :use_weapon, :set_key_pressed_for
 
 
   def toggle_battle_hooks(in_battle=false)
@@ -113,6 +126,11 @@ class Game
       menu_layer.reset_indices
     end
   end
+
+  def interact_with_facing(event)
+    @player.interact_with_facing(self)
+  end
+
   private
   def menu_enter(event)
     menu_layer.enter_current_cursor_location(self)
@@ -123,9 +141,6 @@ class Game
   def battle_up
     @universe.battle_layer.enter_current_cursor_location(self)
   end
-  def interact_with_facing(event)
-    @player.interact_with_facing(self)
-  end
   def battle_confirm
     battle_layer.enter_current_cursor_location(self)
   end
@@ -134,10 +149,6 @@ class Game
     #@screen.savebmp("screenshot.bmp")
 
     SDL.SaveBMP_RW("screenshot.bmp",@screen, 0)
-  end
-  def quit
-    puts "Quitting!"
-    throw :quit
   end
 
   def step

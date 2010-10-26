@@ -3,7 +3,7 @@ class Battle
   extend Forwardable
   def_delegators :@player, :party, :dead?, :inventory_item_at
 
-  attr_reader :monster, :player
+  attr_reader :monster, :player, :universe, :game
   def initialize(game, universe, player, monster, battle_layer)
     @game = game
     @player = player
@@ -59,7 +59,6 @@ class Battle
   def end_battle
     @game.battle_completed
     helper = BattleVictoryHelper.new
-    helper.give_spoils(@player, @monster)
-    helper.monster_killed(@universe,@monster)
+    helper.end_battle_from(self)
   end
 end

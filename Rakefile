@@ -50,4 +50,21 @@ Spec::Rake::SpecTask.new do |t|
   t.libs << Dir["lib"]
 end
 
-task :default => [:spec]
+
+
+require 'cucumber'
+require 'cucumber/rake/task'
+
+Cucumber::Rake::Task.new(:features) do |t|
+  
+  t.cucumber_opts = "features --format pretty"
+
+end
+
+Cucumber::Rake::Task.new(:feature) do |t|
+  t.methods.sort.join(",")
+  t.cucumber_opts = "features --format pretty"
+
+end
+
+task :default => [:spec, :features]

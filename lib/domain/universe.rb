@@ -2,6 +2,7 @@
 class Universe
   attr_reader :worlds, :current_world,  :current_world_idx, :game_layers, :sound_effects, :game
 
+  alias_method :world_number, :current_world_idx
   extend Forwardable
   def_delegators :@sound_effects, :play_sound_effect
   def_delegators :@current_world, :interpret, :npcs, :blit_world, :toggle_bg_music, :fade_out_bg_music, :fade_in_bg_music
@@ -29,6 +30,7 @@ class Universe
   end
 
   def set_current_world_by_index(idx)
+    @current_world_idx = idx
     set_current_world(world_by_index(idx))
   end
 

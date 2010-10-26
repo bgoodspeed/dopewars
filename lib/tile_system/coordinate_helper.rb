@@ -15,6 +15,10 @@ class CoordinateHelper
     update_tile_coords
   end
 
+  def get_position
+    [@px,@py]
+  end
+
   def world_coords
     TileCoordinateSet.new( @universe.current_world.x_offset_for_world(base_x),
       @universe.current_world.x_offset_for_world(max_x),

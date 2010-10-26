@@ -10,6 +10,7 @@ module ResourceLoader
   end
   def load_font(name)
     filename = File.join(font_path, name)
+    puts "font"
     raise MissingResourceError.new unless File.exists?(filename)
 
     TTF.setup
@@ -22,10 +23,9 @@ module ResourceLoader
 
   def load_surface(name)
     filename = File.join(surface_path, name)
-
     raise MissingResourceError.new unless File.exists?(filename)
 
-    Surface.load(filename)
+    Rubygame::Surface.load(filename)
   end
 
 
