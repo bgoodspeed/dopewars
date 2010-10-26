@@ -101,7 +101,8 @@ class Game
   def_delegator :@universe, :toggle_dialog_visibility, :toggle_dialog_layer
   def_delegators :@universe, :battle_layer, :npcs, :menu_layer,
     :reset_menu_positions, :add_notification, :toggle_bg_music, 
-    :current_battle_participant_offset, :world_number, :notifications_layer, :notifications
+    :current_battle_participant_offset, :world_number, :notifications_layer, 
+    :notifications, :current_selected_menu_entry_name, :current_menu_entries
 
   def_delegators :@event_helper, :non_menu_hooks, :rebuild_event_hooks
   def_delegator :@event_helper, :menu_active_hooks, :menu_hooks
@@ -129,6 +130,10 @@ class Game
 
   def interact_with_facing(event)
     @player.interact_with_facing(self)
+  end
+
+  def simulate_event_with_key(k)
+    @queue << KeyPressed.new(k)
   end
 
   private

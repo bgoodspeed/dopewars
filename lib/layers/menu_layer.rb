@@ -8,7 +8,8 @@ class MenuLayer < AbstractLayer
 
   extend Forwardable
   def_delegators :@menu_helper, :enter_current_cursor_location, :move_cursor_down,
-    :move_cursor_up, :cancel_action, :reset_indices
+    :move_cursor_up, :cancel_action, :reset_indices, :current_selected_menu_entry_name,
+    :current_menu_entries
 
   def initialize(screen, game)
     super(screen, (screen.w) - 2*@@MENU_LAYER_INSET, (screen.h) - 2*@@MENU_LAYER_INSET)

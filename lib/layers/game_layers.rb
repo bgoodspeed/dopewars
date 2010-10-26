@@ -4,6 +4,7 @@ class GameLayers
   def_delegator :@menu_layer, :move_cursor_up, :menu_move_cursor_up
   def_delegator :@menu_layer, :move_cursor_down, :menu_move_cursor_down
   def_delegator :@menu_layer, :cancel_action, :menu_cancel_action
+  def_delegators :@menu_layer, :current_selected_menu_entry_name, :current_menu_entries
   def_delegator :@battle_layer, :move_cursor_up, :battle_move_cursor_up
   def_delegator :@battle_layer, :move_cursor_down, :battle_move_cursor_down
   def_delegator :@battle_layer, :cancel_action, :battle_cancel_action

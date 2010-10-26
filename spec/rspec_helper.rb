@@ -88,3 +88,38 @@ module WorldMapMatchers
   end
 
 end
+
+
+module UtilityMatchers
+  class ContainingMatcher
+    @@NEARNESS_THRESHOLD= 1.5
+    def initialize(base)
+      @base = base
+    end
+
+    def matches?(target)
+      target.include?(@base)
+      @target = target
+    end
+
+    def fmt(array)
+      array.join(",")
+    end
+
+    def failure_msg(is_not="")
+      "#{fmt(@base)} expected #{is_not} to contain #{fmt(@target)}"
+    end
+    def failure_message_for_should
+      failure_msg
+    end
+    def failure_message_for_should_not
+      failure_msg("not")
+    end
+
+  end
+
+  def contain?(base)
+    ContainingMatcher.new(base)
+  end
+
+end

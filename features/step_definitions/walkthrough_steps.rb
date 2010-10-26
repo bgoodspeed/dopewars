@@ -44,8 +44,10 @@ end
 def press(what)
   if what =~ /Menu/
     @g.toggle_menu
-  else
+  elsif what =~ /Interact/
     @g.interact_with_facing(nil)
+  else
+    @g.simulate_event_with_key(switch_key(what))
   end
 
 end
@@ -83,3 +85,15 @@ end
 Then /^I should have (\d+) more items$/ do |arg1|
   @g.inventory_count.should == arg1.to_i + @original_item_count
 end
+
+
+
+Then /^I should be on (\w+)$/ do |arg1|
+  @g.current_selected_menu_entry_name.should == arg1
+end
+
+include UtilityMatchers
+Then /^the current menu shows '(\w+)'$/ do |what|
+  @g.current_menu_entries.should contain? what
+end
+

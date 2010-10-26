@@ -14,6 +14,15 @@ class MenuHelper
     replace_sections(sections)
   end
 
+  def current_menu_entries
+    @text_lines
+  end
+
+  def current_selected_menu_entry_name
+    @text_lines[@cursor_position]
+  end
+
+
   def color_for_current_section_cursor
     @cursor_main_color
   end
