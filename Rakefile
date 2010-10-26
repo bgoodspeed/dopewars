@@ -49,3 +49,5 @@ Spec::Rake::SpecTask.new do |t|
   t.spec_files = FileList['spec/**/*.rb']
   t.libs << Dir["lib"]
 end
+
+task :default => [:spec]

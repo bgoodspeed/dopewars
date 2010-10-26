@@ -2,6 +2,7 @@ clean=Remove any temporary products.
 clobber=Remove any generated file.
 clobber_package=Remove package products
 clobber_rdoc=Remove rdoc products
+default=
 doc=
 doc/rdoc=
 doc/rdoc/index.html=

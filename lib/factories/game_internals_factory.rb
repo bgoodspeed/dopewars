@@ -64,7 +64,8 @@ class GameInternalsFactory
     party = Party.new([hero, hero2], party_inventory)
     hero_x_dim = 48
     hero_y_dim = 64
-    player_file = "Charactern8.png"
+    #player_file = "Charactern8.png"
+    player_file = "StickMan.PNG"
     ssx = screen.w/2
     ssy = screen.h/2
     player = Player.new(ssx, ssy , universe, party, player_file, hero_x_dim, hero_y_dim , ssx, ssy )

@@ -2,4 +2,18 @@
 <project-private xmlns="http://www.netbeans.org/ns/project-private/1">
     <coverage xmlns="http://www.netbeans.org/ns/code-coverage/1" aggregating="true"/>
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/1"/>
+    <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/1">
+        <file>file:/home/bg/NetBeansProjects/dopewars/spec/ai/repeating_path_follower_spec.rb</file>
+        <file>file:/home/bg/NetBeansProjects/dopewars/lib/ai/repeating_path_follower.rb</file>
+        <file>file:/home/bg/NetBeansProjects/dopewars/lib/input/key_holder.rb</file>
+        <file>file:/home/bg/NetBeansProjects/dopewars/lib/npcs/always_down_monster_key_holder.rb</file>
+        <file>file:/home/bg/NetBeansProjects/dopewars/lib/ai/static_path_follower.rb</file>
+        <file>file:/home/bg/NetBeansProjects/dopewars/spec/ai/static_path_follower_spec.rb</file>
+        <file>file:/home/bg/NetBeansProjects/dopewars/spec/ai/target_matcher_spec.rb</file>
+        <file>file:/home/bg/NetBeansProjects/dopewars/lib/ai/target_matcher.rb</file>
+        <file>file:/home/bg/NetBeansProjects/dopewars/lib/battle/menu/attack_menu_action.rb</file>
+        <file>file:/home/bg/NetBeansProjects/dopewars/lib/battle/battle.rb</file>
+        <file>file:/home/bg/NetBeansProjects/dopewars/spike.rb</file>
+        <file>file:/home/bg/NetBeansProjects/dopewars/lib/factories/game_internals_factory.rb</file>
+    </open-files>
 </project-private>
