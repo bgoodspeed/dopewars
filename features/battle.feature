@@ -5,7 +5,7 @@ Feature: battle
 
 Scenario: start a fight
     Given I am at 320, 240
-    And I press 'Down' for 46 ticks
+    And I press 'Down' for 48 ticks
     And 70 ticks have passed
     And I press 'Right' for 20 ticks
     When 70 ticks have passed

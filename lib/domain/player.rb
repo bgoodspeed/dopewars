@@ -43,6 +43,7 @@ class Player
 
   def set_key_pressed_for(key, ticks)
     update_facing_if_key_matches(key)
+    update_animated_sprite_helper(key)
     @keys.set_timed_keypress(key, ticks)
   end
 
@@ -70,20 +71,16 @@ class Player
 
   end
 
+  def update_animated_sprite_helper(newkey)
+    @animated_sprite_helper.set_frame_from(newkey)
+    @animated_sprite_helper.replace_avatar(@animation_helper.current_frame)
+
+  end
+
   def key_pressed( event )
     newkey = event.key
     update_facing_if_key_matches(newkey)
-    
-    if event.key == :down
-      @animated_sprite_helper.set_frame(0)
-    elsif event.key == :left
-      @animated_sprite_helper.set_frame(@hero_y_dim)
-    elsif event.key == :right
-      @animated_sprite_helper.set_frame(2 * @hero_y_dim)
-    elsif event.key == :up
-      @animated_sprite_helper.set_frame(3 * @hero_y_dim)
-    end
-    @animated_sprite_helper.replace_avatar(@animation_helper.current_frame)
+    update_animated_sprite_helper(newkey)
 
     @keys.add_key(event.key)
   end

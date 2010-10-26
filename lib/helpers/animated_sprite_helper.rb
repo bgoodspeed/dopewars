@@ -30,6 +30,19 @@ class AnimatedSpriteHelper
   end
 
 
+  def set_frame_from(newkey)
+    if newkey == :down
+      set_frame(0)
+    elsif newkey == :left
+      set_frame(@avatar_y_dim)
+    elsif newkey == :right
+      set_frame(2 * @avatar_y_dim)
+    elsif newkey == :up
+      set_frame(3 * @avatar_y_dim)
+    end
+
+  end
+
   def set_frame(last_dir=0)
     @last_direction_offset = last_dir
   end
