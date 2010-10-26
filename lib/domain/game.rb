@@ -101,7 +101,7 @@ class Game
   def_delegator :@universe, :toggle_dialog_visibility, :toggle_dialog_layer
   def_delegators :@universe, :battle_layer, :npcs, :menu_layer,
     :reset_menu_positions, :add_notification, :toggle_bg_music, 
-    :current_battle_participant_offset, :world_number
+    :current_battle_participant_offset, :world_number, :notifications_layer, :notifications
 
   def_delegators :@event_helper, :non_menu_hooks, :rebuild_event_hooks
   def_delegator :@event_helper, :menu_active_hooks, :menu_hooks
@@ -112,7 +112,7 @@ class Game
   def_delegator :@player, :set_position, :set_player_position
   def_delegator :@player, :get_position, :get_player_position
   def_delegators :@player, :party_members, :inventory_info, :inventory_at,
-    :inventory, :use_weapon, :set_key_pressed_for
+    :inventory, :use_weapon, :set_key_pressed_for, :inventory_count
 
 
   def toggle_battle_hooks(in_battle=false)

@@ -13,6 +13,7 @@ Given /^I am at (\d+), (\d+)$/ do |x, y|
   @g = Game.new
 
   @g.set_player_position(x.to_i,y.to_i)
+  @original_item_count = @g.inventory_count
 end
 
 
@@ -72,4 +73,13 @@ end
 
 Then /^I should be in world (\d+)$/ do |world_number|
   @g.world_number.should == (world_number.to_i - 1)
+end
+
+Then /^I should have a notification$/ do
+  @g.notifications_layer.active?.should be_true
+  @g.notifications.size.should == 1
+end
+
+Then /^I should have (\d+) more items$/ do |arg1|
+  @g.inventory_count.should == arg1.to_i + @original_item_count
 end

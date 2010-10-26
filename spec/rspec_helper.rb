@@ -52,7 +52,7 @@ end
 
 module WorldMapMatchers
   class NearEnoughToMatcher
-    @@NEARNESS_THRESHOLD= 0.9
+    @@NEARNESS_THRESHOLD= 1.5
     def initialize(base)
       @base = base
     end

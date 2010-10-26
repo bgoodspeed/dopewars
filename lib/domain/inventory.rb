@@ -87,6 +87,13 @@ class Inventory
     keys.size
   end
 
+  def inventory_count
+    rv = 0
+    @items.each {|k,v|
+      rv += v.quantity
+    }
+    rv
+  end
   def quantity_of(item)
     return 0 unless has_item?(item)
     @items[item].quantity

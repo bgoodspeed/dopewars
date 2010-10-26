@@ -9,7 +9,7 @@ class Universe
   def_delegators :@game_layers, :dialog_layer, :menu_layer, :battle_layer, :notifications_layer,
     :draw_game_layers_if_active, :menu_move_cursor_up, :menu_move_cursor_down, :menu_cancel_action,
     :battle_cancel_action, :battle_move_cursor_down, :battle_move_cursor_up, :add_notification,
-    :reset_menu_positions, :current_battle_participant_offset
+    :reset_menu_positions, :current_battle_participant_offset, :notifications
 
   def initialize(current_world_idx, worlds, game_layers=nil, sound_effects=nil, game=nil)
     raise "must have at least one world" if worlds.empty?

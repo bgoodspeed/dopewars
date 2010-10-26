@@ -1,7 +1,8 @@
 
 class Party
   extend Forwardable
-  def_delegators :@inventory, :add_item, :gain_inventory, :inventory_info, :inventory_item_at
+  def_delegators :@inventory, :add_item, :gain_inventory, :inventory_info, 
+    :inventory_item_at, :inventory_count
   def_delegators :leader, :world_weapon
   attr_reader :members, :inventory
   def initialize(members, inventory)

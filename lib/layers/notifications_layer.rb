@@ -1,5 +1,6 @@
 
 class NotificationsLayer < AbstractLayer
+  attr_reader :notifications
   def initialize(screen, game)
     super(screen, @@NOTIFICATION_LAYER_WIDTH, @@NOTIFICATION_LAYER_HEIGHT)
     @notifications = []

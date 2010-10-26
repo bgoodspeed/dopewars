@@ -7,7 +7,7 @@ class GameLayers
   def_delegator :@battle_layer, :move_cursor_up, :battle_move_cursor_up
   def_delegator :@battle_layer, :move_cursor_down, :battle_move_cursor_down
   def_delegator :@battle_layer, :cancel_action, :battle_cancel_action
-  def_delegators :@notifications_layer, :add_notification
+  def_delegators :@notifications_layer, :add_notification, :notifications
   def_delegators :@battle_layer, :current_battle_participant_offset
 
 

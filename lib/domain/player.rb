@@ -14,7 +14,8 @@ class Player
   def_delegators :@coordinate_helper, :update_tile_coords, :px, :py, :get_position
   def_delegators :@weapon_helper, :use_weapon, :using_weapon?, :draw_weapon
   def_delegators :@party, :add_readiness, :gain_experience, :gain_inventory,
-    :inventory, :dead?, :inventory_info, :inventory_item_at, :world_weapon
+    :inventory, :dead?, :inventory_info, :inventory_item_at, :world_weapon,
+    :inventory_count
   def_delegators :@keys, :clear_keys
   def_delegator :@party, :add_item, :add_inventory
   def_delegator :@party, :members, :party_members
