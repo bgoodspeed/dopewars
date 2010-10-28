@@ -10,6 +10,8 @@ class SortInventoryAction
     puts "TODO re-sort inventory"
   end
 
-
+  def has_subsections?
+    false
+  end
 
 end

@@ -1,6 +1,7 @@
 
 class MenuAction
   attr_reader :text
+  alias_method :name, :text
   def initialize(text, action=NoopAction.new)
     @text = text
     @action = action

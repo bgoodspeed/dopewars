@@ -37,6 +37,24 @@ Examples:
     | Up     | Load              |
     | Down   | Inventory         |
 
+Scenario Outline: navigating menu breadth first
+    Given I press 'Menu'
+    And 2 ticks have passed
+    And I should be on 'Status'
+    And I press '<button1>' <count1> times
+    And 2 ticks have passed
+    And I press '<button2>'
+    When 2 ticks have passed
+    Then I should see the Menu Layer
+    And I should be on '<active_menu_entry>'
+Examples:
+    | button1 | count1 | button2 | active_menu_entry |
+    | Down    | 1      | Right   | All Items         |
+    | Down    | 2      | Right   | hero              |
+    | Down    | 3      | Right   | hero              |
+    | Down    | 4      | Right   | Slot 1            |
+    | Down    | 5      | Right   | Slot 1            |
+
 
 
 
@@ -49,6 +67,7 @@ Scenario: opening menu
 Scenario: closing menu
     Given I am at 320, 240
     And I press 'Menu'
+    And 2 ticks have passed
     And I press 'Menu'
     When 2 ticks have passed
     Then I should not see the Menu Layer

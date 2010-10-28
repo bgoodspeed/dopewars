@@ -94,7 +94,20 @@ Then /^I should be on '(\w+\.*\w*)'$/ do |arg1|
 end
 
 include UtilityMatchers
-Then /^the current menu shows '(\.+)'$/ do |what|
+Then /^the current menu shows '(\w+)'$/ do |what|
   @g.current_menu_entries.should contain? what
+end
+
+Given /^I press '(\w+)' (\d+) times$/ do |what, how_many|
+  how_many.to_i.times {
+    press(what)
+    @g.step_until(1)
+  }
+end
+
+
+
+Then /^I should be on 'Slot (\d+)'$/ do |arg1|
+  @g.current_selected_menu_entry_name.should == "Slot #{arg1}"
 end
 

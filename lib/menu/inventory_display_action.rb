@@ -1,13 +1,53 @@
 
+class HeroWrapper
+  def initialize(game, item, member)
+    @game = game
+    @item = item
+    @member = member
+  end
+
+  def name
+    @member.name
+  end
+  def section_by_index(idx)
+    self  #TODO this is odd..
+  end
+
+end
+
+class InventoryDisplayWrapper
+  def initialize(game, item)
+    @game = game
+    @item = item
+  end
+  def party_members
+    @game.party_members
+  end
+
+  def section_by_index(idx)
+    HeroWrapper.new(@game, @item, party_members[idx])
+  end
+
+end
+
 class InventoryDisplayAction
   include Rubygame
 
   attr_reader :text
+  alias_method :name, :text 
   def initialize(text, game, menu_helper)
     @text = text
     @game = game
     @menu_helper = menu_helper
     @selected_option = nil
+  end
+
+  def has_subsections?
+    true
+  end
+
+  def section_by_index(idx)
+    InventoryDisplayWrapper.new(@game, info[idx])
   end
 
   def activate(cursor_position, game, section_position, subsection_position=nil, option_position=nil)
@@ -57,4 +97,9 @@ class InventoryDisplayAction
   def size
     info.size
   end
+
+  def draw(menu_layer_config, game, text_rendering_helper, layer, screen)
+    details.blit(layer, menu_layer_config.details_inset_on_layer)
+  end
+
 end

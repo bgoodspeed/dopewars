@@ -16,17 +16,24 @@ class MenuLayer < AbstractLayer
     @layer.fill(:red)
     @layer.alpha = 192
     @game = game
+    @cursor_helper = CursorHelper.new(cursor_dims)
     @menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, [], @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
+
+  end
+
+  def cursor_dims
+    [@@MENU_LINE_SPACING,@@MENU_LINE_SPACING]
   end
 
   def menu_sections_for(chars)
-    [MenuSection.new("Status", chars.collect {|m| StatusDisplayAction.new(m, @menu_helper)}),
-      MenuSection.new("Inventory", [InventoryDisplayAction.new("All Items", @game, @menu_helper), KeyInventoryDisplayAction.new("Key Items", @game, @menu_helper), SortInventoryAction.new("Sort", @game, @menu_helper)]),
-      MenuSection.new("Levelup", chars.collect {|m| LevelUpAction.new(m, @menu_helper)}),
-      MenuSection.new("Equip", chars.collect {|m| UpdateEquipmentAction.new(m, @menu_helper, @game)}),
-      MenuSection.new("Save", [SaveMenuAction.new("Slot 1")]),
-      MenuSection.new("Load", [LoadMenuAction.new("Slot 1")])
-    ]
+    MenuSections.new(@cursor_helper, 0, menu_layer_config.main_menu_text,
+      [ MenuSection.new("Status", MenuSections.new(@cursor_helper,  1, menu_layer_config.section_menu_text, chars.collect {|m| StatusDisplayAction.new(m, @menu_helper)})),
+        MenuSection.new("Inventory", MenuSections.new(@cursor_helper, 1, menu_layer_config.section_menu_text,[InventoryDisplayAction.new("All Items", @game, @menu_helper), KeyInventoryDisplayAction.new("Key Items", @game, @menu_helper), SortInventoryAction.new("Sort", @game, @menu_helper)])),
+        MenuSection.new("Levelup", MenuSections.new(@cursor_helper, 1, menu_layer_config.section_menu_text,chars.collect {|m| LevelUpAction.new(m, @menu_helper)})),
+        MenuSection.new("Equip", MenuSections.new(@cursor_helper, 1, menu_layer_config.section_menu_text,chars.collect {|m| UpdateEquipmentAction.new(m, @menu_helper, @game)})),
+        MenuSection.new("Save", MenuSections.new(@cursor_helper, 1, menu_layer_config.section_menu_text,[SaveMenuAction.new("Slot 1")])),
+        MenuSection.new("Load", MenuSections.new(@cursor_helper, 1, menu_layer_config.section_menu_text,[LoadMenuAction.new("Slot 1")]))
+    ])
   end
 
 
