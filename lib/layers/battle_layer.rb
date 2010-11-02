@@ -51,8 +51,8 @@ class BattleLayer < AbstractLayer
     mlc.main_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, @layer.h - 125, 0)
     mlc.section_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, @layer.h - 150, 0)
     mlc.in_section_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH, @layer.h - 175, 0)
-    mlc.in_subsection_cursor = BattleParticipantCursorTextRenderingConfig.new([AttackMenuAction], 2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
-    mlc.in_option_section_cursor = BattleParticipantCursorTextRenderingConfig.new([ItemMenuAction], 2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
+    mlc.in_subsection_cursor = BattleParticipantCursorTextRenderingConfig.new([AttackBattleMenuAction], 2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
+    mlc.in_option_section_cursor = BattleParticipantCursorTextRenderingConfig.new([UseBattleItemBattleMenuAction], 2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
     mlc.main_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH, @layer.h - 100, 0)
     mlc.layer_inset_on_screen = [@@LAYER_INSET,@@LAYER_INSET]
     mlc.details_inset_on_layer = [@@MENU_DETAILS_INSET_X, @@MENU_DETAILS_INSET_Y]
