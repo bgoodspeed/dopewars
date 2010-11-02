@@ -64,9 +64,32 @@ require 'lib/notifications/notification'
 require 'lib/notifications/world_screen_notification'
 require 'lib/notifications/battle_screen_notification'
 
-require 'lib/menu/noop_action'
-require 'lib/menu/menu_action'
+require 'lib/menu/task_menu'
+
+
+require 'lib/menu/selectors/selections'
+require 'lib/menu/selectors/static_menu_selector'
+require 'lib/menu/selectors/equipment_slot_menu_selector'
+require 'lib/menu/selectors/filtered_inventory_menu_selector'
+require 'lib/menu/selectors/inventory_filter_menu_selector'
+require 'lib/menu/selectors/party_menu_selector'
+require 'lib/menu/selectors/save_slot_menu_selector'
+require 'lib/menu/selectors/stat_line_menu_selector'
+
+require 'lib/menu/actions/selector_dependency_helper'
+require 'lib/menu/actions/equip_item_in_member_slot_menu_action'
+require 'lib/menu/actions/level_up_stat_menu_action'
+require 'lib/menu/actions/save_game_menu_action'
+require 'lib/menu/actions/load_game_menu_action'
+require 'lib/menu/actions/stat_line_info_menu_action'
+require 'lib/menu/actions/use_item_menu_action'
+
 require 'lib/menu/cursor_helper'
+require 'lib/menu/menu_layer_config'
+#TODO delete this
+require 'lib/menu/noop_action'
+require 'lib/menu/menu_helper'
+require 'lib/menu/menu_action'
 require 'lib/menu/menu_section'
 require 'lib/menu/menu_sections'
 require 'lib/menu/abstract_actor_menu_action'
@@ -83,6 +106,7 @@ require 'lib/menu/save_load_menu_action'
 require 'lib/menu/save_menu_action'
 require 'lib/menu/load_menu_action'
 
+#to here
 
 require 'lib/text/text_rendering_config'
 require 'lib/text/text_rendering_helper'

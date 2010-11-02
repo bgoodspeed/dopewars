@@ -47,6 +47,7 @@ end
 
 Spec::Rake::SpecTask.new do |t|
   t.spec_files = FileList['spec/**/*.rb']
+  t.spec_opts << ['--backtrace']
   t.libs << Dir["lib"]
 end
 

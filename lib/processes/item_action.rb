@@ -5,7 +5,11 @@ class ItemAction
     @action_cost = action_cost
   end
   def perform(src, dest, item)
-    dest.consume_item(item)
+    raise "src cant be nil" if src.nil?
+    raise "dest cant be nil" if dest.nil?
+    raise "item cant be nil" if item.nil?
+    
     src.consume_readiness(@action_cost)
+    dest.consume_item(item)
   end
 end

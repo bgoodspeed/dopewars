@@ -27,7 +27,7 @@ Scenario Outline: navigating menu
     Then I should see the Menu Layer
     And I should be on '<active_menu_entry>'
     And the current menu shows 'Status'
-    And the current menu shows 'Inventory'
+    And the current menu shows 'Items'
     And the current menu shows 'Levelup'
     And the current menu shows 'Equip'
     And the current menu shows 'Save'
@@ -35,7 +35,7 @@ Scenario Outline: navigating menu
 Examples:
     | button | active_menu_entry |
     | Up     | Load              |
-    | Down   | Inventory         |
+    | Down   | Items             |
 
 Scenario Outline: navigating menu breadth first
     Given I press 'Menu'

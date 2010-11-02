@@ -10,7 +10,7 @@ Scenario: using items from inventory
     And I should be on 'Status'
     And I press 'Down'
     And 2 ticks have passed
-    And I should be on 'Inventory'
+    And I should be on 'Items'
     And I press 'Right'
     And 2 ticks have passed
     And I should be on 'All Items'

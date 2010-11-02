@@ -7,38 +7,59 @@ class MenuLayer < AbstractLayer
   alias_method :toggle_visibility, :toggle_activity
 
   extend Forwardable
-  def_delegators :@menu_helper, :enter_current_cursor_location, :move_cursor_down,
-    :move_cursor_up, :cancel_action, :reset_indices, :current_selected_menu_entry_name,
-    :current_menu_entries
 
+  def_delegators :@cursor_helper, :reset_indices
+  attr_reader :text_rendering_helper
   def initialize(screen, game)
     super(screen, (screen.w) - 2*@@MENU_LAYER_INSET, (screen.h) - 2*@@MENU_LAYER_INSET)
     @layer.fill(:red)
     @layer.alpha = 192
     @game = game
     @cursor_helper = CursorHelper.new(cursor_dims)
-    @menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, [], @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
+  #  @menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, [], @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
 
   end
+
+
 
   def cursor_dims
     [@@MENU_LINE_SPACING,@@MENU_LINE_SPACING]
   end
 
-  def menu_sections_for(chars)
-    MenuSections.new(@cursor_helper, 0, menu_layer_config.main_menu_text,
-      [ MenuSection.new("Status", MenuSections.new(@cursor_helper,  1, menu_layer_config.section_menu_text, chars.collect {|m| StatusDisplayAction.new(m, @menu_helper)})),
-        MenuSection.new("Inventory", MenuSections.new(@cursor_helper, 1, menu_layer_config.section_menu_text,[InventoryDisplayAction.new("All Items", @game, @menu_helper), KeyInventoryDisplayAction.new("Key Items", @game, @menu_helper), SortInventoryAction.new("Sort", @game, @menu_helper)])),
-        MenuSection.new("Levelup", MenuSections.new(@cursor_helper, 1, menu_layer_config.section_menu_text,chars.collect {|m| LevelUpAction.new(m, @menu_helper)})),
-        MenuSection.new("Equip", MenuSections.new(@cursor_helper, 1, menu_layer_config.section_menu_text,chars.collect {|m| UpdateEquipmentAction.new(m, @menu_helper, @game)})),
-        MenuSection.new("Save", MenuSections.new(@cursor_helper, 1, menu_layer_config.section_menu_text,[SaveMenuAction.new("Slot 1")])),
-        MenuSection.new("Load", MenuSections.new(@cursor_helper, 1, menu_layer_config.section_menu_text,[LoadMenuAction.new("Slot 1")]))
-    ])
+  def rebuild_menu
+    filter_selector = InventoryFilterMenuSelector.new(@game)
+    equipment_slot_selector = EquipmentSlotMenuSelector.new(@game)
+
+    @menu = TaskMenu.new(@game, [
+        StatLineInfoMenuAction.new(@game),
+        UseItemMenuAction.new(@game),
+        LevelUpStatMenuAction.new(@game),
+        EquipItemInMemberSlotMenuAction.new(@game),
+        SaveGameMenuAction.new(@game),
+        LoadGameMenuAction.new(@game)
+      ])
+
   end
 
+  def menu
+    @menu
+  end
 
-  def rebuild_menu_sections
-    menu_sections_for(@game.party_members)
+  def move_cursor_up(e)
+    @cursor_helper.move_cursor_up(menu)
+  end
+  def move_cursor_down(e)
+    @cursor_helper.move_cursor_down(menu)
+  end
+
+  def enter_current_cursor_location(e)
+    @cursor_helper.activate(menu)
+  end
+  def current_selected_menu_entry_name
+    @cursor_helper.current_selected_menu_entry_name(menu)
+  end
+  def current_menu_entries
+    @cursor_helper.current_menu_entries(menu)
   end
   def menu_layer_config
 
@@ -57,7 +78,11 @@ class MenuLayer < AbstractLayer
 
   def draw()
     @layer.fill(:red)
-    @menu_helper.replace_sections(rebuild_menu_sections)
-    @menu_helper.draw(menu_layer_config, @game)
+#    @menu_helper.replace_sections(rebuild_menu_sections)
+    # @menu_helper.draw(menu_layer_config, @game)
+    rebuild_menu
+    menu.draw(menu_layer_config, @cursor_helper.path, @cursor_helper.currently_selected)
+    @cursor_helper.draw_at_depth(@layer, menu_layer_config, @game, nil)
+    @layer.blit(@screen, menu_layer_config.layer_inset_on_screen)
   end
 end

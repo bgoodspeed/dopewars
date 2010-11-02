@@ -17,7 +17,7 @@ class Game
     world2 = @factory.make_world2
     world3 = @factory.make_world3
     @universe = @factory.make_universe([world1, world2, world3], @factory.make_game_layers(@screen, self), @factory.make_sound_effects, self) #XXX might be bad to pass self and make loops in the obj graph
-    @universe.toggle_bg_music
+#    @universe.toggle_bg_music #TODO turned this off because it was annoying me
 
     @player = @factory.make_player(@screen, @universe)
     world1.add_npc(@factory.make_npc(@player, @universe))
