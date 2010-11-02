@@ -111,3 +111,8 @@ Then /^I should be on 'Slot (\d+)'$/ do |arg1|
   @g.current_selected_menu_entry_name.should == "Slot #{arg1}"
 end
 
+
+Given /^I start a fight$/ do
+  monster = MonsterFactory.new.make_monster(@g.player, @g.universe)
+  @g.start_battle(monster)
+end

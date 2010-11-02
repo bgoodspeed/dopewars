@@ -15,6 +15,7 @@ class KeyItemInventoryFilter < InventoryFilter
 end
 
 class InventoryFilterMenuSelector
+  include DrawableElementMenuSelectorHelper
   attr_accessor :menu_item
   def initialize(game)
     @game = game
@@ -25,26 +26,11 @@ class InventoryFilterMenuSelector
     InventoryFilter
   end
 
-  def filters
+  def elements
     [InventoryFilter.new, KeyItemInventoryFilter.new]
   end
-  alias_method :elements, :filters
-  def select_element_at(idx, selections)
-    elements[idx]
-  end
-  def element_names(selections)
-    elements.collect {|el| el.name }
-  end
-
 
   alias_method :element_at, :select_element_at
-  def size(selectios=nil)
-    filters.size
-  end
-  def draw(config, text_rendering_helper, currently_selected)
-    member_names = elements.collect {|m| m.name}
-    text_rendering_helper.render_lines_to_layer( member_names, config)
-  end
 
 
 end

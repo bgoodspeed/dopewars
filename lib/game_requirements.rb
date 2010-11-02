@@ -40,6 +40,7 @@ require 'lib/items/equipment/equippable_game_item'
 require 'lib/items/equipment/equipment_holder'
 
 
+require 'lib/factories/monster_factory'
 require 'lib/factories/game_item_factory'
 require 'lib/factories/world_state_factory'
 require 'lib/factories/game_internals_factory'
@@ -68,6 +69,7 @@ require 'lib/menu/task_menu'
 
 
 require 'lib/menu/selectors/selections'
+require 'lib/menu/selectors/drawable_element_menu_selector_helper'
 require 'lib/menu/selectors/static_menu_selector'
 require 'lib/menu/selectors/equipment_slot_menu_selector'
 require 'lib/menu/selectors/filtered_inventory_menu_selector'
@@ -76,6 +78,7 @@ require 'lib/menu/selectors/party_menu_selector'
 require 'lib/menu/selectors/save_slot_menu_selector'
 require 'lib/menu/selectors/stat_line_menu_selector'
 
+require 'lib/menu/actions/base_selector_dependency_helper'
 require 'lib/menu/actions/selector_dependency_helper'
 require 'lib/menu/actions/equip_item_in_member_slot_menu_action'
 require 'lib/menu/actions/level_up_stat_menu_action'
@@ -142,6 +145,21 @@ require 'lib/battle/battle_participant_cursor_text_rendering_config'
 require 'lib/battle/menu/attack_menu_action'
 require 'lib/battle/menu/end_battle_menu_action'
 require 'lib/battle/menu/item_menu_action'
+
+require 'lib/battle/menu/selectors/battle_skill_menu_selector'
+require 'lib/battle/menu/selectors/battle_ready_party_menu_selector'
+require 'lib/battle/menu/selectors/battle_targets_menu_selector'
+require 'lib/battle/menu/selectors/battle_filtered_inventory_menu_selector'
+require 'lib/battle/menu/selectors/battle_accept_spoils_menu_selector'
+
+require 'lib/battle/menu/actions/battle_selector_dependency_helper'
+require 'lib/battle/menu/actions/accept_battle_outcome_menu_action'
+require 'lib/battle/menu/actions/attack_battle_menu_action'
+require 'lib/battle/menu/actions/use_battle_item_battle_menu_action'
+require 'lib/battle/menu/actions/use_skill_battle_menu_action'
+require 'lib/battle/menu/actions/flee_battle_menu_action'
+
+
 
 require 'lib/palettes/i_s_b_p_entry'
 require 'lib/palettes/s_b_p_entry'

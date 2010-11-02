@@ -6,19 +6,21 @@ class BattleLayer < AbstractLayer
   extend Forwardable
   def_delegators :@battle, :participants, :current_battle_participant_offset
   def_delegators :@game, :inventory
-  attr_reader :battle
+  attr_reader :battle, :text_rendering_helper
   include EventHandler::HasEventHandler
   def initialize(screen, game)
     super(screen, screen.w - 50, screen.h - 50)
     @layer.fill(:orange)
     @text_rendering_helper = TextRenderingHelper.new(@layer, @font)
     @battle = nil
-    @menu_helper = nil
     @game = game
     @battle_hud = BattleHud.new(@screen, @text_rendering_helper, @layer)
-    sections = [MenuSection.new("Exp",[EndBattleMenuAction.new("Confirm", self)]),
-      MenuSection.new("Items", [EndBattleMenuAction.new("Confirm", self)])]
-    @end_of_battle_menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
+    
+    @cursor_helper = CursorHelper.new([20,20]) #TODO these constants should be extracted
+
+#    sections = [MenuSection.new("Exp",[EndBattleMenuAction.new("Confirm", self)]),
+#      MenuSection.new("Items", [EndBattleMenuAction.new("Confirm", self)])]
+#    @end_of_battle_menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
     make_magic_hooks({ClockTicked => :update})
   end
   def update( event )
@@ -26,14 +28,27 @@ class BattleLayer < AbstractLayer
     dt = event.seconds # Time since last update
     @battle.accumulate_readiness(dt)
   end
+
+  def rebuild_menu
+    @menu = TaskMenu.new(@game, [
+        AttackBattleMenuAction.new(@game),
+        UseBattleItemBattleMenuAction.new(@game),
+        UseSkillBattleMenuAction.new(@game),
+        FleeBattleMenuAction.new(@game) ])
+
+    @end_menu = TaskMenu.new(@game, [
+        AcceptBattleOutcomeMenuAction.new(@game)
+      ])
+
+  end
   def start_battle(game, universe, player, monster)
     @active = true
     @battle = Battle.new(game, universe, player, monster, self)
 
-    @menu_helper = BattleMenuHelper.new(@battle, @screen, @layer, @text_rendering_helper, [], @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
+#    @menu_helper = BattleMenuHelper.new(@battle, @screen, @layer, @text_rendering_helper, [], @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
 
-    sections = player.party.collect {|hero|  HeroMenuSection.new(hero, [AttackMenuAction.new("Attack", self, @menu_helper), ItemMenuAction.new("Item", self, @menu_helper, @game)])}
-    @menu_helper.replace_sections(sections)
+ #   sections = player.party.collect {|hero|  HeroMenuSection.new(hero, [AttackMenuAction.new("Attack", self, @menu_helper), ItemMenuAction.new("Item", self, @menu_helper, @game)])}
+ #   @menu_helper.replace_sections(sections)
   end
   def end_battle
     @active = false
@@ -64,43 +79,50 @@ class BattleLayer < AbstractLayer
     mlc.layer_inset_on_screen = [@@LAYER_INSET,@@LAYER_INSET]
     mlc
   end
+
+  def menu
+    @menu
+  end
   def draw()
     @layer.fill(:orange)
     if @battle.over?
       if @battle.player_alive?
-        @end_of_battle_menu_helper.draw(end_battle_menu_layer_config, @game)
+        @end_of_battle_menu.draw(end_battle_menu_layer_config, @game)
       else
         puts "you died ... game should be over... whatever"
-        @end_of_battle_menu_helper.draw(end_battle_menu_layer_config, @game)
+        @end_of_battle_menu..draw(end_battle_menu_layer_config, @game)
       end
     else
       @battle.monster.draw_to(@layer)
-      @menu_helper.draw(menu_layer_config, @game)
+      rebuild_menu
+      menu.draw(menu_layer_config, @cursor_helper.path, @cursor_helper.currently_selected)
+      @cursor_helper.draw_at_depth(@layer, menu_layer_config, @game, nil)
+      @layer.blit(@screen, menu_layer_config.layer_inset_on_screen)
       @battle_hud.draw(menu_layer_config, @game, @battle)
     end
   end
 
-  def enter_current_cursor_location(game)
-    if @battle.over?
-      @end_of_battle_menu_helper.enter_current_cursor_location(game)
-    else
-      @menu_helper.enter_current_cursor_location(game)
-    end
+  def move_cursor_up(e)
+    @cursor_helper.move_cursor_up(menu)
+  end
+  def move_cursor_down(e)
+    @cursor_helper.move_cursor_down(menu)
   end
 
-  def move_cursor_down
-    send_action_to_target(:move_cursor_down)
+  def enter_current_cursor_location(e)
+    @cursor_helper.activate(menu)
   end
-  def move_cursor_up
-    send_action_to_target(:move_cursor_up)
-  end
-
-  def cancel_action
-    send_action_to_target(:cancel_action)
+  def current_selected_menu_entry_name
+    @cursor_helper.current_selected_menu_entry_name(menu)
   end
 
-  def send_action_to_target(sym)
-    target = @battle.over? ? @end_of_battle_menu_helper : @menu_helper
-    target.send(sym)
+  #TODO might have to rebuild menu here and in there check for the battle being over to deal with
+  # having a different end of battle menu
+  def current_menu_entries
+    @cursor_helper.current_menu_entries(menu)
   end
+
+
+
+
 end

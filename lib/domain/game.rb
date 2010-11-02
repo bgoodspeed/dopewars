@@ -70,6 +70,9 @@ class Game
   end
 
 
+  def start_battle(monster)
+    battle_layer.start_battle(self, universe, player, monster)
+  end
 
   def rebuild_hud
     @hud = @factory.make_hud(@screen, @player, @universe)
