@@ -17,10 +17,6 @@ class BattleLayer < AbstractLayer
     @battle_hud = BattleHud.new(@screen, @text_rendering_helper, @layer)
     
     @cursor_helper = CursorHelper.new([20,20]) #TODO these constants should be extracted
-
-#    sections = [MenuSection.new("Exp",[EndBattleMenuAction.new("Confirm", self)]),
-#      MenuSection.new("Items", [EndBattleMenuAction.new("Confirm", self)])]
-#    @end_of_battle_menu_helper = MenuHelper.new(screen, @layer, @text_rendering_helper, sections, @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
     make_magic_hooks({ClockTicked => :update})
   end
   def update( event )
@@ -44,11 +40,6 @@ class BattleLayer < AbstractLayer
   def start_battle(game, universe, player, monster)
     @active = true
     @battle = Battle.new(game, universe, player, monster, self)
-
-#    @menu_helper = BattleMenuHelper.new(@battle, @screen, @layer, @text_rendering_helper, [], @@MENU_LINE_SPACING,@@MENU_LINE_SPACING)
-
- #   sections = player.party.collect {|hero|  HeroMenuSection.new(hero, [AttackMenuAction.new("Attack", self, @menu_helper), ItemMenuAction.new("Item", self, @menu_helper, @game)])}
- #   @menu_helper.replace_sections(sections)
   end
   def end_battle
     @active = false
@@ -87,19 +78,21 @@ class BattleLayer < AbstractLayer
     @layer.fill(:orange)
     if @battle.over?
       if @battle.player_alive?
-        @end_of_battle_menu.draw(end_battle_menu_layer_config, @game)
+        @end_menu.draw(end_battle_menu_layer_config, @game)
       else
         puts "you died ... game should be over... whatever"
-        @end_of_battle_menu..draw(end_battle_menu_layer_config, @game)
+        @end_menu.draw(end_battle_menu_layer_config, @game)
       end
     else
       @battle.monster.draw_to(@layer)
       rebuild_menu
       menu.draw(menu_layer_config, @cursor_helper.path, @cursor_helper.currently_selected)
-      @cursor_helper.draw_at_depth(@layer, menu_layer_config, @game, nil)
-      @layer.blit(@screen, menu_layer_config.layer_inset_on_screen)
       @battle_hud.draw(menu_layer_config, @game, @battle)
     end
+
+    @cursor_helper.draw_at_depth(@layer, menu_layer_config, @game, nil)
+    @layer.blit(@screen, menu_layer_config.layer_inset_on_screen)
+
   end
 
   def move_cursor_up(e)
