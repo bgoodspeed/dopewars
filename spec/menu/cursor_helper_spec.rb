@@ -4,6 +4,8 @@
 require 'spec/rspec_helper'
 
 describe CursorHelper do
+  include DomainMocks
+
   def menu_layer_config
 
     mlc = MenuLayerConfig.new
@@ -19,33 +21,6 @@ describe CursorHelper do
     mlc
   end
 
-  def named_mock(name)
-    m = mock("named mock: #{name}")
-    m.stub!(:name).and_return name
-    m
-  end
-
-  def hero(name)
-    h = Hero.new(name,nil, 1, 1, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(0,1,2,3,4,5,6,7)), nil))
-    h
-  end
-
-  def item(name)
-    i = InventoryItem.new(1, GameItem.new(name, ItemState.new(ItemAttributes.none)))
-    i
-  end
-
-  def mock_game
-    g = mock("game")
-    g.stub!(:party_members).and_return([hero("person a"), hero("person b")])
-    g.stub!(:inventory_info).and_return([item("item 1")])
-    g
-  end
-
-  def mock_action
-    g = mock("action")
-    g
-  end
   before(:each) do
     @cursor_helper = CursorHelper.new([20,20])
     @game = mock_game()

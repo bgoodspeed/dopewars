@@ -4,22 +4,7 @@
 require 'spec/rspec_helper'
 
 describe StatLineInfoMenuAction do
-  def hero(name)
-    h = Hero.new(name,nil, 1, 1, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(0,1,2,3,4,5,6,7)), nil))
-    h
-  end
-
-  def item(name)
-    i = InventoryItem.new(1, GameItem.new(name, ItemState.new(ItemAttributes.none)))
-    i
-  end
-
-  def mock_game
-    g = mock("game")
-    g.stub!(:party_members).and_return([hero("person a"), hero("person b")])
-    g.stub!(:inventory_info).and_return([item("item 1")])
-    g
-  end
+  include DomainMocks
 
   before(:each) do
     @selections = Selections.new

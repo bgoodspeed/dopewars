@@ -16,6 +16,78 @@ module MockeryHelp
 end
 
 
+
+module DomainMocks
+  def named_mock(name)
+    m = mock("named mock: #{name}")
+    m.stub!(:name).and_return name
+    m
+  end
+
+  def monster(player, universe)
+    MonsterFactory.new.make_monster(player, universe)
+  end
+
+  def hero(name)
+    h = Hero.new(name,nil, 1, 1, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(0,1,2,3,4,5,6,7)), nil))
+    h
+  end
+
+  def item(name)
+    i = InventoryItem.new(1, GameItem.new(name, ItemState.new(ItemAttributes.none)))
+    i
+  end
+  def mock_text_rendering_helper
+    m = mock("text rendering helper")
+    m.stub!(:render_lines_to_layer)
+    m
+  end
+
+  def mock_menu_layer
+    m = mock("menu layer")
+    m.stub!(:text_rendering_helper).and_return mock_text_rendering_helper
+    m
+  end
+  def mock_game
+    g = mock("game")
+    g.stub!(:player_missions).and_return([named_mock("mission 1")])
+    g.stub!(:party_members).and_return([hero("person a"), hero("person b")])
+    g.stub!(:inventory_info).and_return([item("item 1")])
+    g.stub!(:menu_layer).and_return(mock_menu_layer)
+    g
+  end
+
+  def mock_action
+    g = mock("action")
+    g
+  end
+
+end
+
+module MenuSelectorMatchers
+  class MenuSelectorMatcher
+    def matches?(target)
+      @target = target
+      props = [ target.size.kind_of?(Numeric) ,
+        target.elements.is_a?(Array),
+        target.selection_type.is_a?(Class) ]
+
+      failures = props.select {|prop| !prop}
+      
+      failures.size == 0
+    end
+
+    def failure_message
+      "#{@target.class} must define 'size->Numeric', 'elements->Array' and 'selection_type->Class'"
+    end
+  end
+
+  def behave_as_a_menu_selector
+    MenuSelectorMatcher.new
+  end
+end
+
+
 module DelegationMatchers
   class DelegateToMatcher
     def initialize(sym_and_args, config)

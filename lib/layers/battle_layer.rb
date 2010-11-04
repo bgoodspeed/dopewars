@@ -87,11 +87,11 @@ class BattleLayer < AbstractLayer
       @battle.monster.draw_to(@layer)
       rebuild_menu
       menu.draw(menu_layer_config, @cursor_helper.path, @cursor_helper.currently_selected)
-      @battle_hud.draw(menu_layer_config, @game, @battle)
     end
 
     @cursor_helper.draw_at_depth(@layer, menu_layer_config, @game, nil)
     @layer.blit(@screen, menu_layer_config.layer_inset_on_screen)
+    @battle_hud.draw(menu_layer_config, @game, @battle) unless @battle.over?
 
   end
 

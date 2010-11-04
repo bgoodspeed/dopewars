@@ -12,6 +12,7 @@ class Hero
     :dead?, :status_info, :consume_item, :consume_level_up, :current_hp, :hp, 
     :hp_ratio, :equipment_info, :equip_in_slot_index
   def_delegators :@readiness_helper, :consume_readiness, :add_readiness, :ready?, :ready_ratio
+  def_delegator :@readiness_helper, :points, :readiness_points
 
   attr_reader :money, :inventory, :name , :world_weapon
   def initialize(name="MAIN DUDE", world_weapon=nil, helper_start=1, helper_rate=1, attrib=nil)

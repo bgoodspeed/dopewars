@@ -27,8 +27,17 @@ Given /^I press '(\w+)' for (\d+) ticks$/ do |key, ticks|
   @g.set_key_pressed_for(switch_key(key), ticks.to_i)
 end
 
+Given /^I press '(\w+)' for (\d+) ms$/ do |key, ms|
+  @g.set_key_pressed_for_time(switch_key(key), ms.to_i)
+end
+
+
 When /^(\d+) ticks have passed$/ do |arg1|
   @g.step_until(arg1.to_i)
+end
+
+Given /^(\d+) ms have passed$/ do |arg1|
+  @g.step_until_time(arg1.to_i)
 end
 
 
@@ -111,8 +120,27 @@ Then /^I should be on 'Slot (\d+)'$/ do |arg1|
   @g.current_selected_menu_entry_name.should == "Slot #{arg1}"
 end
 
+Then /^I should be on 'Upgrade yourself'$/ do
+  @g.current_selected_menu_entry_name.should == 'Upgrade yourself'
+end
 
 Given /^I start a fight$/ do
   monster = MonsterFactory.new.make_monster(@g.player, @g.universe)
   @g.start_battle(monster)
+end
+
+Given /^'(\w+)' should have (\d+) battle points$/ do |hero_name, battle_points|
+  @g.current_battle.hero_by_name(hero_name).readiness_points.should == battle_points.to_i
+end
+
+Given /^'(\w+)' should have (\d+) hit points$/ do |hero_name, hit_points|
+  @g.current_battle.hero_by_name(hero_name).current_hp.should == hit_points.to_i
+end
+
+Given /^the first monster should have (\d+) hit points$/ do |hp|
+  @g.current_battle.first_monster.current_hp.should == hp.to_i
+end
+
+Given /^the first monster should have (\d+) battle points$/ do |bp|
+  @g.current_battle.first_monster.readiness_points.should == bp.to_i
 end

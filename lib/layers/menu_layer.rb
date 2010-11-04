@@ -35,6 +35,7 @@ class MenuLayer < AbstractLayer
         UseItemMenuAction.new(@game),
         LevelUpStatMenuAction.new(@game),
         EquipItemInMemberSlotMenuAction.new(@game),
+        MissionInfoMenuAction.new(@game),
         SaveGameMenuAction.new(@game),
         LoadGameMenuAction.new(@game)
       ])

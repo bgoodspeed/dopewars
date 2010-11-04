@@ -17,11 +17,17 @@ class Player
     :inventory, :dead?, :inventory_info, :inventory_item_at, :world_weapon,
     :inventory_count
   def_delegators :@keys, :clear_keys
+  def_delegators :@mission_archive, :mission_achieved?
+
+  def_delegator :@mission_archive, :missions, :player_missions
+
   def_delegator :@party, :add_item, :add_inventory
   def_delegator :@party, :members, :party_members
 
+
   attr_reader :filename, :hero_x_dim, :hero_y_dim
-  def initialize( px, py,  universe, party, filename, hx, hy, sx, sy)
+  def initialize( px, py,  universe, party, filename, hx, hy, sx, sy, game)
+    @game = game
     @universe = universe
     @filename = filename
     @hero_x_dim = hx
@@ -32,6 +38,7 @@ class Player
     @animation_helper = AnimationHelper.new(@keys)
     @weapon_helper = WorldWeaponHelper.new(self, @universe)
     @animated_sprite_helper = AnimatedSpriteHelper.new(filename, sx, sy, @hero_x_dim, @hero_y_dim)
+    @mission_archive = MissionArchive.new(game)
     @party = party
 
     make_magic_hooks(
@@ -45,6 +52,12 @@ class Player
     update_facing_if_key_matches(key)
     update_animated_sprite_helper(key)
     @keys.set_timed_keypress(key, ticks)
+  end
+
+  def set_key_pressed_for_time(key, ms)
+    update_facing_if_key_matches(key)
+    update_animated_sprite_helper(key)
+    @keys.set_timed_keypress_in_ms(key, ms)
   end
 
 

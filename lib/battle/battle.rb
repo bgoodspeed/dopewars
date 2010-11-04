@@ -21,6 +21,10 @@ class Battle
     [@monster]
   end
 
+  def first_monster
+    monsters.first
+  end
+
   def heroes
     @player.party.members
   end
@@ -34,6 +38,11 @@ class Battle
     participants[idx]
   end
 
+
+  def hero_by_name(name)
+    found = heroes.select{ |h| h.name == name}
+    found.empty? ? nil : found.first
+  end
 
   def current_battle_participant_offset(idx)
 

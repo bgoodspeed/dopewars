@@ -49,7 +49,7 @@ class GameInternalsFactory
   def make_hud(screen, player, universe)
     Hud.new :screen => screen, :player => player, :universe => universe
   end
-  def make_player(screen, universe)
+  def make_player(screen, universe, game)
     #@player = Ship.new( @screen.w/2, @screen.h/2, @topomap, pallette, @terrainmap, terrain_pallette, @interactmap, interaction_pallette, @bgsurface )
     hero = Hero.new("hero",  SwungWorldWeapon.new(interaction_pallette), @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(
         CharacterState.new(CharacterAttributes.new(5, 5, 1, 0, 0, 0, 0, 0)),
@@ -68,7 +68,7 @@ class GameInternalsFactory
     player_file = "StickMan.PNG"
     ssx = screen.w/2
     ssy = screen.h/2
-    player = Player.new(ssx, ssy , universe, party, player_file, hero_x_dim, hero_y_dim , ssx, ssy )
+    player = Player.new(ssx, ssy , universe, party, player_file, hero_x_dim, hero_y_dim , ssx, ssy, game )
 
     player
     # Make event hook to pass all events to @player#handle().

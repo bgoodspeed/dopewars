@@ -52,8 +52,9 @@ Examples:
     | Down    | 1      | Right   | All Items         |
     | Down    | 2      | Right   | hero              |
     | Down    | 3      | Right   | hero              |
-    | Down    | 4      | Right   | Slot 1            |
+    | Down    | 4      | Right   | Upgrade yourself  |
     | Down    | 5      | Right   | Slot 1            |
+    | Down    | 6      | Right   | Slot 1            |
 
 
 

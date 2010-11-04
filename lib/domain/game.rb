@@ -19,7 +19,7 @@ class Game
     @universe = @factory.make_universe([world1, world2, world3], @factory.make_game_layers(@screen, self), @factory.make_sound_effects, self) #XXX might be bad to pass self and make loops in the obj graph
 #    @universe.toggle_bg_music #TODO turned this off because it was annoying me
 
-    @player = @factory.make_player(@screen, @universe)
+    @player = @factory.make_player(@screen, @universe, self)
     world1.add_npc(@factory.make_npc(@player, @universe))
     world1.add_npc(@factory.make_monster(@player, @universe))
     @hud = @factory.make_hud(@screen, @player, @universe)
@@ -61,6 +61,14 @@ class Game
       step
     end
   end
+
+  def step_until_time(millisecs)
+    time_of_death = @clock.lifetime + millisecs
+    while (@clock.lifetime < time_of_death) do
+      step
+    end
+  end
+
   def battle_begun(universe, player)
     toggle_battle_hooks(false)
   end
@@ -116,8 +124,13 @@ class Game
   def_delegator :@player, :set_position, :set_player_position
   def_delegator :@player, :get_position, :get_player_position
   def_delegators :@player, :party_members, :inventory_info, :inventory_at,
-    :inventory, :use_weapon, :set_key_pressed_for, :inventory_count
+    :inventory, :use_weapon, :set_key_pressed_for, :inventory_count,
+    :set_key_pressed_for_time, :player_missions, :mission_achieved?
 
+
+  def current_battle
+    battle_layer.battle
+  end
 
   def toggle_battle_hooks(in_battle=false)
     EventManager.new.swap_event_sets(self, in_battle, non_battle_hooks, battle_hooks)
@@ -216,5 +229,6 @@ class Game
     @screen.update()
   end
 
+  
 
 end

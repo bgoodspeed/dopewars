@@ -15,36 +15,9 @@ class FakeMenuAction
 end
 
 describe SelectorDependencyHelper do
-
-  def hero(name)
-    h = Hero.new(name,nil, 1, 1, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(0,1,2,3,4,5,6,7)), nil))
-    h
-  end
-
-  def item(name)
-    i = InventoryItem.new(1, GameItem.new(name, ItemState.new(ItemAttributes.none)))
-    i
-  end
+  include DomainMocks
 
 
-  def mock_text_rendering_helper
-    m = mock("text rendering helper")
-    m.stub!(:render_lines_to_layer)
-    m
-  end
-
-  def mock_menu_layer
-    m = mock("menu layer")
-    m.stub!(:text_rendering_helper).and_return mock_text_rendering_helper
-    m
-  end
-  def mock_game
-    g = mock("game")
-    g.stub!(:party_members).and_return([hero("person a"), hero("person b")])
-    g.stub!(:inventory_info).and_return([item("item 1")])
-    g.stub!(:menu_layer).and_return(mock_menu_layer)
-    g
-  end
   def menu_layer_config
 
     mlc = MenuLayerConfig.new

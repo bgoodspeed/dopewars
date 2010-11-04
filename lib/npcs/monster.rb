@@ -12,8 +12,9 @@ class Monster
   extend Forwardable
   def_delegators :@coordinate_helper, :px, :py, :collides_on_x?, :collides_on_y?
 
-  def_delegators :@character_attribution, :take_damage, :experience, :dead?, :damage, :consume_item
+  def_delegators :@character_attribution, :take_damage, :experience, :dead?, :damage, :consume_item, :current_hp
   def_delegators :@readiness_helper, :consume_readiness
+  def_delegator :@readiness_helper, :points, :readiness_points
 
 
   attr_reader :inventory, :player
