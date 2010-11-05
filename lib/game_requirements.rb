@@ -44,6 +44,12 @@ require 'lib/items/equipment/equippable_game_item'
 require 'lib/items/equipment/equipment_holder'
 
 
+require 'lib/facades/surface_facade'
+require 'lib/facades/music_facade'
+require 'lib/facades/sound_facade'
+
+require 'lib/factories/music_factory'
+require 'lib/factories/surface_factory'
 require 'lib/factories/monster_factory'
 require 'lib/factories/game_item_factory'
 require 'lib/factories/world_state_factory'

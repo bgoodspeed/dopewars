@@ -5,8 +5,8 @@ class CursorHelper
   include Rubygame
 
   attr_reader :position, :depth, :path, :currently_selected
-  def initialize(dims)
-    @cursor = Surface.new(dims)
+  def initialize(dims, surface_factory=SurfaceFactory.new)
+    @cursor = surface_factory.make_surface(dims)
     @current_color = :blue
     reset_indices
   end

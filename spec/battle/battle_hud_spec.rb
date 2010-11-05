@@ -17,7 +17,7 @@ describe BattleHud do
 
   before(:each) do
     
-    @screen = Rubygame::Surface.new([100,100])
+    @screen = SurfaceFactory.new.make_surface([100,100])
     @battle_hud = BattleHud.new(@screen, mock_text_rendering_helper, mock_layer)
   end
 

@@ -1,10 +1,8 @@
 
 class BackgroundMusic
-  include Rubygame
-  include ResourceLoader
-  def initialize(filename)
+  def initialize(filename, music_factory=MusicFactory.new)
     @filename = filename
-    @music = load_music(filename)
+    @music = music_factory.load_music(filename)
   end
 
   def play_pause

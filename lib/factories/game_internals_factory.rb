@@ -111,7 +111,7 @@ class GameInternalsFactory
   end
 
   def tile(color)
-    s = Surface.new([160,160])
+    s = SurfaceFactory.new.make_surface([160,160])
     s.fill(color)
     s
   end

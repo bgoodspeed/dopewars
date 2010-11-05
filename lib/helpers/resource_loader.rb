@@ -25,7 +25,7 @@ module ResourceLoader
     filename = File.join(surface_path, name)
     raise MissingResourceError.new unless File.exists?(filename)
 
-    Rubygame::Surface.load(filename)
+    SurfaceFacade.load(filename)
   end
 
 
@@ -38,7 +38,7 @@ module ResourceLoader
 
     raise MissingResourceError.new(filename) unless File.exists?(filename)
 
-    Music.load(filename)
+    MusicFacade.load(filename)
   end
 
   def load_sound(name)
@@ -46,7 +46,7 @@ module ResourceLoader
 
     raise MissingResourceError.new(filename) unless File.exists?(filename)
 
-    Sound.load(filename)
+    SoundFacade.load(filename)
   end
 
   def map_path

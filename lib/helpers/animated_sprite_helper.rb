@@ -5,7 +5,7 @@ class AnimatedSpriteHelper
   include ColorKeyHelper
   include ResourceLoader
   
-  def initialize(filename, position)
+  def initialize(filename, position, surface_factory=SurfaceFactory.new)
     @all_char_postures = load_surface(filename)
 
     set_colorkey_from_corner(@all_char_postures)
@@ -17,7 +17,7 @@ class AnimatedSpriteHelper
     @avatar_y_dim = position.dimension.y
 
 
-    @image = Surface.new([@avatar_x_dim,@avatar_y_dim])
+    @image = surface_factory.make_surface([@avatar_x_dim, @avatar_y_dim])
     @image.fill(@all_char_postures.colorkey)
     @image.colorkey = @all_char_postures.colorkey
     @image.alpha = 255

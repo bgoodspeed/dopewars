@@ -1,11 +1,11 @@
 class BattleHud
   include Rubygame
 
-  def initialize(screen, text_rendering_helper, layer)
+  def initialize(screen, text_rendering_helper, layer, surface_factory=SurfaceFactory.new)
     @screen = screen
     @text_rendering_helper = text_rendering_helper
     @layer = layer
-
+    @surface_factory = surface_factory
   end
 
   def map_to_colors(rate)
@@ -20,11 +20,11 @@ class BattleHud
     health_rates = heroes.collect {|h| h.hp_ratio * 10}
     ready_rates = heroes.collect {|h| h.ready_ratio * 10}
 
-    s = Surface.new([500, 50])
+    s = @surface_factory.make_surface([500, 50])
     s.fill(:green)
     puts "health rates: #{health_rates.join(',')}"
     health_rates.each_with_index do |hr, hi|
-      sub = Surface.new([10, 10])
+      sub = @surface_factory.make_surface([10, 10])
       colors = map_to_colors(hr)
       ready_colors = map_to_colors(ready_rates[hi])
       colors.each_with_index do |color, idx|
@@ -33,8 +33,6 @@ class BattleHud
         sub.fill(ready_colors[idx])
         sub.blit(s, [hi * 100 + idx * 10, 25])
       end
-
-
     end
     s.blit(@screen, [40,400])
 
