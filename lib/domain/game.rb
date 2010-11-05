@@ -79,7 +79,7 @@ class Game
 
 
   def start_battle(monster)
-    battle_layer.start_battle(self, universe, player, monster)
+    battle_layer.start_battle(self, monster)
   end
 
   def rebuild_hud

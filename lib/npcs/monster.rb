@@ -73,8 +73,8 @@ class Monster
   end
 
   def interact(game, universe, player)
-    game.battle_begun(universe,player)
-    universe.battle_layer.start_battle(game, universe, player, self)
+    game.battle_begun(universe,player) #TODO these calls are weirdly coupled ... fix it with a better battle menu test
+    game.start_battle(self)
   end
 
   def add_readiness(pts, battle)

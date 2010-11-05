@@ -4,11 +4,12 @@ class Battle
   def_delegators :@player, :party, :dead?, :inventory_item_at
 
   attr_reader :monster, :player, :universe, :game
-  def initialize(game, universe, player, monster, battle_layer)
+  def initialize(game, monster)
+
     @game = game
-    @player = player
+    @player = game.player
     @monster = monster #TODO allow multi-monster battles
-    @universe = universe
+    @universe = game.universe
   end
 
   def accumulate_readiness(dt)

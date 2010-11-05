@@ -24,6 +24,34 @@ module DomainMocks
     m
   end
 
+  def mock_player
+    m = mock("player")
+    m.stub!(:party).and_return mock_party
+    m
+  end
+
+  def mock_layer
+    m = mock("layer")
+    m
+  end
+
+  def mock_world
+    m = mock("world")
+    m.stub!(:x_offset_for_world).and_return 42
+    m.stub!(:y_offset_for_world).and_return 69
+    m.stub!(:x_offset_for_interaction).and_return 42
+    m.stub!(:y_offset_for_interaction).and_return 69
+    m
+  end
+
+  def mock_universe
+    m = mock("universe")
+    m.stub!(:current_world).and_return mock_world
+    m
+  end
+
+
+
   def monster(player, universe)
     MonsterFactory.new.make_monster(player, universe)
   end
@@ -54,8 +82,19 @@ module DomainMocks
     g.stub!(:party_members).and_return([hero("person a"), hero("person b")])
     g.stub!(:inventory_info).and_return([item("item 1")])
     g.stub!(:menu_layer).and_return(mock_menu_layer)
+    g.stub!(:player).and_return(mock_player)
+    g.stub!(:universe).and_return(mock_universe)
     g
   end
+
+  def mock_party
+    m = mock("party")
+    m.stub!(:members).and_return [named_mock("ALPHA"), named_mock("BETA")]
+    m
+  end
+
+
+
 
   def mock_action
     g = mock("action")

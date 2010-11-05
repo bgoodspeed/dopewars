@@ -37,9 +37,9 @@ class BattleLayer < AbstractLayer
       ])
 
   end
-  def start_battle(game, universe, player, monster)
+  def start_battle(game, monster)
     @active = true
-    @battle = Battle.new(game, universe, player, monster, self)
+    @battle = Battle.new(game, monster)
   end
   def end_battle
     @active = false
