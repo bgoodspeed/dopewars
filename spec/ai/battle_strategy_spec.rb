@@ -67,7 +67,7 @@ describe BattleStrategy do
     @n2 = never
     @only_jim = only(:jim)
     @battle_strategy = BattleStrategy.new([@n1, @n2, @a1, @a2])
-    @only_jim_strategy = BattleStrategy.new([@n1, @n2, @only_jim, @a1])
+    @only_jim_strategy = BattleStrategy.new([@n1, @n2, @only_jim])
   end
 
   it "should evaluate the tactics in order" do
@@ -82,6 +82,18 @@ describe BattleStrategy do
     tactical_match.target.should == :jim
     tactical_match.tactic.should == @only_jim
     tactical_match.actor.should == :alice
+  end
+
+  def mock_battle_actor
+    m = mock("battle actor")
+    m
+  end
+
+  it "should do a noop if nothing matches" do
+    actor = mock_battle_actor
+    actor.should_receive(:consume_readiness)
+    @only_jim_strategy.take_battle_turn(actor, battle([:bob]))
+    
   end
 
   it "should invoke the action" do

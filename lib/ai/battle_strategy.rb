@@ -34,8 +34,6 @@ class BattleStrategy
   end
 
   def take_battle_turn(actor, battle)
-    puts "take #{actor}s battle turn in #{battle}"
-
     tactic = first_matching_tactic(battle.participants, actor)
     if tactic.matches?
       tactic.perform

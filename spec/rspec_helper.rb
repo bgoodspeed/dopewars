@@ -57,7 +57,10 @@ module DomainMocks
   end
 
   def hero(name)
-    h = Hero.new(name,nil, 1, 1, CharacterAttribution.new(CharacterState.new(CharacterAttributes.new(0,1,2,3,4,5,6,7)), nil))
+    h = Hero.new(name, nil, 1, 1, CharacterAttribution.new(
+                                    CharacterState.new(
+                                      CharacterAttributes.new(10,1,2,3,4,5,6,7)
+                                    ), nil))
     h
   end
 
@@ -89,7 +92,7 @@ module DomainMocks
 
   def mock_party
     m = mock("party")
-    m.stub!(:members).and_return [named_mock("ALPHA"), named_mock("BETA")]
+    m.stub!(:members).and_return [hero("ALPHA"), hero("BETA")]
     m
   end
 

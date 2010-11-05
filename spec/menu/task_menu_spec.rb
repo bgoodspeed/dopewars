@@ -66,13 +66,13 @@ describe TaskMenu do
   it "should be able to get a name for a given path plus current cursor -- inside stat task" do
     @task_menu.element_name_at([0],0,nil).should == "person a"
     @task_menu.element_name_at([0],1,nil).should == "person b"
-    @task_menu.element_name_at([0, 0],0,selections_with_hero).should == "HP: 0/0"
+    @task_menu.element_name_at([0, 0],0,selections_with_hero).should == "HP: 10/10"
   end
 
   it "should be able to get a list of elements for a a given path and selections" do
     @task_menu.element_names_at([       ], nil).should == [@stat_action.name, @item_action.name]
     @task_menu.element_names_at([0      ], nil).should == ["person a", "person b"]
-    @task_menu.element_names_at([0, 0   ], selections_with_hero).should == ["HP: 0/0", "MP: 1/1", "EXP: 0", "LVP: 0"]
+    @task_menu.element_names_at([0, 0   ], selections_with_hero).should == ["HP: 10/10", "MP: 1/1", "EXP: 0", "LVP: 0"]
     @task_menu.element_names_at([1, 0   ], nil).should == ["item 1"]
     @task_menu.element_names_at([1, 0, 0], nil).should == ["person a", "person b"]
   end
