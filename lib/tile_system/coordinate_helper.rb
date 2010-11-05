@@ -196,8 +196,6 @@ class CoordinateHelper
     @px -= dx if clamp_to_tile_restrictions_on_x(topo, new_bg_tile_coords) or clamp_to_tile_restrictions_on_x(interact, new_interaction_tile_coords) or !x_collisions.empty?
     @py -= dy if clamp_to_tile_restrictions_on_y(topo, new_bg_tile_coords) or clamp_to_tile_restrictions_on_y(interact, new_interaction_tile_coords) or !y_collisions.empty?
 
-#    puts "tile topo x: #{clamp_to_tile_restrictions_on_x(topo, new_bg_tile_coords)} tile interact x: #{clamp_to_tile_restrictions_on_x(interact, new_interaction_tile_coords)} x cols: #{!x_collisions.empty?}"
-#    puts "tile topo y: #{clamp_to_tile_restrictions_on_y(topo, new_bg_tile_coords)} tile interact y: #{clamp_to_tile_restrictions_on_y(interact, new_interaction_tile_coords)} y cols: #{!y_collisions.empty?}"
     cols = y_hits(x_hits(candidate_npcs(who)))
     handle_collision(cols) unless cols.empty?
     update_tile_coords

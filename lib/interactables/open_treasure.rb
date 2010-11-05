@@ -1,5 +1,5 @@
 class OpenTreasure < Treasure
   def activate(game,  player, worldstate, tilex, tiley)
-    puts "Nothing to do, already opened"
+    #NOOP nothing to do here.
   end
 end

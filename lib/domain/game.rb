@@ -11,13 +11,12 @@ class Game
   def initialize()
     @factory = GameInternalsFactory.new
     @screen = @factory.make_screen
-    @clock = @factory.make_clock
-    @queue = @factory.make_queue
+    
     world1 = @factory.make_world1
     world2 = @factory.make_world2
     world3 = @factory.make_world3
     @universe = @factory.make_universe([world1, world2, world3], @factory.make_game_layers(@screen, self), @factory.make_sound_effects, self) #XXX might be bad to pass self and make loops in the obj graph
-#    @universe.toggle_bg_music #TODO turned this off because it was annoying me
+#    @universe.toggle_bg_music #TODO turned this off because it was annoying me during testing
 
     @player = @factory.make_player(@screen, @universe, self)
     world1.add_npc(@factory.make_npc(@player, @universe))
@@ -38,8 +37,11 @@ class Game
       :left => :battle_left, :right => :battle_right, :up => :battle_up, :down => :battle_down,
       :i => :battle_confirm, :b => :battle_cancel
     }
+    @event_system = @factory.make_event_system(self, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
 
-    @event_helper = @factory.make_event_hooks(self, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
+#    @event_helper = @factory.make_event_hooks(self, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
+#    @clock = @factory.make_clock
+#    @queue = @factory.make_queue
 
   end
 
@@ -63,8 +65,8 @@ class Game
   end
 
   def step_until_time(millisecs)
-    time_of_death = @clock.lifetime + millisecs
-    while (@clock.lifetime < time_of_death) do
+    time_of_death = @event_system.lifetime + millisecs
+    while (@event_system.lifetime < time_of_death) do
       step
     end
   end
@@ -91,11 +93,9 @@ class Game
   end
 
   def remove_all_hooks
-    puts "pre hook count: #{all_hooks.size}"
     all_hooks.each {|hook|
       remove_hook(hook)
     }
-    puts "post hook count: #{all_hooks.size}"
   end
 
   extend Forwardable
@@ -115,10 +115,10 @@ class Game
     :current_battle_participant_offset, :world_number, :notifications_layer, 
     :notifications, :current_selected_menu_entry_name, :current_menu_entries
 
-  def_delegators :@event_helper, :non_menu_hooks, :rebuild_event_hooks
-  def_delegator :@event_helper, :menu_active_hooks, :menu_hooks
-  def_delegator :@event_helper, :battle_active_hooks, :battle_hooks
-  def_delegator :@event_helper, :non_menu_hooks, :non_battle_hooks
+  def_delegators :@event_system, :non_menu_hooks, :rebuild_event_hooks
+  def_delegator :@event_system, :menu_active_hooks, :menu_hooks
+  def_delegator :@event_system, :battle_active_hooks, :battle_hooks
+  def_delegator :@event_system, :non_menu_hooks, :non_battle_hooks
 
   def_delegator :@player, :update_tile_coords, :update_player_tile_coords
   def_delegator :@player, :set_position, :set_player_position
@@ -136,7 +136,6 @@ class Game
     EventManager.new.swap_event_sets(self, in_battle, non_battle_hooks, battle_hooks)
   end
   def toggle_menu
-    #puts "tm: #{@event_helper.menu_active_hooks}"
     EventManager.new.swap_event_sets(self, menu_layer.active?, non_menu_hooks, menu_hooks)
     menu_layer.toggle_activity
     unless menu_layer.active?
@@ -149,7 +148,7 @@ class Game
   end
 
   def simulate_event_with_key(k)
-    @queue << KeyPressed.new(k)
+    @event_system.queue << KeyPressed.new(k)
   end
 
   private
@@ -197,18 +196,20 @@ class Game
     @universe.blit_world(@screen, @player)
   end
   def fetch_events
-    @queue.fetch_sdl_events
+    @event_system.queue.fetch_sdl_events
   end
+
+  #TODO move this method into the event system 
   def tick_clock
-    tick = @clock.tick
-    @queue << tick
+    tick = @event_system.clock.tick
+    @event_system.queue << tick
     tick
   end
   def update_hud(tick)
     @hud.update :time => "Framerate: #{1.0/tick.seconds}"
   end
   def process_events
-    @queue.each do |event|
+    @event_system.queue.each do |event|
       handle( event ) #if !@paused
     end
   end

@@ -15,7 +15,6 @@ class TargetMatcher
     if target_is_enemy?
       return is_enemy_of?(src,target)
     end
-    puts "target #{@target} matches #{target}?"
     true
   end
 end

@@ -10,7 +10,6 @@ module ResourceLoader
   end
   def load_font(name)
     filename = File.join(font_path, name)
-    puts "font"
     raise MissingResourceError.new unless File.exists?(filename)
 
     FontFacade.new(filename, @@DEPTH)

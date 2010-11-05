@@ -51,7 +51,6 @@ class CursorHelper
     @path.push(@position)
     @position = 0
     e = menu.navigate_path_to_select(path, @currently_selected)
-    puts "selecting #{e}"
     add_currently_selected e
 
     if menu.any_satisfiable_and_selected?(@currently_selected)
@@ -92,9 +91,7 @@ class CursorHelper
   end
 
   def cancel
-    puts "before cancel path was size: #{@path.size}"
     @path.shift
-    puts "after cancel path was size: #{@path.size}"
     @depth = reduce_only_to_zero(@depth)
   end
 
@@ -126,7 +123,6 @@ class CursorHelper
 
 
   def should_display_submenu_for?(index, depth)
-    #puts "in should display submenu we have path size #{@path.join(',')}=>#{@path.size} vs depth: #{depth}"
     (depth < @path.size) && @path.first == index
   end
 

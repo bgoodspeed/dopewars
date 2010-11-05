@@ -34,14 +34,12 @@ class InteractionHelper
       return if @policy.return_after_dialog
     end
 
-    puts "you are facing #{@facing}"
     tilex = game.universe.current_world.x_offset_for_interaction(px)
     tiley = game.universe.current_world.y_offset_for_interaction(py)
     this_tile_interacts = game.universe.current_world.interaction_interpreter.interpret(tilex, tiley)
     facing_tile_interacts = false
 
     if this_tile_interacts
-      puts "you can interact with the current tile"
       interact_with_current_tile(game, tilex, tiley, this_tile_interacts)
       return if @policy.return_after_current
     end
@@ -71,7 +69,6 @@ class InteractionHelper
     facing_tile_close_enough = facing_tile_dist < @@INTERACTION_DISTANCE_THRESHOLD
 
     if facing_tile_close_enough and facing_tile_interacts
-      puts "you can interact with the facing tile in the #{@facing} direction, it is at #{facing_tilex} #{facing_tiley}"
       interact_with_facing_tile(game, facing_tilex, facing_tiley, facing_tile_interacts)
 
       return if @policy.return_after_facing
@@ -79,7 +76,6 @@ class InteractionHelper
 
     interactable_npcs = game.universe.current_world.npcs.select {|npc| npc.nearby?(px,py, @@INTERACTION_DISTANCE_THRESHOLD, @@INTERACTION_DISTANCE_THRESHOLD)  }
     unless interactable_npcs.empty?
-      puts "you can interact with the npc: #{interactable_npcs[0]}"
       interact_with_npc(game, interactable_npcs)
     end
 

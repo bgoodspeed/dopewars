@@ -4,6 +4,7 @@ class ConditionMatcher
     @condition = cond
   end
   def matches?(src, target)
+    #TODO implement this
     puts "TODO: condition #{@condition} matches #{target} ?"
     true
   end

@@ -17,9 +17,7 @@ class WarpPoint
     uni = player.universe
     player.universe.fade_out_bg_music
     player.universe.play_sound_effect(SoundEffect::WARP)
-    puts "player was at #{player.px},#{player.py}"
     player.set_position(@destination_x, @destination_y)
-    puts "warp from  #{worldstate} to #{uni.world_by_index(@destination)}"
     uni.set_current_world_by_index(@destination)
     player.universe.fade_in_bg_music
   end

@@ -1,7 +1,7 @@
 
 class WorldWeaponInteractionHelper < InteractionHelper
   def interact_with_current_tile(game, tilex, tiley)
-    puts "noop current"
+    #TODO revisit this class
   end
 
   def interact_with_dialog

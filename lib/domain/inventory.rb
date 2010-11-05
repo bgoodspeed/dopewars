@@ -69,7 +69,6 @@ class Inventory
 
   def gain_inventory(inventory)
     inventory.keys.each do |key|
-      puts "key: #{key}"
       add_item(inventory.quantity_of(key), key)
     end
   end

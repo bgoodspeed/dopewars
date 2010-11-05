@@ -16,13 +16,11 @@ class BattleHud
   def draw(menu_layer_config, game, battle)
     heroes = battle.heroes
     hpr = heroes.collect {|h| h.hp_ratio}
-    puts "hprs: #{hpr.join(',')}"
     health_rates = heroes.collect {|h| h.hp_ratio * 10}
     ready_rates = heroes.collect {|h| h.ready_ratio * 10}
 
     s = @surface_factory.make_surface([500, 50])
     s.fill(:green)
-    puts "health rates: #{health_rates.join(',')}"
     health_rates.each_with_index do |hr, hi|
       sub = @surface_factory.make_surface([10, 10])
       colors = map_to_colors(hr)

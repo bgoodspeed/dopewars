@@ -13,9 +13,7 @@ class WorldWeaponHelper
   end
 
   def use_weapon
-    if using_weapon?
-      puts "world weapon already in use!"
-    else
+    unless using_weapon?
       @weapon = @player.world_weapon
       @weapon.fired_from(@player.px, @player.py, @player.facing)
     end

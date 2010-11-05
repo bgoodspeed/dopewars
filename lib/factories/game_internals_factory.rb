@@ -5,6 +5,10 @@ class GameInternalsFactory
   include Rubygame::EventActions
   include Rubygame::EventTriggers
 
+  def make_event_system(game, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
+    EventSystem.new(make_clock, make_queue, make_event_hooks(game, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks))
+  end
+
 
   def make_screen
     #@screen = Screen.open( [640, 480] )

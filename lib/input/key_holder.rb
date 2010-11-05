@@ -43,7 +43,6 @@ class KeyHolder
       end
     }
     @ms_ttl_map.each {|k,v|
-      puts "dt is #{dt}"
       newv = v - dt * @@MS_PER_SEC
       if newv <= 0
         delete_key(k)

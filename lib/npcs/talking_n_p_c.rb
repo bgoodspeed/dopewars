@@ -10,7 +10,6 @@ class TalkingNPC < Monster
   end
 
   def interact(game, universe, player)
-    puts "display dialog '#{@text}' from #{self}"
     universe.dialog_layer.active = true
     universe.dialog_layer.text = @text
   end

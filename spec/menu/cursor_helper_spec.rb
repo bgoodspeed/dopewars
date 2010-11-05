@@ -39,9 +39,7 @@ describe CursorHelper do
     @cursor_helper.activate(@menu)
     @cursor_helper.currently_selected.size.should == 1
     @cursor_helper.currently_selected.search_selected_for(StatLineInfoMenuAction).should_not be_nil
-    puts "this one"
     @cursor_helper.activate(@menu)
-    puts "done"
     @cursor_helper.currently_selected.size.should == 2
     @cursor_helper.currently_selected.search_selected_for(Hero).should_not be_nil
 

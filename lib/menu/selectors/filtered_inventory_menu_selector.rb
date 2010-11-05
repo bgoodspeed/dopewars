@@ -28,7 +28,6 @@ class FilteredInventoryMenuSelector
 
   def select_element_at(idx, selections)
     rv = elements[idx]
-    puts "rv is a #{rv}"
     rv
   end
 

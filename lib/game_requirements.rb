@@ -1,6 +1,7 @@
 # To change this template, choose Tools | Templates
 # and open the template in the editor.
 
+require 'lib/event_system/event_system'
 require 'lib/tile_system/sdl_coordinate'
 require 'lib/tile_system/positioned_tile_coordinate'
 
