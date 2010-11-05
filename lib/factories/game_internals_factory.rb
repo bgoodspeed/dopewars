@@ -68,7 +68,8 @@ class GameInternalsFactory
     player_file = "StickMan.PNG"
     ssx = screen.w/2
     ssy = screen.h/2
-    player = Player.new(ssx, ssy , universe, party, player_file, hero_x_dim, hero_y_dim , ssx, ssy, game )
+    posn = PositionedTileCoordinate.new(SdlCoordinate.new(ssx, ssy), SdlCoordinate.new(hero_x_dim, hero_y_dim))
+    player = Player.new(posn, universe, party, player_file, ssx, ssy, game )
 
     player
     # Make event hook to pass all events to @player#handle().
@@ -88,7 +89,8 @@ class GameInternalsFactory
         EquipmentHolder.new)
     npcai = ArtificialIntelligence.new(RepeatingPathFollower.new("LURD", 80), nil) #TODO maybe make a noop battle strategy just in case?
     #npcai = StaticPathFollower.new
-    TalkingNPC.new(player, universe, "i am an npc", "gogo-npc.png", 600, 200,48,64, Inventory.new(255), npcattrib, npcai)
+    posn = PositionedTileCoordinate.new(SdlCoordinate.new(600,200), SdlCoordinate.new(48,64))
+    TalkingNPC.new(player, universe, "i am an npc", "gogo-npc.png", posn, Inventory.new(255), npcattrib, npcai)
   end
 
   def make_world2

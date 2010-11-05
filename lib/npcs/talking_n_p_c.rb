@@ -4,8 +4,8 @@ class TalkingNPC < Monster
     true
   end
 
-  def initialize(player, universe, text, filename, px, py, npc_x, npc_y, inv=nil, attrib=nil, ai=nil)
-    super(player, universe,filename, px, py, npc_x, npc_y, inv, attrib, ai)
+  def initialize(player, universe, text, filename, posn, inv=nil, attrib=nil, ai=nil)
+    super(player, universe,filename, posn, inv, attrib, ai)
     @text = text
   end
 

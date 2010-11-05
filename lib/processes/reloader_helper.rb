@@ -14,7 +14,9 @@ class ReloaderHelper
 
     universe.reblit_backgrounds
     puts "backgrounds rebuilt"
-    player = Player.new(json_player.px, json_player.py,  universe, json_player.party, json_player.filename, json_player.hero_x_dim, json_player.hero_y_dim, game.screen.w/2, game.screen.h/2)
+    posn = PositionedTileCoordinate.new(SdlCoordinate.new(json_player.px, json_player.py), SdlCoordinate.new(json_player.hero_x_dim, json_player.hero_y_dim))
+    
+    player = Player.new(posn,  universe, json_player.party, json_player.filename, game.screen.w/2, game.screen.h/2)
     #TODO update tile coords for player
     game.universe = universe
     game.player = player

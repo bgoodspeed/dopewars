@@ -1,6 +1,9 @@
 # To change this template, choose Tools | Templates
 # and open the template in the editor.
 
+require 'lib/tile_system/sdl_coordinate'
+require 'lib/tile_system/positioned_tile_coordinate'
+
 require 'lib/helpers/resource_loader'
 require 'lib/helpers/color_key_helper'
 require 'lib/helpers/json_helper'
@@ -11,6 +14,7 @@ require 'lib/helpers/animated_sprite_helper'
 require 'lib/tile_system/json_surface'
 require 'lib/tile_system/json_loadable_surface'
 require 'lib/tile_system/coordinate_helper'
+
 
 require 'lib/input/key_holder'
 require 'lib/input/event_helper'

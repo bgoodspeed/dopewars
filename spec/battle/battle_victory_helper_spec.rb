@@ -23,7 +23,8 @@ describe BattleVictoryHelper do
     AnimatedSpriteHelper.should_receive(:new).and_return(@animated_sprite_helper)
     @party = Party.new([], Inventory.new(255))
     @uni = mocking(:current_world => @world)
-    @player = Player.new(320, 240 ,@uni, @party, "fake", 12, 12, 1111, 2222, mock_game )
+    posn = PositionedTileCoordinate.new(SdlCoordinate.new(320,240), SdlCoordinate.new(12,12) )
+    @player = Player.new(posn ,@uni, @party, "fake", 1111, 2222, mock_game )
   end
 
   it "should delete the monster from the universe" do

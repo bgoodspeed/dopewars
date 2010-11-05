@@ -18,16 +18,17 @@ class Monster
 
 
   attr_reader :inventory, :player
-  def initialize(player, universe, filename, px, py, npc_x = @@MONSTER_X, npc_y = @@MONSTER_Y, inventory=Inventory.new(255), character_attrib=nil, ai=nil)
-    @npc_x = npc_x
-    @npc_y = npc_y
+  def initialize(player, universe, filename, position, inventory=Inventory.new(255), character_attrib=nil, ai=nil)
+    @npc_x = position.dimension.x
+    @npc_y = position.dimension.y
     @filename = filename
     @universe = universe
     @player = player
     @ai = ai
-    @animated_sprite_helper = AnimatedSpriteHelper.new(filename, px, py, @npc_x, @npc_y)
+    @animated_sprite_helper = AnimatedSpriteHelper.new(filename, position)
     @keys = AlwaysDownMonsterKeyHolder.new
-    @coordinate_helper = MonsterCoordinateHelper.new(px, py, @keys, @universe, @npc_x, @npc_y,100, 300,200)
+    
+    @coordinate_helper = MonsterCoordinateHelper.new(position, @keys, @universe ,100, 300,200)
     @animation_helper = AnimationHelper.new(@keys, 3)
     @readiness_helper = BattleReadinessHelper.new(@@MONSTER_START_BATTLE_PTS, @@MONSTER_BATTLE_PTS_RATE)
     @character_attribution = character_attrib

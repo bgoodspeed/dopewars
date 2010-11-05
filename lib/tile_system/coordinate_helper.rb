@@ -2,11 +2,12 @@
 class CoordinateHelper
   attr_accessor :px, :py
 
-  def initialize(px,py, key,universe, hero_x_dim, hero_y_dim, max_speed=400, accel=1200, slowdown=800)
-    @hero_x_dim, @hero_y_dim =  hero_x_dim, hero_y_dim
+  def initialize(position, key,universe,  max_speed=400, accel=1200, slowdown=800)
+    @hero_x_dim = position.dimension.x
+    @hero_y_dim = position.dimension.y
     @universe = universe
     @keys = key
-    @px, @py = px, py # Current Position
+    @px, @py = position.position.x, position.position.y # Current Position
     @vx, @vy = 0, 0 # Current Velocity
     @ax, @ay = 0, 0 # Current Acceleration
     @max_speed = max_speed # Max speed on an axis

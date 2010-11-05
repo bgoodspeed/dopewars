@@ -5,16 +5,16 @@ class AnimatedSpriteHelper
   include ColorKeyHelper
   include ResourceLoader
   
-  def initialize(filename, px, py, avatar_x_dim, avatar_y_dim)
+  def initialize(filename, position)
     @all_char_postures = load_surface(filename)
 
     set_colorkey_from_corner(@all_char_postures)
     @all_char_postures.alpha = 255
 
-    @px = px
-    @py = py #XXX this might be a bug to use these, they should come from the coord helper?
-    @avatar_x_dim = avatar_x_dim
-    @avatar_y_dim = avatar_y_dim
+    @px = position.position.x
+    @py = position.position.y #XXX this might be a bug to use these, they should come from the coord helper?
+    @avatar_x_dim = position.dimension.x
+    @avatar_y_dim = position.dimension.y
 
 
     @image = Surface.new([@avatar_x_dim,@avatar_y_dim])
