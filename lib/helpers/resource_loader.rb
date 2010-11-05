@@ -13,8 +13,7 @@ module ResourceLoader
     puts "font"
     raise MissingResourceError.new unless File.exists?(filename)
 
-    TTF.setup
-    TTF.new filename, @@DEPTH
+    FontFacade.new(filename, @@DEPTH)
   end
 
   def surface_path

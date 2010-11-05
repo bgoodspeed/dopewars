@@ -47,6 +47,7 @@ require 'lib/items/equipment/equipment_holder'
 require 'lib/facades/surface_facade'
 require 'lib/facades/music_facade'
 require 'lib/facades/sound_facade'
+require 'lib/facades/font_facade'
 
 require 'lib/factories/music_factory'
 require 'lib/factories/surface_factory'
