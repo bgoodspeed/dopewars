@@ -51,7 +51,21 @@ Spec::Rake::SpecTask.new do |t|
   t.libs << Dir["lib"]
 end
 
+require 'rake'
+require 'spec/rake/verify_rcov'
+require 'spec/rake/spectask'
 
+desc "Run all examples with RCov"
+Spec::Rake::SpecTask.new('examples_with_rcov') do |t|
+  t.spec_files = FileList['spec/**/*.rb']
+  t.rcov = true
+  t.rcov_opts = ['--exclude', 'spec', '--exclude', '/var/lib']
+end
+
+RCov::VerifyTask.new(:verify_rcov => 'examples_with_rcov') do |t|
+  t.threshold = 100.0
+  t.index_html = 'coverage/index.html'
+end
 
 require 'cucumber'
 require 'cucumber/rake/task'

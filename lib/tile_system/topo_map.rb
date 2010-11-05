@@ -53,7 +53,6 @@ class TopoMap
   def blit_to(palette, target)
     0.upto(@y-1) do |yi|
       0.upto(@x-1) do |xi|
-        
         datum = palette[data_at(xi,yi)]
         datum.blit(target, [xi*@xsize, yi*@ysize])
       end
@@ -83,18 +82,6 @@ class TopoMap
     end
     
   end
-
-  def blit_with_pallette(palette, target, wmx, wmy)
-    vdata = viewport_data_for(x_offset_for_world(wmx), y_offset_for_world(wmy), 4,3)
-
-    0.upto(3) do |yi|
-      0.upto(4) do |xi|
-        palette[vdata[yi*@x+xi]].blit(target, [xi*160, yi*160])
-      end
-    end
-    
-  end
-
 
   def to_json(*a)
     {
