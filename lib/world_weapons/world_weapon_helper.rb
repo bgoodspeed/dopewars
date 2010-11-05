@@ -5,11 +5,11 @@ class WorldWeaponHelper
   def_delegators :@weapon, :draw_weapon
   def_delegators :@interaction_helper, :facing, :facing=
 
-  def initialize(player, universe)
-    @player = player
+  def initialize(game)
+    @player = game.player
     @weapon = nil
-    @universe = universe
-    @interaction_helper = WorldWeaponInteractionHelper.new(@player, @universe, InteractionPolicy.process_all)
+    @universe = game.universe
+    @interaction_helper = WorldWeaponInteractionHelper.new(game, InteractionPolicy.process_all)
   end
 
   def use_weapon

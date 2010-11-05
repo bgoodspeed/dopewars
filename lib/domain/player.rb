@@ -33,11 +33,11 @@ class Player
     @hero_x_dim = position.dimension.x
     @hero_y_dim = position.dimension.y
     
-    @interaction_helper = InteractionHelper.new(self, @universe, InteractionPolicy.immediate_return)
+    @interaction_helper = InteractionHelper.new(game, InteractionPolicy.immediate_return)
     @keys = KeyHolder.new
     @coordinate_helper = CoordinateHelper.new(position, @keys, @universe)
     @animation_helper = AnimationHelper.new(@keys)
-    @weapon_helper = WorldWeaponHelper.new(self, @universe)
+    @weapon_helper = WorldWeaponHelper.new(game)
     sprite_pos = position.clone
     sprite_pos.position = SdlCoordinate.new(sx,sy)
     @animated_sprite_helper = AnimatedSpriteHelper.new(filename, sprite_pos)
