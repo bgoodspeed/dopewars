@@ -1,8 +1,6 @@
 
 class Hud
-include Rubygame
-include Rubygame::Events
-include ResourceLoader
+  include ResourceLoader
 
   # construct the HUD
   def initialize options

@@ -1,8 +1,6 @@
 
 class SurfaceBackedPallette < Pallette
 
-  include Rubygame
-  include ResourceLoader
   attr_reader :tile_x, :tile_y
   def initialize(filename, x, y, pal=nil, surface_factory=SurfaceFactory.new)
     super(nil,pal)

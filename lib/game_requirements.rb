@@ -1,6 +1,14 @@
 # To change this template, choose Tools | Templates
 # and open the template in the editor.
 
+
+
+require 'lib/facades/surface_facade'
+require 'lib/facades/music_facade'
+require 'lib/facades/sound_facade'
+require 'lib/facades/font_facade'
+
+
 require 'lib/event_system/event_system'
 require 'lib/tile_system/sdl_coordinate'
 require 'lib/tile_system/positioned_tile_coordinate'
@@ -44,11 +52,6 @@ require 'lib/items/game_item'
 require 'lib/items/equipment/equippable_game_item'
 require 'lib/items/equipment/equipment_holder'
 
-
-require 'lib/facades/surface_facade'
-require 'lib/facades/music_facade'
-require 'lib/facades/sound_facade'
-require 'lib/facades/font_facade'
 
 require 'lib/factories/music_factory'
 require 'lib/factories/surface_factory'

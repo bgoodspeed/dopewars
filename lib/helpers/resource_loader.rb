@@ -2,8 +2,7 @@ class MissingResourceError < RuntimeError
 end
 
 module ResourceLoader
-  @@DEPTH = 24
-  include Rubygame
+  @@FONT_DEPTH = 24
 
   def font_path
     File.join(Dir.pwd, 'resources', 'fonts')
@@ -12,7 +11,7 @@ module ResourceLoader
     filename = File.join(font_path, name)
     raise MissingResourceError.new unless File.exists?(filename)
 
-    FontFacade.new(filename, @@DEPTH)
+    FontFacade.new(filename, @@FONT_DEPTH)
   end
 
   def surface_path

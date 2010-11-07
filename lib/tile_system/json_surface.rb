@@ -1,5 +1,5 @@
 
-class JsonSurface < Rubygame::Surface
+class JsonSurface < SurfaceFacade
   
 
   def initialize(size)

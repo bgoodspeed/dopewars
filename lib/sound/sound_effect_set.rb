@@ -1,7 +1,4 @@
 class SoundEffectSet
-  include Rubygame
-  include ResourceLoader
-
   def initialize(filenames, music_factory=MusicFactory.new)
     @effects = {}
     filenames.each do |filename|
