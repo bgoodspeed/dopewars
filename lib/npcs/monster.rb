@@ -1,12 +1,6 @@
 
 class Monster
   include ScreenOffsetHelper
-  include Rubygame
-  include Sprites::Sprite
-  
-
-  
-  
   extend Forwardable
   def_delegators :@coordinate_helper, :px, :py, :collides_on_x?, :collides_on_y?
 

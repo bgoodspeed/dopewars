@@ -1,7 +1,5 @@
 
 class Player
-  include Rubygame
-  include Sprites::Sprite
 
   attr_accessor :universe, :party
 
@@ -43,6 +41,10 @@ class Player
     @party = party
   end
 
+  def draw(screen)
+    @animated_sprite_helper.image.blit screen, [screen.w/2,screen.h/2], [0,0,@hero_x_dim,@hero_y_dim]
+  end
+
   def set_key_pressed_for(key, ticks)
     update_facing_if_key_matches(key)
     update_animated_sprite_helper(key)
@@ -67,7 +69,6 @@ class Player
   def json_params
     [ @coordinate_helper.px, @coordinate_helper.py, @universe, @party, @filename,@hero_x_dim, @hero_y_dim, @animated_sprite_helper.px, @animated_sprite_helper.py]
   end
-
 
 
   def update_facing_if_key_matches(newkey)
