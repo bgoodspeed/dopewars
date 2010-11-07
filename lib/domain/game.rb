@@ -1,12 +1,5 @@
 
 class Game
-  include Rubygame
-  include Rubygame::Events
-  include Rubygame::EventActions
-  include Rubygame::EventTriggers
-
-  include EventHandler::HasEventHandler
-
   attr_accessor :player, :universe, :screen
   def initialize()
     @factory = GameInternalsFactory.new
@@ -22,34 +15,57 @@ class Game
     world1.add_npc(@factory.make_npc(@player, @universe))
     world1.add_npc(@factory.make_monster(@player, @universe))
     @hud = @factory.make_hud(@screen, @player, @universe)
-    always_on_hooks = {
-      :escape => :quit,
-      :q => :quit,
-      QuitRequested => :quit,
-      :c => :capture_ss,
-      :d => :toggle_dialog_layer,
-      :m => :toggle_menu,
-      :p => :pause
-    }
-    menu_killed_hooks = { :i => :interact_with_facing, :space => :use_weapon, :p => :toggle_bg_music }
-    menu_active_hooks = { :left => :menu_left, :right => :menu_right, :up => :menu_up, :down => :menu_down, :i => :menu_enter, :b => :menu_cancel }
-    battle_hooks = {
-      :left => :battle_left, :right => :battle_right, :up => :battle_up, :down => :battle_down,
-      :i => :battle_confirm, :b => :battle_cancel
-    }
+    trigger_factory = TriggerFactory.new
 
+    #TODO FIXMENOW TODOFIXMENOW 
+#    QuitRequestedFacade.quit_request_type => :quit, #TODO i'd rather not see direct references to facade objects, hide in a factory
+    always_on_hooks = [
+      trigger_factory.make_key_press_event_hook(self, :escape, :quit),
+      trigger_factory.make_key_press_event_hook(self, :q, :quit),
+      trigger_factory.make_key_press_event_hook(self, :c, :capture_ss),
+      trigger_factory.make_key_press_event_hook(self, :d, :toggle_dialog_layer),
+      trigger_factory.make_key_press_event_hook(self, :m, :toggle_menu),
+      trigger_factory.make_key_press_event_hook(self, :p, :pause)
+    ]
+    menu_killed_hooks = [
+      trigger_factory.make_key_press_event_hook(self, :i, :interact_with_facing),
+      trigger_factory.make_key_press_event_hook(self, :space, :use_weapon),
+      trigger_factory.make_key_press_event_hook(self, :b, :toggle_bg_music)
+    ]
+
+    menu_active_hooks = [
+      trigger_factory.make_key_press_event_hook(self, :left, :menu_left),
+      trigger_factory.make_key_press_event_hook(self, :right, :menu_right),
+      trigger_factory.make_key_press_event_hook(self, :up, :menu_up),
+      trigger_factory.make_key_press_event_hook(self, :down, :menu_down),
+      trigger_factory.make_key_press_event_hook(self, :i, :menu_enter),
+      trigger_factory.make_key_press_event_hook(self, :b, :menu_cancel)
+    ]
+    
+    battle_hooks = [
+      trigger_factory.make_key_press_event_hook(self, :left, :battle_left),
+      trigger_factory.make_key_press_event_hook(self, :right, :battle_right),
+      trigger_factory.make_key_press_event_hook(self, :up, :battle_up),
+      trigger_factory.make_key_press_event_hook(self, :down, :battle_down),
+      trigger_factory.make_key_press_event_hook(self, :i, :battle_enter),
+      trigger_factory.make_key_press_event_hook(self, :b, :battle_cancel)
+    ]
+    
     battle_layer_hooks = [
-      EventHook.new(:owner => battle_layer, :trigger => TickTrigger.new, :action => MethodAction.new(:update) )
+      trigger_factory.make_event_hook(battle_layer, :tick, :update)
     ]
 
     player_hooks = [
-      EventHook.new(:owner => player, :trigger => KeyPressTrigger.new, :action => MethodAction.new(:key_pressed) ),
-      EventHook.new(:owner => player, :trigger => KeyReleaseTrigger.new, :action => MethodAction.new(:key_released) ),
-      EventHook.new(:owner => player, :trigger => TickTrigger.new, :action => MethodAction.new(:update) )
+      trigger_factory.make_event_hook(player, :key_press, :key_pressed),
+      trigger_factory.make_event_hook(player, :key_release, :key_released),
+      trigger_factory.make_event_hook(player, :tick, :update)
     ]
 
-    npc_hooks = npcs.collect {|npc| EventHook.new(:owner => npc, :trigger => TickTrigger.new, :action => MethodAction.new(:update))}
+    npc_hooks = npcs.collect {|npc|
+      trigger_factory.make_event_hook(npc, :tick, :update)
+    }
 
+    @event_handler = trigger_factory.make_event_handler
     @event_system = @factory.make_event_system(self, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks, battle_layer_hooks, player_hooks, npc_hooks)
 
 #    @event_helper = @factory.make_event_hooks(self, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
@@ -129,6 +145,10 @@ class Game
     :notifications, :current_selected_menu_entry_name, :current_menu_entries,
     :monsters
 
+
+  #TODO the handler should be internal to event system, these should delegate there
+  def_delegators :@event_handler, :make_magic_hooks, :make_magic_hooks_for, 
+    :append_hook, :remove_hook, :handle
   def_delegators :@event_system, :non_menu_hooks, :rebuild_event_hooks
   def_delegator :@event_system, :menu_active_hooks, :menu_hooks
   def_delegator :@event_system, :battle_active_hooks, :battle_hooks
@@ -162,7 +182,7 @@ class Game
   end
 
   def simulate_event_with_key(k)
-    @event_system.queue << KeyPressed.new(k)
+    @event_system.queue << KeyPressedFacade.new(k) #TODO don't have references to the facades leak outside factories
   end
 
   private

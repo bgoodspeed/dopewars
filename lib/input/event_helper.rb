@@ -17,29 +17,24 @@ class EventHelper
     rebuild_event_hooks
   end
 
+  def accumulate_hooks_from_config(cfg)
+    hooks = []
+    cfg.each {|hook|
+      hooks << @game.append_hook(hook)
+    }
+    hooks
+  end
+
   def rebuild_event_hooks
-    @always_on_hooks = @game.make_magic_hooks(@always_on_hooks_config)
-    @menu_killed_hooks = @game.make_magic_hooks(@menu_killed_hooks_config)
-    @menu_active_hooks = @game.make_magic_hooks(@menu_active_hooks_config)
-    @battle_active_hooks = @game.make_magic_hooks(@battle_hooks_config)
+    #TODO these should probably occasionally not target game.. not really urgent
+    @always_on_hooks = accumulate_hooks_from_config(@always_on_hooks_config)
+    @menu_killed_hooks = accumulate_hooks_from_config(@menu_killed_hooks_config)
+    @menu_active_hooks = accumulate_hooks_from_config(@menu_active_hooks_config)
+    @battle_active_hooks = accumulate_hooks_from_config(@battle_hooks_config)
 
-    @battle_layer_hooks = []
-    @battle_layer_hooks_config.each {|hook|
-      @battle_layer_hooks << @game.append_hook(hook)
-    }
-    
-
-    @npc_hooks = []
-    @npc_hooks_config.each {|hook|
-      @npc_hooks << @game.append_hook(hook)
-    }
-
-    @player_hooks = []
-    @player_hooks_config.each {|hook|
-      @player_hooks << @game.append_hook(hook)
-    }
-
-
+    @battle_layer_hooks = accumulate_hooks_from_config(@battle_layer_hooks_config)
+    @npc_hooks = accumulate_hooks_from_config(@npc_hooks_config)
+    @player_hooks = accumulate_hooks_from_config(@player_hooks_config)
 
     remove_menu_active_hooks
     remove_battle_active_hooks

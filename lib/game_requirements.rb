@@ -3,6 +3,14 @@
 
 
 
+require 'lib/facades/quit_requested_facade'
+require 'lib/facades/event_handler_facade'
+require 'lib/facades/method_action_facade'
+require 'lib/facades/event_hook_facade'
+require 'lib/facades/key_release_trigger_facade'
+require 'lib/facades/key_press_trigger_facade'
+require 'lib/facades/tick_trigger_facade'
+require 'lib/facades/key_pressed_facade'
 require 'lib/facades/screen_facade'
 require 'lib/facades/clock_facade'
 require 'lib/facades/event_queue_facade'
@@ -63,6 +71,7 @@ require 'lib/factories/game_item_factory'
 require 'lib/factories/world_state_factory'
 require 'lib/factories/game_internals_factory'
 require 'lib/factories/topo_map_factory'
+require 'lib/factories/trigger_factory'
 
 require 'lib/tile_system/topo_map'
 require 'lib/tile_system/interpreted_map'
