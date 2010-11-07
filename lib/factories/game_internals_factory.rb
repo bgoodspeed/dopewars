@@ -1,10 +1,5 @@
 
 class GameInternalsFactory
-  include Rubygame
-  include Rubygame::Events
-  include Rubygame::EventActions
-  include Rubygame::EventTriggers
-
   def make_event_system(game, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks, battle_layer_hooks, player_hooks, npc_hooks)
     EventSystem.new(make_clock, make_queue, make_event_hooks(game, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks, battle_layer_hooks, player_hooks, npc_hooks))
   end
@@ -12,12 +7,12 @@ class GameInternalsFactory
 
   def make_screen
     #@screen = Screen.open( [640, 480] )
-    screen = Screen.new([@@SCREEN_X, @@SCREEN_Y])
+    screen = ScreenFacade.new([@@SCREEN_X, @@SCREEN_Y])
     screen.title = @@GAME_TITLE
     screen
   end
   def make_clock
-    clock = Clock.new()
+    clock = ClockFacade.new()
     clock.target_framerate = 50
     clock.calibrate
     clock.enable_tick_events
@@ -25,10 +20,10 @@ class GameInternalsFactory
   end
 
   def make_queue
-    queue = EventQueue.new()
+    queue = EventQueueFacade.new()
     queue.enable_new_style_events
+    queue.ignore_mouse_movement
 
-    queue.ignore = [MouseMoved]
     queue
   end
 

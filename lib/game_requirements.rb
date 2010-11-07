@@ -3,6 +3,9 @@
 
 
 
+require 'lib/facades/screen_facade'
+require 'lib/facades/clock_facade'
+require 'lib/facades/event_queue_facade'
 require 'lib/facades/surface_facade'
 require 'lib/facades/music_facade'
 require 'lib/facades/sound_facade'
