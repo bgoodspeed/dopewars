@@ -1,9 +1,6 @@
 
 
 class EventHelper
-  include Rubygame
-  include Rubygame::Events
-  include Rubygame::EventTriggers
 
   attr_reader :player_hooks, :npc_hooks, :battle_layer_hooks, :battle_active_hooks,
     :menu_active_hooks, :menu_killed_hooks, :always_on_hooks

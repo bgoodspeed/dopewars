@@ -3,12 +3,10 @@
 
 require 'spec/rspec_helper'
 require 'rubygems'
-require 'rubygame'
 
 describe BattleVictoryHelper do
   include MockeryHelp
   include DomainMocks
-  include Rubygame
   
   before(:each) do
     @battle_victory_helper = BattleVictoryHelper.new

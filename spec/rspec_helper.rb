@@ -1,5 +1,4 @@
 require 'rubygems'
-
 require 'rubygame'
 require 'json'
 require 'forwardable'
