@@ -5,8 +5,8 @@ class GameInternalsFactory
   include Rubygame::EventActions
   include Rubygame::EventTriggers
 
-  def make_event_system(game, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
-    EventSystem.new(make_clock, make_queue, make_event_hooks(game, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks))
+  def make_event_system(game, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks, battle_layer_hooks, player_hooks, npc_hooks)
+    EventSystem.new(make_clock, make_queue, make_event_hooks(game, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks, battle_layer_hooks, player_hooks, npc_hooks))
   end
 
 
@@ -104,8 +104,8 @@ class GameInternalsFactory
     WorldStateFactory.build_world_state("world3_bg","world3_interaction", pallette,  interaction_pallette, @@BGX, @@BGY, [], BackgroundMusic.new("bonobo-gypsy.mp3"))
   end
 
-  def make_event_hooks(game, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
-    event_helper = EventHelper.new(game, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
+  def make_event_hooks(game, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks, battle_layer_hooks, player_hooks, npc_hooks)
+    event_helper = EventHelper.new(game, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks, battle_layer_hooks, player_hooks, npc_hooks)
     event_helper
   end
 

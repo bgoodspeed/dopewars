@@ -2,11 +2,9 @@
 class Monster
   include ScreenOffsetHelper
   include Rubygame
-  include Rubygame::Events
   include Sprites::Sprite
   
 
-  include EventHandler::HasEventHandler
   
   
   extend Forwardable
@@ -33,10 +31,6 @@ class Monster
     @readiness_helper = BattleReadinessHelper.new(@@MONSTER_START_BATTLE_PTS, @@MONSTER_BATTLE_PTS_RATE)
     @character_attribution = character_attrib
     @inventory = inventory
-
-    make_magic_hooks(
-      ClockTicked => :update
-    )
   end
 
 

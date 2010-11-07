@@ -37,7 +37,20 @@ class Game
       :left => :battle_left, :right => :battle_right, :up => :battle_up, :down => :battle_down,
       :i => :battle_confirm, :b => :battle_cancel
     }
-    @event_system = @factory.make_event_system(self, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
+
+    battle_layer_hooks = [
+      EventHook.new(:owner => battle_layer, :trigger => TickTrigger.new, :action => MethodAction.new(:update) )
+    ]
+
+    player_hooks = [
+      EventHook.new(:owner => player, :trigger => KeyPressTrigger.new, :action => MethodAction.new(:key_pressed) ),
+      EventHook.new(:owner => player, :trigger => KeyReleaseTrigger.new, :action => MethodAction.new(:key_released) ),
+      EventHook.new(:owner => player, :trigger => TickTrigger.new, :action => MethodAction.new(:update) )
+    ]
+
+    npc_hooks = npcs.collect {|npc| EventHook.new(:owner => npc, :trigger => TickTrigger.new, :action => MethodAction.new(:update))}
+
+    @event_system = @factory.make_event_system(self, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks, battle_layer_hooks, player_hooks, npc_hooks)
 
 #    @event_helper = @factory.make_event_hooks(self, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
 #    @clock = @factory.make_clock
@@ -113,7 +126,8 @@ class Game
   def_delegators :@universe, :battle_layer, :npcs, :menu_layer,
     :reset_menu_positions, :add_notification, :toggle_bg_music, 
     :current_battle_participant_offset, :world_number, :notifications_layer, 
-    :notifications, :current_selected_menu_entry_name, :current_menu_entries
+    :notifications, :current_selected_menu_entry_name, :current_menu_entries,
+    :monsters
 
   def_delegators :@event_system, :non_menu_hooks, :rebuild_event_hooks
   def_delegator :@event_system, :menu_active_hooks, :menu_hooks

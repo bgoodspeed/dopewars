@@ -5,7 +5,7 @@ class Universe
   alias_method :world_number, :current_world_idx
   extend Forwardable
   def_delegators :@sound_effects, :play_sound_effect
-  def_delegators :@current_world, :interpret, :npcs, :blit_world, :toggle_bg_music, :fade_out_bg_music, :fade_in_bg_music
+  def_delegators :@current_world, :interpret, :npcs, :blit_world, :toggle_bg_music, :fade_out_bg_music, :fade_in_bg_music, :monsters
   def_delegators :@game_layers, :dialog_layer, :menu_layer, :battle_layer, :notifications_layer,
     :draw_game_layers_if_active, :menu_move_cursor_up, :menu_move_cursor_down, :menu_cancel_action,
     :battle_cancel_action, :battle_move_cursor_down, :battle_move_cursor_up, :add_notification,

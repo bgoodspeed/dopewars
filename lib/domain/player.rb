@@ -1,9 +1,7 @@
 
 class Player
   include Rubygame
-  include Rubygame::Events
   include Sprites::Sprite
-  include EventHandler::HasEventHandler
 
   attr_accessor :universe, :party
 
@@ -43,12 +41,6 @@ class Player
     @animated_sprite_helper = AnimatedSpriteHelper.new(filename, sprite_pos)
     @mission_archive = MissionArchive.new(game)
     @party = party
-
-    make_magic_hooks(
-      KeyPressed => :key_pressed,
-      KeyReleased => :key_released,
-      ClockTicked => :update
-    )
   end
 
   def set_key_pressed_for(key, ticks)
@@ -77,7 +69,6 @@ class Player
   end
 
 
-  private
 
   def update_facing_if_key_matches(newkey)
     if [:down, :left,:up, :right].include?(newkey)

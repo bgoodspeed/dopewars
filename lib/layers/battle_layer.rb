@@ -1,13 +1,11 @@
 
 class BattleLayer < AbstractLayer
-  include Rubygame
-  include Rubygame::Events
 
   extend Forwardable
   def_delegators :@battle, :participants, :current_battle_participant_offset
   def_delegators :@game, :inventory
   attr_reader :battle, :text_rendering_helper
-  include EventHandler::HasEventHandler
+  
   def initialize(screen, game)
     super(screen, screen.w - 50, screen.h - 50)
     @layer.fill(:orange)
@@ -17,7 +15,6 @@ class BattleLayer < AbstractLayer
     @battle_hud = BattleHud.new(@screen, @text_rendering_helper, @layer)
     
     @cursor_helper = CursorHelper.new([20,20]) #TODO these constants should be extracted
-    make_magic_hooks({ClockTicked => :update})
   end
   def update( event )
     return unless @battle and !@battle.over?
