@@ -1,19 +1,17 @@
 # To change this template, choose Tools | Templates
 # and open the template in the editor.
 
-class UseItemMenuAction
+class UseItemMenuAction < MenuAction
   attr_reader :dependencies, :name, :game
   include SelectorDependencyHelper
 
   def initialize(game, action=ItemAction.new)
-    @game = game
-    @dependencies = [
+    super(game, "Items", [
       InventoryFilterMenuSelector.new(game),
       FilteredInventoryMenuSelector.new(game),
       PartyMenuSelector.new(game)
-    ]
-    @name = "Items"
-    @action=action
+    ])
+    @action = action
   end
 
   def invoke(selections)

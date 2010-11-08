@@ -2,6 +2,9 @@
 # and open the template in the editor.
 
 module BaseSelectorDependencyHelper
+  
+   attr_reader :dependencies, :name, :game
+
    def element_at(idx, selections)
      dependencies[idx]
    end

@@ -83,3 +83,11 @@ Cucumber::Rake::Task.new(:feature) do |t|
 end
 
 task :default => [:spec, :features]
+
+
+#Integrate with:
+#heckle :  spec spec/.../..._spec.rb --heckle ClassNameToVerify
+#reek :  reek lib/**/*.rb
+#roodi :  roodi lib/**/*.rb
+#flog :  flog lib/**/*.rb
+#flay :  flay lib/**/*.rb

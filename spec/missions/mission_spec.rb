@@ -2,6 +2,16 @@
 # and open the template in the editor.
 
 require 'spec/rspec_helper'
+require 'heckle'
+
+class HeckleFacade < Heckle
+
+  def tests_pass?
+    puts "I wonder how to decide this... lets say... true?"
+    true
+  end
+
+end
 
 describe Mission do
   include DomainMocks
@@ -9,7 +19,10 @@ describe Mission do
     @mission = Mission.new(:test_mission, "not described",[], [],[])
   end
 
-  
+
+  it "should have description aliased as name" do
+    @mission.name.should == @mission.description
+  end
 
   it "should have an id token" do
     @mission.id_token.should be_an_instance_of Symbol

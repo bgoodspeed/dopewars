@@ -1,15 +1,11 @@
 # To change this template, choose Tools | Templates
 # and open the template in the editor.
 
-class LoadGameMenuAction
-   attr_reader :dependencies, :name, :game
-   include SelectorDependencyHelper
+class LoadGameMenuAction < MenuAction
   def initialize(game)
-    @game = game
-    @name = "Load"
-    @dependencies = [
+    super(game, "Load",[
       SaveSlotMenuSelector.new(game)
-    ]
+    ])
   end
 
 end

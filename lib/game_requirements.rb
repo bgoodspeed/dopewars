@@ -108,6 +108,7 @@ require 'lib/menu/selectors/mission_menu_selector'
 
 require 'lib/menu/actions/base_selector_dependency_helper'
 require 'lib/menu/actions/selector_dependency_helper'
+require 'lib/menu/actions/menu_action'
 require 'lib/menu/actions/equip_item_in_member_slot_menu_action'
 require 'lib/menu/actions/level_up_stat_menu_action'
 require 'lib/menu/actions/save_game_menu_action'

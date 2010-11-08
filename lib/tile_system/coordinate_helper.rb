@@ -127,30 +127,35 @@ class CoordinateHelper
     end
     false
   end
-  def clamp_to_tile_restrictions_on_y(interp, new_bg_tile_coords)
+
+  def clamp_to_tile_restrictions_on(interp, new_values, old_values, y_coord_pairs, x_coord_pairs)
     rv = false
 
-    if new_bg_tile_coords.miny != @bg_tile_coords.miny
-      rv = true if check_corners(interp, new_bg_tile_coords.maxx, new_bg_tile_coords.miny, new_bg_tile_coords.minx, new_bg_tile_coords.miny)
+    if new_values[0] != old_values[0]
+      rv = true if check_corners(interp, *y_coord_pairs)
     end
-    if new_bg_tile_coords.maxy != @bg_tile_coords.maxy
-      rv = true if check_corners(interp, new_bg_tile_coords.maxx, new_bg_tile_coords.maxy, new_bg_tile_coords.minx, new_bg_tile_coords.maxy)
+    if new_values[1] != old_values[1]
+      rv = true if check_corners(interp, *x_coord_pairs)
     end
     rv
+
+  end
+
+  def clamp_to_tile_restrictions_on_y(interp, new_bg_tile_coords)
+    clamp_to_tile_restrictions_on(interp,
+      [new_bg_tile_coords.miny, new_bg_tile_coords.maxy],
+      [@bg_tile_coords.miny, @bg_tile_coords.maxy],
+      [new_bg_tile_coords.maxx, new_bg_tile_coords.miny, new_bg_tile_coords.minx, new_bg_tile_coords.miny],
+      [new_bg_tile_coords.maxx, new_bg_tile_coords.maxy, new_bg_tile_coords.minx, new_bg_tile_coords.maxy])
   end
   def clamp_to_tile_restrictions_on_x(interp, new_bg_tile_coords)
-    rv = false
-
-    if new_bg_tile_coords.minx != @bg_tile_coords.minx
-      rv = true if check_corners(interp, new_bg_tile_coords.minx, new_bg_tile_coords.miny, new_bg_tile_coords.minx, new_bg_tile_coords.maxy)
-    end
-
-    if new_bg_tile_coords.maxx != @bg_tile_coords.maxx
-      rv = true if check_corners(interp, new_bg_tile_coords.maxx, new_bg_tile_coords.miny, new_bg_tile_coords.maxx, new_bg_tile_coords.maxy)
-    end
-
-    rv
+    clamp_to_tile_restrictions_on(interp,
+      [new_bg_tile_coords.minx, new_bg_tile_coords.maxx],
+      [@bg_tile_coords.minx, @bg_tile_coords.maxx],
+      [new_bg_tile_coords.minx, new_bg_tile_coords.miny, new_bg_tile_coords.minx, new_bg_tile_coords.maxy],
+      [new_bg_tile_coords.maxx, new_bg_tile_coords.miny, new_bg_tile_coords.maxx, new_bg_tile_coords.maxy])
   end
+
   def blocking(col)
     col.select do |npc|
       npc.is_blocking?

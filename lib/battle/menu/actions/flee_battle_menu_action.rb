@@ -1,16 +1,14 @@
 # To change this template, choose Tools | Templates
 # and open the template in the editor.
 
-class FleeBattleMenuAction
-  attr_reader :dependencies, :name, :game
+class FleeBattleMenuAction < MenuAction
   include BattleSelectorDependencyHelper
 
   def initialize(game)
-    @game = game
-    @name = "Flee"
-    @dependencies = [
+    super(game, "Flee",[
       BattleReadyPartyMenuSelector.new(game)
-    ]
+    ])
   end
+      
   
 end
