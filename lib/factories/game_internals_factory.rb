@@ -48,14 +48,21 @@ class GameInternalsFactory
   def make_hud(screen, player, universe)
     Hud.new :screen => screen, :player => player, :universe => universe
   end
+
+  def make_attribution
+    CharacterAttribution.new(
+        CharacterState.new(CharacterAttributes.new(5, 5, 1, 0, 0, 0, 0, 0)),
+        EquipmentHolder.new)
+  end
+
+  def make_hero(name, weapon, default_start_pts=@@HERO_START_BATTLE_PTS, default_rate=@@HERO_BATTLE_PTS_RATE, attr=make_attribution)
+    Hero.new(name,  weapon, default_start_pts, default_rate, attr)
+  end
+
   def make_player(screen, universe, game)
     #@player = Ship.new( @screen.w/2, @screen.h/2, @topomap, pallette, @terrainmap, terrain_pallette, @interactmap, interaction_pallette, @bgsurface )
-    hero = Hero.new("hero",  SwungWorldWeapon.new(interaction_pallette), @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(
-        CharacterState.new(CharacterAttributes.new(5, 5, 1, 0, 0, 0, 0, 0)),
-        EquipmentHolder.new))
-    hero2 = Hero.new("cohort", ShotWorldWeapon.new(interaction_pallette), @@HERO_START_BATTLE_PTS, @@HERO_BATTLE_PTS_RATE, CharacterAttribution.new(
-        CharacterState.new(CharacterAttributes.new(5, 5, 1, 0, 0, 0, 0, 0)),
-        EquipmentHolder.new))
+    hero = make_hero("hero", SwungWorldWeapon.new(interaction_pallette))
+    hero2 = make_hero("cohort", ShotWorldWeapon.new(interaction_pallette))
     party_inventory = Inventory.new(255) #TODO revisit inventory -- should it have a maximum?
     party_inventory.add_item(1, GameItemFactory.potion)
     party_inventory.add_item(1, GameItemFactory.antidote) #TODO how to model status effects
@@ -115,30 +122,45 @@ class GameInternalsFactory
     s
   end
 
+  def cisbp(conf, content)
+    CISBPEntry.new(conf,content)
+  end
+
+  def cisbp_standard_treasure_box(item)
+    cisbp(["treasure-boxes.png",4,4],Treasure.new(item))
+  end
+
   def interaction_pallette
     pal = CompositeInteractableSurfaceBackedPallette.new([["treasure-boxes.png", 32,32], ["weapons-32x32.png", 32,32]])
 #XXX note mixing sizes in a composite does not work well, ..
-    pal['O'] = CISBPEntry.new(["treasure-boxes.png",4,7],OpenTreasure.new("O"))
-    pal['T'] = CISBPEntry.new(["treasure-boxes.png",4,4],Treasure.new(GameItemFactory.potion))
-    pal['E'] = CISBPEntry.new(["weapons-32x32.png", 1,0],Treasure.new(GameItemFactory.sword))
-    pal['F'] = CISBPEntry.new(["treasure-boxes.png",4,4],Treasure.new(GameItemFactory.sword))
-    pal['m'] = CISBPEntry.new(["treasure-boxes.png",1,1],WarpPoint.new(1, 120, 700))
-
-    pal['w'] = CISBPEntry.new(["treasure-boxes.png",1,1],WarpPoint.new(1, 1020, 700))
+    pal['O'] = cisbp(["treasure-boxes.png",4,7],OpenTreasure.new("O"))
+    pal['T'] = cisbp_standard_treasure_box(GameItemFactory.potion)
+    pal['E'] = cisbp(["weapons-32x32.png", 1,0],Treasure.new(GameItemFactory.sword))
+    pal['F'] = cisbp_standard_treasure_box(GameItemFactory.sword)
+    pal['m'] = cisbp(["treasure-boxes.png",1,1],WarpPoint.new(1, 120, 700))
+    pal['w'] = cisbp(["treasure-boxes.png",1,1],WarpPoint.new(1, 1020, 700))
 #    pal['W'] = ISBPEntry.new([1,1],WarpPoint.new(0, 1200, 880))
 
     pal
   end
+  def isbp(conf, content)
+    ISBPEntry.new(conf, content)
+  end
+
+  def isbp_standard_treasure_box(item)
+    isbp([4,4], Treasure.new(item))
+  end
+
   def interaction_pallette_160
     pal = InteractableSurfaceBackedPallette.new("treasure-boxes-160.png", 160,160)
 
-    pal['O'] = ISBPEntry.new([4,7],OpenTreasure.new("O"))
-    pal['1'] = ISBPEntry.new([4,4],Treasure.new(GameItemFactory.potion))
-    pal['2'] = ISBPEntry.new([4,4],Treasure.new(GameItemFactory.antidote))
-    pal['3'] = ISBPEntry.new([4,4],Treasure.new(GameItemFactory.potion))
-    pal['J'] = ISBPEntry.new([1,1],WarpPoint.new(2, 120, 700))
-    pal['w'] = ISBPEntry.new([1,1],WarpPoint.new(1, 1020, 700))
-    pal['W'] = ISBPEntry.new([1,1],WarpPoint.new(0, 1200, 880))
+    pal['O'] = isbp([4,7],OpenTreasure.new("O"))
+    pal['1'] = isbp_standard_treasure_box(GameItemFactory.potion)
+    pal['2'] = isbp_standard_treasure_box(GameItemFactory.antidote)
+    pal['3'] = isbp_standard_treasure_box(GameItemFactory.potion)
+    pal['J'] = isbp([1,1],WarpPoint.new(2, 120, 700))
+    pal['w'] = isbp([1,1],WarpPoint.new(1, 1020, 700))
+    pal['W'] = isbp([1,1],WarpPoint.new(0, 1200, 880))
 
     pal
 

@@ -35,7 +35,6 @@ class EventHelper
     @battle_layer_hooks = accumulate_hooks_from_config(@battle_layer_hooks_config)
     @npc_hooks = accumulate_hooks_from_config(@npc_hooks_config)
     @player_hooks = accumulate_hooks_from_config(@player_hooks_config)
-
     remove_menu_active_hooks
     remove_battle_active_hooks
   end

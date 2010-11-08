@@ -2,8 +2,20 @@
 class Game
   attr_accessor :player, :universe, :screen
 
+  def key_press_hooks(*pairs)
+    pairs.collect{|pair| key_press_hook(pair[0], pair[1])}
+  end
+
   def key_press_hook(keysym, target)
     @trigger_factory.make_key_press_event_hook(self, keysym, target)
+  end
+
+  def event_hook(owner, event_type, target)
+    @trigger_factory.make_event_hook(owner, event_type, target)
+  end
+
+  def standard_keymap(left, down, right, up, enter, cancel)
+    key_press_hooks([:left, left], [:down, down], [:right, right], [:up, up], [:i, enter], [:b, cancel])
   end
 
   def initialize()
@@ -24,54 +36,36 @@ class Game
 
     #TODO FIXMENOW TODOFIXMENOW 
 #    QuitRequestedFacade.quit_request_type => :quit, #TODO i'd rather not see direct references to facade objects, hide in a factory
-    always_on_hooks = [
-      key_press_hook( :escape, :quit),
-      key_press_hook( :q, :quit),
-      key_press_hook( :c, :capture_ss),
-      key_press_hook( :d, :toggle_dialog_layer),
-      key_press_hook( :m, :toggle_menu),
-      key_press_hook( :p, :pause)
-    ]
-    menu_killed_hooks = [
-      key_press_hook( :i, :interact_with_facing),
-      key_press_hook( :space, :use_weapon),
-      key_press_hook( :b, :toggle_bg_music)
-    ]
 
-    menu_active_hooks = [
-      key_press_hook( :left, :menu_left),
-      key_press_hook( :right, :menu_right),
-      key_press_hook( :up, :menu_up),
-      key_press_hook( :down, :menu_down),
-      key_press_hook( :i, :menu_enter),
-      key_press_hook( :b, :menu_cancel)
-    ]
+
+    always_on_keymap = key_press_hooks( [:escape, :quit], [ :q, :quit],
+        [ :c, :capture_ss], [ :d, :toggle_dialog_layer], [ :m, :toggle_menu], [ :p, :pause]
+      )
     
-    battle_hooks = [
-      key_press_hook( :left, :battle_left),
-      key_press_hook( :right, :battle_right),
-      key_press_hook( :up, :battle_up),
-      key_press_hook( :down, :battle_down),
-      key_press_hook( :i, :battle_enter),
-      key_press_hook( :b, :battle_cancel)
-    ]
+    menu_killed_hooks = key_press_hooks( [ :i, :interact_with_facing],
+        [ :space, :use_weapon], [ :b, :toggle_bg_music]
+    )
+
+    menu_active_hooks = standard_keymap(:menu_left, :menu_down, :menu_right, :menu_up, :menu_enter, :menu_cancel)
+    battle_hooks = standard_keymap(:battle_left, :battle_down, :battle_right, :battle_up, :battle_enter, :battle_cancel)
+
     
     battle_layer_hooks = [
-      @trigger_factory.make_event_hook(battle_layer, :tick, :update)
+      event_hook(battle_layer, :tick, :update)
     ]
 
     player_hooks = [
-      @trigger_factory.make_event_hook(player, :key_press, :key_pressed),
-      @trigger_factory.make_event_hook(player, :key_release, :key_released),
-      @trigger_factory.make_event_hook(player, :tick, :update)
+      event_hook(player, :key_press, :key_pressed),
+      event_hook(player, :key_release, :key_released),
+      event_hook(player, :tick, :update)
     ]
 
     npc_hooks = npcs.collect {|npc|
-      @trigger_factory.make_event_hook(npc, :tick, :update)
+      event_hook(npc, :tick, :update)
     }
 
     @event_handler = @trigger_factory.make_event_handler
-    @event_system = @factory.make_event_system(self, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks, battle_layer_hooks, player_hooks, npc_hooks)
+    @event_system = @factory.make_event_system(self, always_on_keymap, menu_killed_hooks, menu_active_hooks, battle_hooks, battle_layer_hooks, player_hooks, npc_hooks)
 
 #    @event_helper = @factory.make_event_hooks(self, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
 #    @clock = @factory.make_clock

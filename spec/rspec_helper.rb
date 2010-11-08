@@ -46,6 +46,12 @@ module DomainMocks
   def mock_universe
     m = mock("universe")
     m.stub!(:current_world).and_return mock_world
+    m.stub!(:x_offset_for_world).and_return 42
+    m.stub!(:y_offset_for_world).and_return 69
+    m.stub!(:x_offset_for_interaction).and_return 42
+    m.stub!(:y_offset_for_interaction).and_return 69
+
+
     m
   end
 

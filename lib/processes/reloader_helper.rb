@@ -8,9 +8,7 @@ class ReloaderHelper
     universe = Universe.new(uni.current_world_idx, uni.worlds, orig_uni.game_layers, orig_uni.sound_effects)
 
     puts "universe has current world: #{universe.current_world_idx}"
-    universe.replace_world_pallettes(orig_uni)
-    universe.replace_world_bgsurfaces(orig_uni)
-    universe.replace_world_bgmusics(orig_uni)
+    universe.replace_world_data(orig_uni)
 
     universe.reblit_backgrounds
     puts "backgrounds rebuilt"

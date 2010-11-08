@@ -4,50 +4,49 @@ end
 module ResourceLoader
   @@FONT_DEPTH = 24
 
+  def resource_path(elem)
+    File.join(Dir.pwd, 'resources', elem)
+  end
+
   def font_path
-    File.join(Dir.pwd, 'resources', 'fonts')
+    resource_path('fonts')
   end
   def load_font(name)
-    filename = File.join(font_path, name)
-    raise MissingResourceError.new unless File.exists?(filename)
-
-    FontFacade.new(filename, @@FONT_DEPTH)
+    FontFacade.new(check_file(font_path, name), @@FONT_DEPTH)
   end
 
   def surface_path
-    File.join(Dir.pwd, 'resources', 'images')
+    resource_path('images')
   end
 
   def load_surface(name)
-    filename = File.join(surface_path, name)
-    raise MissingResourceError.new unless File.exists?(filename)
-
-    SurfaceFacade.load(filename)
+    SurfaceFacade.load(check_file(surface_path, name))
   end
 
+  def music_path
+    resource_path('music')
+  end
+
+  def load_music(name)
+    MusicFacade.load(check_file(music_path, name))
+  end
 
   def sound_path
-    File.join(Dir.pwd, 'resources', 'sounds')
+    resource_path('sounds')
   end
-  
-  def load_music(name)
-    filename = File.join(sound_path, name)
 
+  def check_file(path, name)
+    filename = File.join(path, name)
     raise MissingResourceError.new(filename) unless File.exists?(filename)
-
-    MusicFacade.load(filename)
+    filename
   end
 
   def load_sound(name)
-    filename = File.join(sound_path, name)
-
-    raise MissingResourceError.new(filename) unless File.exists?(filename)
-
-    SoundFacade.load(filename)
+    SoundFacade.load(check_file(sound_path, name))
   end
 
   def map_path
-    File.join(Dir.pwd, 'resources', 'worlds')
+    resource_path('worlds')
   end
 
 

@@ -9,7 +9,7 @@ class BattleTargetsMenuSelector
   end
 
   def elements
-    @game.battle_ready_party_members
+    @game.battle_members
   end
 
 end

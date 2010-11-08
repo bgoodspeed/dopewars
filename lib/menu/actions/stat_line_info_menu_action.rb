@@ -3,8 +3,8 @@
 
 
 class StatLineInfoMenuAction < MenuAction
-   def initialize(game)
-    super(game, "Status",[
+   def initialize(game, name = "Status")
+    super(game, name,[
       PartyMenuSelector.new(game),
       StatLineMenuSelector.new(game)
     ])

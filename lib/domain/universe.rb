@@ -5,7 +5,9 @@ class Universe
   alias_method :world_number, :current_world_idx
   extend Forwardable
   def_delegators :@sound_effects, :play_sound_effect
-  def_delegators :@current_world, :interpret, :npcs, :blit_world, :toggle_bg_music, :fade_out_bg_music, :fade_in_bg_music, :monsters
+  def_delegators :@current_world, :interpret, :npcs, :blit_world, :toggle_bg_music, 
+    :fade_out_bg_music, :fade_in_bg_music, :monsters, :x_offset_for_world, :y_offset_for_world,
+    :x_offset_for_interaction, :y_offset_for_interaction
   def_delegators :@game_layers, :dialog_layer, :menu_layer, :battle_layer, :notifications_layer,
     :draw_game_layers_if_active, :menu_move_cursor_up, :menu_move_cursor_down, :menu_cancel_action,
     :battle_cancel_action, :battle_move_cursor_down, :battle_move_cursor_up, :add_notification,
@@ -38,9 +40,12 @@ class Universe
   def reblit_backgrounds
     @worlds.each {|world| world.reblit_background}
   end
-  def replace_world_pallettes(orig_uni)
+
+  def replace_world_data(orig_uni)
     worlds_with_index(orig_uni) {|world, orig_world|
       world.replace_pallettes(orig_world)
+      world.replace_bgsurface(orig_world)
+      world.replace_bgmusic(orig_world)
     }
   end
 
@@ -49,18 +54,6 @@ class Universe
       orig_world = orig_uni.world_by_index(index)
       yield world, orig_world
     end
-  end
-  def replace_world_bgsurfaces(orig_uni)
-    worlds_with_index(orig_uni) {|world, orig_world|
-      world.replace_bgsurface(orig_world)
-    }
-  end
-
-  def replace_world_bgmusics(orig_uni)
-    worlds_with_index(orig_uni) {|world, orig_world|
-      world.replace_bgmusic(orig_world)
-    }
-
   end
 
   include JsonHelper

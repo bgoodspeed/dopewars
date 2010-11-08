@@ -20,18 +20,31 @@ class CoordinateHelper
     [@px,@py]
   end
 
+  def get_coord_set(is_world)
+    x1 = @universe.x_offset_for_world(base_x)
+    x2 = @universe.x_offset_for_world(max_x)
+
+    y1 = @universe.y_offset_for_world(base_y)
+    y2 = @universe.y_offset_for_world(max_y)
+
+
+    unless is_world
+      x1 = @universe.x_offset_for_interaction(base_x)
+      x2 = @universe.x_offset_for_interaction(max_x)
+
+      y1 = @universe.y_offset_for_interaction(base_y)
+      y2 = @universe.y_offset_for_interaction(max_y)
+      
+    end
+
+    TileCoordinateSet.new(x1,x2, y1,y2 )
+  end
   def world_coords
-    TileCoordinateSet.new( @universe.current_world.x_offset_for_world(base_x),
-      @universe.current_world.x_offset_for_world(max_x),
-      @universe.current_world.y_offset_for_world(base_y ),
-      @universe.current_world.y_offset_for_world(max_y) )
+    get_coord_set(true)
   end
 
   def interact_coords
-    TileCoordinateSet.new( @universe.current_world.x_offset_for_interaction(base_x),
-      @universe.current_world.x_offset_for_interaction(max_x),
-      @universe.current_world.y_offset_for_interaction(base_y ),
-      @universe.current_world.y_offset_for_interaction(max_y) )
+    get_coord_set(false)
   end
 
   def max_x
@@ -141,19 +154,43 @@ class CoordinateHelper
 
   end
 
-  def clamp_to_tile_restrictions_on_y(interp, new_bg_tile_coords)
-    clamp_to_tile_restrictions_on(interp,
-      [new_bg_tile_coords.miny, new_bg_tile_coords.maxy],
-      [@bg_tile_coords.miny, @bg_tile_coords.maxy],
-      [new_bg_tile_coords.maxx, new_bg_tile_coords.miny, new_bg_tile_coords.minx, new_bg_tile_coords.miny],
-      [new_bg_tile_coords.maxx, new_bg_tile_coords.maxy, new_bg_tile_coords.minx, new_bg_tile_coords.maxy])
+  def clamp_to_tile_restrictions_on_y(interp, coords)
+    clamp_to_tile_restrictions_on(interp, *y_args(coords))
   end
-  def clamp_to_tile_restrictions_on_x(interp, new_bg_tile_coords)
-    clamp_to_tile_restrictions_on(interp,
-      [new_bg_tile_coords.minx, new_bg_tile_coords.maxx],
-      [@bg_tile_coords.minx, @bg_tile_coords.maxx],
-      [new_bg_tile_coords.minx, new_bg_tile_coords.miny, new_bg_tile_coords.minx, new_bg_tile_coords.maxy],
-      [new_bg_tile_coords.maxx, new_bg_tile_coords.miny, new_bg_tile_coords.maxx, new_bg_tile_coords.maxy])
+
+  def bg_tile_ys
+    [@bg_tile_coords.miny, @bg_tile_coords.maxy]
+  end
+  def bg_tile_xs
+    [@bg_tile_coords.minx, @bg_tile_coords.maxy]
+  end
+
+  def coord_xs(coords)
+    [coords.minx, coords.maxx]
+  end
+
+  def coord_ys(coords)
+    [coords.miny, coords.maxy]
+  end
+
+  def y_args(coords)
+    [ coord_ys(coords),
+      [bg_tile_ys],
+      [coords.maxx, coords.miny, coords.minx, coords.miny],
+      [coords.maxx, coords.maxy, coords.minx, coords.maxy]
+
+    ]
+  end
+  def x_args(coords)
+    [ coord_xs(coords),
+      bg_tile_xs,
+      [coords.minx, coords.miny, coords.minx, coords.maxy],
+      [coords.maxx, coords.miny, coords.maxx, coords.maxy]
+    ]
+  end
+
+  def clamp_to_tile_restrictions_on_x(interp, coords)
+    clamp_to_tile_restrictions_on(interp, *x_args(coords))
   end
 
   def blocking(col)

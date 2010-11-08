@@ -27,7 +27,40 @@ class InteractionHelper
     npc.interact(game, game.universe, game.player) #TODO change the expected signature for interact and make interactable api tests
   end
 
+  def calculate_facing(stable_dirs, negative_dirs, tile)
+    if stable_dirs.include?(@facing)
+      tile
+    elsif negative_dirs.include?(@facing)
+      tile - 1
+    else
+      tile
+    end
+  end
+  def facing_tilex_for(tile)
+    calculate_facing([:down,:up], [:left], tile)
+  end
+
+  def facing_tiley_for(tile)
+    calculate_facing([:left, :right], [:up], tile)
+  end
+
+  def facing_tile_distance_for(game, tilex, tiley, px, py)
+    facing_tile_dist = nil
+    if @facing == :down
+      facing_tile_dist = (game.universe.current_world.interaction_interpreter.top_side(tiley + 1) - py).abs
+    elsif @facing == :up
+      facing_tile_dist = (game.universe.current_world.interaction_interpreter.bottom_side(tiley - 1) - py).abs
+    elsif @facing == :left
+      facing_tile_dist = (game.universe.current_world.interaction_interpreter.right_side(tilex - 1) - px).abs
+    else
+      facing_tile_dist = (game.universe.current_world.interaction_interpreter.left_side(tilex + 1) - px).abs
+    end
+    facing_tile_dist
+  end
+
   def interact_with_facing(game, px,py)
+    puts "mapped key to interaction helper"
+
     if game.universe.dialog_layer.active
       puts "confirming/closing/paging dialog"
       interact_with_dialog
@@ -44,27 +77,10 @@ class InteractionHelper
       return if @policy.return_after_current
     end
 
-    if @facing == :down
-      facing_tilex = tilex
-      facing_tiley = tiley + 1
-      facing_tile_dist = (game.universe.current_world.interaction_interpreter.top_side(tiley + 1) - py).abs
-    end
-    if @facing == :up
-      facing_tilex = tilex
-      facing_tiley = tiley - 1
-      facing_tile_dist = (game.universe.current_world.interaction_interpreter.bottom_side(tiley - 1) - py).abs
-    end
-    if @facing == :left
-      facing_tilex = tilex - 1
-      facing_tiley = tiley
-      facing_tile_dist = (game.universe.current_world.interaction_interpreter.right_side(tilex - 1) - px).abs
-    end
-    if @facing == :right
-      facing_tilex = tilex + 1
-      facing_tiley = tiley
-      facing_tile_dist = (game.universe.current_world.interaction_interpreter.left_side(tilex + 1) - px).abs
-    end
-
+    facing_tilex = facing_tilex_for(tilex)
+    facing_tiley = facing_tiley_for(tiley)
+    facing_tile_dist = facing_tile_distance_for(game, tilex, tiley, px, py)
+    #puts "i am on #{tilex},#{tiley}, i am facing #{@facing} -> #{facing_tilex}"
     facing_tile_interacts = game.universe.current_world.interaction_interpreter.interpret(facing_tilex, facing_tiley)
     facing_tile_close_enough = facing_tile_dist < @@INTERACTION_DISTANCE_THRESHOLD
 

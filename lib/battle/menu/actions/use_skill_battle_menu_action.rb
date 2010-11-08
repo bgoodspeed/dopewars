@@ -1,14 +1,8 @@
 # To change this template, choose Tools | Templates
 # and open the template in the editor.
 
-class UseSkillBattleMenuAction < MenuAction
-  include BattleSelectorDependencyHelper
-
+class UseSkillBattleMenuAction < BattleMenuAction
   def initialize(game)
-    super(game, "Skills", [
-      BattleReadyPartyMenuSelector.new(game),
-      BattleSkillMenuSelector.new(game),
-      BattleTargetsMenuSelector.new(game)
-    ])
+    super(game, "Skills", [BattleSkillMenuSelector.new(game)])
   end
 end

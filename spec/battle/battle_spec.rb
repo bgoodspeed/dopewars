@@ -11,6 +11,10 @@ describe Battle do
   before(:each) do
     p = mock_player
     u = mock_universe
+    u.stub!(:x_offset_for_world).and_return 0
+    u.stub!(:y_offset_for_world).and_return 0
+    u.stub!(:x_offset_for_interaction).and_return 0
+    u.stub!(:y_offset_for_interaction).and_return 0
     @battle = Battle.new(mock_game, monster(p,u))
   end
 

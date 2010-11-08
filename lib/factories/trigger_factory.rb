@@ -11,7 +11,10 @@ class TriggerFactory
   def make_tick_trigger
     TickTriggerFacade.new
   end
-  def make_key_press_trigger(key=nil)
+  def make_any_key_press_trigger
+    KeyPressTriggerFacade.new
+  end
+  def make_key_press_trigger(key)
     KeyPressTriggerFacade.new(key)
   end
   def make_key_release_trigger
@@ -25,7 +28,7 @@ class TriggerFactory
   def map_trigger_type(trigger_type)
     conf = {}
     conf[:tick] = make_tick_trigger
-    conf[:key_press] = make_key_press_trigger
+    conf[:key_press] = make_any_key_press_trigger
     conf[:key_release] = make_key_release_trigger
 
     conf[trigger_type]
