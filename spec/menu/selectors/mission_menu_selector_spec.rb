@@ -17,7 +17,7 @@ describe MissionMenuSelector do
 
   it "should ask the game for missions" do
     @game.should_receive(:player_missions)
-    @menu_selector.elements
+    @menu_selector.elements(nil)
   end
 end
 

@@ -26,7 +26,7 @@ class InventoryFilterMenuSelector
     InventoryFilter
   end
 
-  def elements
+  def elements(selections)
     [InventoryFilter.new, KeyItemInventoryFilter.new]
   end
 

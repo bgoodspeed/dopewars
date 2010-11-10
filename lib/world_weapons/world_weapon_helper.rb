@@ -5,11 +5,12 @@ class WorldWeaponHelper
   def_delegators :@weapon, :draw_weapon
   def_delegators :@interaction_helper, :facing, :facing=
 
-  def initialize(game)
+  def initialize(game, helper = WorldWeaponInteractionHelper.new(game, InteractionPolicy.process_all))
+    @game = game
     @player = game.player
     @weapon = nil
     @universe = game.universe
-    @interaction_helper = WorldWeaponInteractionHelper.new(game, InteractionPolicy.process_all)
+    @interaction_helper = helper
   end
 
   def use_weapon
@@ -23,14 +24,14 @@ class WorldWeaponHelper
     !@weapon.nil?
   end
 
-  def update_weapon_if_active()
+  def update_weapon_if_active
     return unless using_weapon?
     @weapon.displayed
     if @weapon.consumed?
       @weapon.die
       @weapon = nil
     else
-      @interaction_helper.interact_with_facing(@universe.game, @player.px, @player.py)
+      @interaction_helper.interact_with_facing(@game, @player.px, @player.py)
     end
   end
 

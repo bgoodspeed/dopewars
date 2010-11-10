@@ -8,7 +8,7 @@ class BattleTargetsMenuSelector
     @game = game
   end
 
-  def elements
+  def elements(selections)
     @game.battle_members
   end
 

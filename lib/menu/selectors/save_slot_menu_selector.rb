@@ -22,7 +22,7 @@ class SaveSlotMenuSelector
     SaveSlot
   end
 
-  def elements
+  def elements(selections)
     (0..@@NUM_SLOTS).collect {|i| save_slot(i)}
   end
   def save_slot(idx)

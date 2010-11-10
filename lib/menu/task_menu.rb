@@ -6,11 +6,11 @@ class TaskMenu
     @actions = actions
   end
 
-  def elements
+  def elements(selections)
     @actions
   end
   def element_at(idx, selections)
-    elements[idx]
+    elements(selections)[idx]
   end
   def size(selections=nil)
     @actions.size
@@ -29,7 +29,7 @@ class TaskMenu
   end
 
   def element_names(selections)
-    elements.collect {|el| el.name }
+    elements(selections).collect {|el| el.name }
   end
 
   def navigate_path(path)

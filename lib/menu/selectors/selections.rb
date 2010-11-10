@@ -29,17 +29,17 @@ class Selections
     found.empty? ? nil : found.first
   end
 
-  def selected_party_member
-    found = search_selected_for(Hero)
-    sel = "party member"
-    raise "Required selection of #{sel} not performed" if found.nil?
+  def get_selected_type(type, msg)
+    found = search_selected_for(type)
+    raise "Required selection of #{msg} not performed" if found.nil?
     found
   end
+
+  def selected_party_member
+    get_selected_type(Hero, "party member")
+  end
   def selected_inventory_item
-    found = search_selected_for(InventoryItem)
-    sel = "inventory item"
-    raise "Required selection of #{sel} not performed" if found.nil?
-    found
+    get_selected_type(InventoryItem, "inventory item")
   end
 
   def drop_last

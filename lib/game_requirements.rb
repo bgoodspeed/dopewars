@@ -60,10 +60,12 @@ require 'lib/traits/character_attribution'
 require 'lib/items/item_attributes'
 require 'lib/items/item_state'
 require 'lib/items/game_item'
+require 'lib/items/equipment/equipment_info'
 require 'lib/items/equipment/equippable_game_item'
 require 'lib/items/equipment/equipment_holder'
 
 
+require 'lib/factories/character_attribution_factory'
 require 'lib/factories/music_factory'
 require 'lib/factories/surface_factory'
 require 'lib/factories/monster_factory'

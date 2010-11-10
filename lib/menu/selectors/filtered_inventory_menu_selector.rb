@@ -2,6 +2,7 @@
 # and open the template in the editor.
 
 class FilteredInventoryMenuSelector
+  include DrawableElementMenuSelectorHelper
   attr_accessor :menu_item
   def initialize(game)
     @game = game
@@ -22,7 +23,7 @@ class FilteredInventoryMenuSelector
     elements(selections).size
   end
 
-  def elements(selected=[])
+  def elements(selected)
     filter(@game.inventory_info, selected)
   end
 
@@ -30,15 +31,5 @@ class FilteredInventoryMenuSelector
     rv = elements[idx]
     rv
   end
-
-  alias_method :element_at, :select_element_at
-
-  def draw(config, text_rendering_helper, currently_selected)
-
-    member_names = elements(currently_selected).collect {|m| m.name}
-    text_rendering_helper.render_lines_to_layer( member_names, config)
-  end
-
-
 
  end

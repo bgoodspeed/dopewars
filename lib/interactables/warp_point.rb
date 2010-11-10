@@ -13,13 +13,14 @@ class WarpPoint
     @destination_y = dest_y
   end
 
+  #TODO this should invoke a game process
   def activate(game, player, worldstate, tilex, tiley)
-    uni = player.universe
-    player.universe.fade_out_bg_music
-    player.universe.play_sound_effect(SoundEffect::WARP)
+    uni = game.universe
+    uni.fade_out_bg_music
+    uni.play_sound_effect(SoundEffect::WARP)
     player.set_position(@destination_x, @destination_y)
     uni.set_current_world_by_index(@destination)
-    player.universe.fade_in_bg_music
+    uni.fade_in_bg_music
   end
   include JsonHelper
   def json_params

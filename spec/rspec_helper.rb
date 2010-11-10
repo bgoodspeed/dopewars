@@ -14,18 +14,131 @@ module MockeryHelp
   end
 end
 
+module MethodDefinitionMatchers
+  class MethodDefinedMatcher
+    def initialize(name)
+      @name = name
+    end
 
+    def matches?(other)
+      @other = other
+      other.respond_to?(@name)
+    end
+
+    def failure_message
+      "Expected #{@other} to define #{@name}"
+    end
+
+  end
+
+  def define(method_name)
+    MethodDefinedMatcher.new(method_name)
+  end
+
+end
 
 module DomainMocks
+
+  def mock_attributes
+    m = mock("attributes")
+    m
+  end
+
   def named_mock(name)
     m = mock("named mock: #{name}")
     m.stub!(:name).and_return name
     m
   end
 
+  def mock_event
+    m = mock("event")
+
+    m
+  end
+
+  def mock_wrapper
+    m = mock("surface wrapper")
+    m.stub!(:tile_x).and_return 0
+    m.stub!(:tile_y).and_return 0
+    m
+  end
+
+  def mock_screen
+    m = mock("screen")
+    m.stub!(:w).and_return 640
+    m.stub!(:h).and_return 480
+    m
+  end
+
+  def mock_hero
+    h = mock("hero")
+    h
+  end
+
+  def expect_readiness_consumed(m)
+    m.should_receive(:consume_readiness)
+  end
+
+  def expect_item_consumed(hero, item)
+    hero.should_receive(:consume_item).with(item)
+  end
+
+
+  def expect_world_change(uni)
+    uni.should_receive(:set_current_world_by_index)
+  end
+
+  def expect_fades_out_bg_music(uni)
+    uni.should_receive(:fade_out_bg_music)
+  end
+
+  def expect_fades_in_bg_music(uni)
+    uni.should_receive(:fade_in_bg_music)
+  end
+
+  def expect_sound_effect(uni, effect)
+    uni.should_receive(:play_sound_effect).with(effect)
+
+  end
+
+  def expect_interaction_update(world)
+    world.should_receive(:update_interaction_map)
+  end
+
+  def expect_notification(world)
+    world.should_receive(:add_notification)
+  end
+
+  def expect_inventory_added(p)
+    p.should_receive(:add_inventory)
+  end
+
+  def expect_warp_sound_effect(uni)
+    expect_sound_effect(uni, "warp")
+  end
+
+  def expect_treasure_sound_effect(uni)
+    expect_sound_effect(uni, "treasure")
+  end
+
+  def expect_player_position_set(p)
+    p.should_receive(:set_position)
+  end
+
+
+  def mock_world_weapon
+    m = mock("world weapon")
+    
+    m
+  end
+
   def mock_player
     m = mock("player")
     m.stub!(:party).and_return mock_party
+    m.stub!(:world_weapon).and_return mock_world_weapon
+    m.stub!(:px).and_return 1122
+    m.stub!(:py).and_return 3344
+    m.stub!(:facing).and_return :down
     m
   end
 
@@ -55,7 +168,14 @@ module DomainMocks
     m
   end
 
+  #TODO update all these mocks so that they auto-verify their mocked classes
+  #TODO ie mock_class(ClassName) -> mock("class name"), needs a fully constructed
+  #TODO instance to compare to and run "respond_to?" for all mocked symbols
+  def mock_interaction_helper
+    m = mock("interaction helper")
 
+    m
+  end
 
   def monster(player, universe)
     MonsterFactory.new.make_monster(player, universe)
@@ -115,8 +235,8 @@ module MenuSelectorMatchers
   class MenuSelectorMatcher
     def matches?(target)
       @target = target
-      props = [ target.size.kind_of?(Numeric) ,
-        target.elements.is_a?(Array),
+      props = [ target.size(nil).kind_of?(Numeric) ,
+        target.elements(nil).is_a?(Array),
         target.selection_type.is_a?(Class) ]
 
       failures = props.select {|prop| !prop}

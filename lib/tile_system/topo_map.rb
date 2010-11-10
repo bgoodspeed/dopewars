@@ -2,6 +2,8 @@
 # and open the template in the editor.
 
 class TopoMap
+
+  attr_reader :world_x, :world_y
   def initialize(x,y, world_x, world_y, data)
     @x = x
     @y = y

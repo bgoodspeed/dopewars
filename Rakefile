@@ -67,6 +67,58 @@ RCov::VerifyTask.new(:verify_rcov => 'examples_with_rcov') do |t|
   t.index_html = 'coverage/index.html'
 end
 
+require 'roodi'
+require 'roodi_task'
+desc "Analyze for code best practices"
+RoodiTask.new 'verify_roodi', ['lib/**/*.rb']
+
+
+require 'reek'
+require 'reek/rake/task'
+
+desc "Analyze for code smells"
+Reek::Rake::Task.new(:verify_reek) do |t|
+  t.fail_on_error = true
+end
+
+require 'flog'
+desc "Analyze for code complexity"
+task :verify_flog do
+  flog = Flog.new
+  files = Flog.expand_dirs_to_files(['lib'])
+  files_to_ignore = ["lib/game_requirements.rb"]
+  files -= files_to_ignore
+  threshold = 40
+
+  flog.flog(*files)
+  
+  bad_methods = flog.totals.select do |name, score|
+    score > threshold
+  end
+  bad_methods.sort { |a,b| a[1] <=> b[1] }.each do |name, score|
+    puts "%8.1f: %s" % [score, name]
+  end
+
+  raise "#{bad_methods.size} methods have a flog complexity > #{threshold}" unless bad_methods.empty?
+end
+
+require 'flay'
+
+desc "Analyze for code duplication"
+task :verify_flay do
+  threshold = 20
+  flay = Flay.new({:fuzzy => false, :verbose => false, :mass => threshold})
+  files = Flay.expand_dirs_to_files(['lib'])
+  puts "got files: #{files.join(',')}"
+  flay.process(*files)
+
+  flay.report
+
+  raise "#{flay.masses.size} chunks of code have a duplicate mass > #{threshold}" unless flay.masses.empty?
+end
+
+task :verify => [:verify_rcov, :verify_flay, :verify_flog, :verify_reek, :verify_roodi ]
+
 require 'cucumber'
 require 'cucumber/rake/task'
 

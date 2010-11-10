@@ -13,10 +13,10 @@ class MissionMenuSelector
   end
 
   def size(selections=nil)
-    elements.size
+    elements(selections).size
   end
 
-  def elements
+  def elements(selections)
     @game.player_missions
   end
 

@@ -9,6 +9,8 @@ class StatLine
 end
 
 class StatLineMenuSelector
+
+  include DrawableElementMenuSelectorHelper
   attr_accessor :menu_item
 
   def initialize(game)
@@ -32,15 +34,8 @@ class StatLineMenuSelector
   end
 
   def select_element_at(idx, selections)
-    raise "fucking hell" if idx.nil?
     elements(selections)[idx]
   end
 
-  alias_method :element_at, :select_element_at
-
-  def draw(config, text_rendering_helper, selections)
-    member_names = elements(selections).collect {|m| m.name}
-    text_rendering_helper.render_lines_to_layer( member_names, config)
-  end
 
 end

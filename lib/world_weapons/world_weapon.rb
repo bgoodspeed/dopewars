@@ -1,6 +1,6 @@
 class WorldWeapon
 
-  attr_reader :ticks
+  attr_reader :ticks, :max_ticks
   def initialize(pallette, max_ticks=25)
     @pallette = pallette
     @ticks = 0

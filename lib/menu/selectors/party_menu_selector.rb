@@ -12,10 +12,10 @@ class PartyMenuSelector
   end
 
   def size(selections=nil)
-    elements.size
+    elements(selections).size
   end
 
-  def elements
+  def elements(selections)
     @game.party_members
   end
 

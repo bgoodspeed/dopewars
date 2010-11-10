@@ -21,7 +21,7 @@ describe PartyMenuSelector do
     @menu_selector.size.should be_a_kind_of Numeric
   end
   it "meets the criteria of a menu selector -- elements" do
-    @menu_selector.elements.should be_an_instance_of Array
+    @menu_selector.elements(nil).should be_an_instance_of Array
   end
   
   it "meets the criteria of a menu selector -- selection type" do

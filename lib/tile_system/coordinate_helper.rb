@@ -198,21 +198,17 @@ class CoordinateHelper
       npc.is_blocking?
     end
   end
-  def x_hits(npcs)
+
+  
+
+  def hits(npcs)
     npcs.select do |npc|
-      npc.collides_on_x?(base_x) or npc.collides_on_x?(max_x)
+      (npc.collides_on_x?(base_x) or npc.collides_on_x?(max_x)) and
+       (npc.collides_on_y?(base_y) or npc.collides_on_y?(max_y))
     end
   end
-  def y_hits(npcs)
-    npcs.select do |npc|
-      npc.collides_on_y?(base_y) or npc.collides_on_y?(max_y)
-    end
-  end
-  def hit_blocking_npcs_on_x(npcs)
-    blocking(y_hits(x_hits(npcs)))
-  end
-  def hit_blocking_npcs_on_y(npcs)
-    blocking(y_hits(x_hits(npcs)))
+  def hit_blocking_npcs(npcs)
+    blocking(hits(npcs))
   end
 
 
@@ -220,25 +216,44 @@ class CoordinateHelper
     @universe.current_world.npcs
   end
 
+  def topo
+    @universe.current_world.topo_interpreter
+  end
+
+  def interaction
+    @universe.current_world.interaction_interpreter
+  end
+
+
+  def check_collisions(c)
+    !c.empty?
+  end
+  def check_axis(collisions, axis)
+    if axis == :x
+      c1 = clamp_to_tile_restrictions_on_x(topo, world_coords)
+      c2 = clamp_to_tile_restrictions_on_x(interaction, interact_coords)
+    else
+      c1 = clamp_to_tile_restrictions_on_y(topo, world_coords)
+      c2 = clamp_to_tile_restrictions_on_y(interaction, interact_coords)
+    end
+    c1 or c2 or check_collisions(collisions)
+  end
+
+
   def update_pos( dt, who=nil )
     dx = @vx * dt
     dy = @vy * dt
 
     @px += dx
-    x_collisions = hit_blocking_npcs_on_x(candidate_npcs(who))
+    x_collisions = hit_blocking_npcs(candidate_npcs(who))
     @py += dy
-    y_collisions = hit_blocking_npcs_on_x(candidate_npcs(who)) - x_collisions
+    y_collisions = hit_blocking_npcs(candidate_npcs(who)) - x_collisions
     clamp_to_world_dimensions
 
-    topo = @universe.current_world.topo_interpreter
-    interact = @universe.current_world.interaction_interpreter
-    new_bg_tile_coords = world_coords
-    new_interaction_tile_coords = interact_coords
+    @px -= dx if check_axis(x_collisions, :x)
+    @py -= dy if check_axis(y_collisions, :y)
 
-    @px -= dx if clamp_to_tile_restrictions_on_x(topo, new_bg_tile_coords) or clamp_to_tile_restrictions_on_x(interact, new_interaction_tile_coords) or !x_collisions.empty?
-    @py -= dy if clamp_to_tile_restrictions_on_y(topo, new_bg_tile_coords) or clamp_to_tile_restrictions_on_y(interact, new_interaction_tile_coords) or !y_collisions.empty?
-
-    cols = y_hits(x_hits(candidate_npcs(who)))
+    cols = hits(candidate_npcs(who))
     handle_collision(cols) unless cols.empty?
     update_tile_coords
   end

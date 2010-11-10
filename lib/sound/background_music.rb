@@ -1,5 +1,6 @@
 
 class BackgroundMusic
+  attr_reader :music
   def initialize(filename, music_factory=MusicFactory.new)
     @filename = filename
     @music = music_factory.load_music(filename)

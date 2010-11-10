@@ -50,9 +50,7 @@ class GameInternalsFactory
   end
 
   def make_attribution
-    CharacterAttribution.new(
-        CharacterState.new(CharacterAttributes.new(5, 5, 1, 0, 0, 0, 0, 0)),
-        EquipmentHolder.new)
+    CharacterAttributionFactory.new.make_attribution
   end
 
   def make_hero(name, weapon, default_start_pts=@@HERO_START_BATTLE_PTS, default_rate=@@HERO_BATTLE_PTS_RATE, attr=make_attribution)
@@ -80,9 +78,14 @@ class GameInternalsFactory
     player
     # Make event hook to pass all events to @player#handle().
   end
+
+  def make_world(bg_filename, inter_filename, pal, inter_pal, bgm)
+    WorldStateFactory.build_world_state(bg_filename,inter_filename, pal, inter_pal, @@BGX, @@BGY, [], bgm)
+  end
+
   def make_world1
     bgm = BackgroundMusic.new("bonobo-time_is_the_enemy.mp3")
-    WorldStateFactory.build_world_state("world1_bg","world1_interaction", pallette, interaction_pallette, @@BGX, @@BGY, [], bgm)
+    make_world("world1_bg","world1_interaction", pallette, interaction_pallette,bgm)
   end
 
   def make_monster(player,universe)
@@ -100,10 +103,10 @@ class GameInternalsFactory
   end
 
   def make_world2
-    WorldStateFactory.build_world_state("world2_bg","world2_interaction", pallette_160,  interaction_pallette_160, @@BGX, @@BGY, [], BackgroundMusic.new("bonobo-gypsy.mp3"))
+    make_world("world2_bg","world2_interaction", pallette_160,  interaction_pallette_160, BackgroundMusic.new("bonobo-gypsy.mp3"))
   end
   def make_world3
-    WorldStateFactory.build_world_state("world3_bg","world3_interaction", pallette,  interaction_pallette, @@BGX, @@BGY, [], BackgroundMusic.new("bonobo-gypsy.mp3"))
+    make_world("world3_bg","world3_interaction", pallette,  interaction_pallette,BackgroundMusic.new("bonobo-gypsy.mp3"))
   end
 
   def make_event_hooks(game, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks, battle_layer_hooks, player_hooks, npc_hooks)
