@@ -1,6 +1,7 @@
 
 class Game
-  attr_accessor :player, :universe, :screen
+  attr_accessor :player, :universe, :screen, :event_system, :event_handler,
+    :event_manager, :hud
 
   def key_press_hooks(*pairs)
     pairs.collect{|pair| key_press_hook(pair[0], pair[1])}
@@ -18,8 +19,8 @@ class Game
     key_press_hooks([:left, left], [:down, down], [:right, right], [:up, up], [:i, enter], [:b, cancel])
   end
 
-  def initialize()
-    @factory = GameInternalsFactory.new
+  def initialize(factory=GameInternalsFactory.new, trigger_factory = TriggerFactory.new)
+    @factory = factory
     @screen = @factory.make_screen
     
     world1 = @factory.make_world1
@@ -32,7 +33,7 @@ class Game
     world1.add_npc(@factory.make_npc(@player, @universe))
     world1.add_npc(@factory.make_monster(@player, @universe))
     @hud = @factory.make_hud(@screen, @player, @universe)
-    @trigger_factory = TriggerFactory.new
+    @trigger_factory = trigger_factory
 
     #TODO FIXMENOW TODOFIXMENOW 
 #    QuitRequestedFacade.quit_request_type => :quit, #TODO i'd rather not see direct references to facade objects, hide in a factory
@@ -65,6 +66,7 @@ class Game
     }
 
     @event_handler = @trigger_factory.make_event_handler
+    @event_manager = @factory.make_event_manager
     @event_system = @factory.make_event_system(self, always_on_keymap, menu_killed_hooks, menu_active_hooks, battle_hooks, battle_layer_hooks, player_hooks, npc_hooks)
 
 #    @event_helper = @factory.make_event_hooks(self, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
@@ -166,10 +168,10 @@ class Game
   end
 
   def toggle_battle_hooks(in_battle=false)
-    EventManager.new.swap_event_sets(self, in_battle, non_battle_hooks, battle_hooks)
+    @event_manager.swap_event_sets(self, in_battle, non_battle_hooks, battle_hooks)
   end
   def toggle_menu
-    EventManager.new.swap_event_sets(self, menu_layer.active?, non_menu_hooks, menu_hooks)
+    @event_manager.swap_event_sets(self, menu_layer.active?, non_menu_hooks, menu_hooks)
     menu_layer.toggle_activity
     unless menu_layer.active?
       menu_layer.reset_indices
@@ -184,7 +186,6 @@ class Game
     @event_system.queue << KeyPressedFacade.new(k) #TODO don't have references to the facades leak outside factories
   end
 
-  private
   def menu_enter(event)
     menu_layer.enter_current_cursor_location(self)
   end
@@ -192,7 +193,7 @@ class Game
     menu_layer.enter_current_cursor_location(self)
   end
   def battle_up
-    @universe.battle_layer.enter_current_cursor_location(self)
+    battle_layer.enter_current_cursor_location(self)
   end
   def battle_confirm
     battle_layer.enter_current_cursor_location(self)
@@ -201,7 +202,7 @@ class Game
     #TODO this does not work, find a different way to dump screen data
     #@screen.savebmp("screenshot.bmp")
 
-    SDL.SaveBMP_RW("screenshot.bmp",@screen, 0)
+    #SDL.SaveBMP_RW("screenshot.bmp",@screen, 0)
   end
 
   def step

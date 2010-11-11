@@ -5,7 +5,7 @@ class BattleLayer < AbstractLayer
   def_delegators :@battle, :participants, :current_battle_participant_offset
   def_delegators :@game, :inventory
   attr_reader :battle, :text_rendering_helper
-  
+  attr_accessor :cursor_helper, :menu, :layer, :battle_hud, :end_menu
   def initialize(screen, game)
     super(screen, screen.w - 50, screen.h - 50)
     @layer.fill(:orange)
@@ -72,17 +72,14 @@ class BattleLayer < AbstractLayer
     mlc
   end
 
-  def menu
-    @menu
-  end
   def draw()
     @layer.fill(:orange)
     if @battle.over?
       if @battle.player_alive?
-        @end_menu.draw(end_battle_menu_layer_config, @game)
+        @end_menu.draw(end_battle_menu_layer_config, @cursor_helper.path, @cursor_helper.currently_selected)
       else
         puts "you died ... game should be over... whatever"
-        @end_menu.draw(end_battle_menu_layer_config, @game)
+        @end_menu.draw(end_battle_menu_layer_config,@cursor_helper.path, @cursor_helper.currently_selected)
       end
     else
       @battle.monster.draw_to(@layer)
@@ -106,13 +103,13 @@ class BattleLayer < AbstractLayer
   def enter_current_cursor_location(e)
     @cursor_helper.activate(menu)
   end
-  def current_selected_menu_entry_name
+  def current_selected_menu_entry_name(e=nil)
     @cursor_helper.current_selected_menu_entry_name(menu)
   end
 
   #TODO might have to rebuild menu here and in there check for the battle being over to deal with
   # having a different end of battle menu
-  def current_menu_entries
+  def current_menu_entries(e=nil)
     @cursor_helper.current_menu_entries(menu)
   end
 

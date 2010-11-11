@@ -1,6 +1,6 @@
 
 class CoordinateHelper
-  attr_accessor :px, :py
+  attr_accessor :px, :py, :ax, :ay, :vx, :vy
 
   def initialize(position, key,universe,  max_speed=400, accel=1200, slowdown=800)
     @hero_x_dim = position.dimension.x

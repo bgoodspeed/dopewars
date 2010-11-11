@@ -10,6 +10,7 @@ class MenuLayer < AbstractLayer
 
   def_delegators :@cursor_helper, :reset_indices
   attr_reader :text_rendering_helper
+  attr_accessor :cursor_helper, :layer
   def initialize(screen, game)
     super(screen, (screen.w) - 2*@@MENU_LAYER_INSET, (screen.h) - 2*@@MENU_LAYER_INSET)
     @layer.fill(:red)
@@ -56,10 +57,10 @@ class MenuLayer < AbstractLayer
   def enter_current_cursor_location(e)
     @cursor_helper.activate(menu)
   end
-  def current_selected_menu_entry_name
+  def current_selected_menu_entry_name(e=nil)
     @cursor_helper.current_selected_menu_entry_name(menu)
   end
-  def current_menu_entries
+  def current_menu_entries(e=nil)
     @cursor_helper.current_menu_entries(menu)
   end
 
