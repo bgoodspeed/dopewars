@@ -3,10 +3,11 @@ require 'spec/rspec_helper'
 
 describe SdlCoordinate do
   before(:each) do
-    @sdl_coordinate = SdlCoordinate.new
+    @coordinate = SdlCoordinate.new(:x, :y)
   end
 
-  it "should be described" do
-    fail
+  it "should be define x and y" do
+    @coordinate.x.should == :x
+    @coordinate.y.should == :y
   end
 end

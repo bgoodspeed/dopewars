@@ -3,10 +3,10 @@ require 'spec/rspec_helper'
 
 describe BattleReadyPartyMenuSelector do
   before(:each) do
-    @battle_ready_party_menu_selector = BattleReadyPartyMenuSelector.new
+    @selector = BattleReadyPartyMenuSelector.new(@game)
   end
 
   it "should be described" do
-    fail
+    #TODO not done yet
   end
 end

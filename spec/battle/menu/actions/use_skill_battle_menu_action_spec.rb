@@ -3,10 +3,11 @@ require 'spec/rspec_helper'
 
 describe UseSkillBattleMenuAction do
   before(:each) do
-    @use_skill_battle_menu_action = UseSkillBattleMenuAction.new
+    @action = UseSkillBattleMenuAction.new(@game)
   end
 
   it "should be described" do
-    fail
+    klasses = @action.dependencies.collect {|dep| dep.class}
+    klasses.should == [BattleReadyPartyMenuSelector, BattleSkillMenuSelector, BattleTargetsMenuSelector]
   end
 end

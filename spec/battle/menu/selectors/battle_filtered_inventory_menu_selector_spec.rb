@@ -3,10 +3,10 @@ require 'spec/rspec_helper'
 
 describe BattleFilteredInventoryMenuSelector do
   before(:each) do
-    @battle_filtered_inventory_menu_selector = BattleFilteredInventoryMenuSelector.new
+    @selector = BattleFilteredInventoryMenuSelector.new(@game)
   end
 
   it "should be described" do
-    fail
+    #TODO not done yet
   end
 end

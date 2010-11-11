@@ -2,11 +2,16 @@
 require 'spec/rspec_helper'
 
 describe ItemReward do
+  include DomainMocks
+
+
   before(:each) do
-    @item_reward = ItemReward.new
+    @game = mock_game
+    @item = mock_item
+    @reward = ItemReward.new(@game, @item)
   end
 
   it "should be described" do
-    fail
+    #TODO unimplemented
   end
 end

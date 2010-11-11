@@ -3,10 +3,10 @@ require 'spec/rspec_helper'
 
 describe Party do
   before(:each) do
-    @party = Party.new
+    @party = Party.new([@hero1, @hero2], @inventory)
   end
 
-  it "should be described" do
-    fail
+  it "should have a leader" do
+    @party.leader.should == @hero1
   end
 end

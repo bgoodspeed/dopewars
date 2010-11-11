@@ -1,5 +1,7 @@
 
 class KeyHolder
+
+  attr_reader :keys
   def initialize
     @keys = []
     @ttl_map = {}

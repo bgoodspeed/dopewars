@@ -3,9 +3,7 @@
 
 class FleeBattleMenuAction < BattleMenuAction
   def initialize(game)
-    super(game, "Flee",[
-      BattleReadyPartyMenuSelector.new(game)
-    ])
+    super(game, "Flee",[])
   end
       
   

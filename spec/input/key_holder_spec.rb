@@ -6,7 +6,13 @@ describe KeyHolder do
     @key_holder = KeyHolder.new
   end
 
-  it "should be described" do
-    fail
+  it "should start empty" do
+    @key_holder.keys.should == []
+  end
+  it "should add and delete keys" do
+    @key_holder.add_key(:monkey)
+    @key_holder.keys.should == [:monkey]
+    @key_holder.delete_key(:monkey)
+    @key_holder.keys.should == []
   end
 end

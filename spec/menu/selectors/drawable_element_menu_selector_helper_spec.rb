@@ -1,12 +1,18 @@
 
 require 'spec/rspec_helper'
 
+class FakeDrawable
+  include DrawableElementMenuSelectorHelper
+end
+
 describe DrawableElementMenuSelectorHelper do
+  include MethodDefinitionMatchers
+  
   before(:each) do
-    @drawable_element_menu_selector_helper = DrawableElementMenuSelectorHelper.new
+    @helper = FakeDrawable.new
   end
 
-  it "should be described" do
-    fail
+  it "should give draw methods" do
+    @helper.should define(:draw)
   end
 end

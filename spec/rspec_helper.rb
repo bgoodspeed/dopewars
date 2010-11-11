@@ -55,7 +55,10 @@ module DomainMocks
 
     m
   end
-
+  def mock_item
+    m = mock("item")
+    m
+  end
   def mock_wrapper
     m = mock("surface wrapper")
     m.stub!(:tile_x).and_return 0
@@ -144,20 +147,31 @@ module DomainMocks
 
   def mock_layer
     m = mock("layer")
+    m.stub!(:active=)
+    m.stub!(:active).and_return false
     m
   end
 
+  def mock_interpreter
+    m = mock("interpreter")
+    m.stub!(:interpret)
+    m.stub!(:top_side).and_return 3
+    m
+  end
   def mock_world
     m = mock("world")
+    m.stub!(:npcs).and_return []
     m.stub!(:x_offset_for_world).and_return 42
     m.stub!(:y_offset_for_world).and_return 69
     m.stub!(:x_offset_for_interaction).and_return 42
     m.stub!(:y_offset_for_interaction).and_return 69
+    m.stub!(:interaction_interpreter).and_return mock_interpreter
     m
   end
 
   def mock_universe
     m = mock("universe")
+    m.stub!(:dialog_layer).and_return mock_layer
     m.stub!(:current_world).and_return mock_world
     m.stub!(:x_offset_for_world).and_return 42
     m.stub!(:y_offset_for_world).and_return 69

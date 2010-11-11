@@ -99,7 +99,6 @@ require 'lib/menu/task_menu'
 
 require 'lib/menu/selectors/selections'
 require 'lib/menu/selectors/drawable_element_menu_selector_helper'
-require 'lib/menu/selectors/static_menu_selector'
 require 'lib/menu/selectors/equipment_slot_menu_selector'
 require 'lib/menu/selectors/filtered_inventory_menu_selector'
 require 'lib/menu/selectors/inventory_filter_menu_selector'

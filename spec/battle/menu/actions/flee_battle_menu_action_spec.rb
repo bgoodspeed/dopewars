@@ -3,10 +3,11 @@ require 'spec/rspec_helper'
 
 describe FleeBattleMenuAction do
   before(:each) do
-    @flee_battle_menu_action = FleeBattleMenuAction.new
+    @action = FleeBattleMenuAction.new(@game)
   end
 
   it "should be described" do
-    fail
+    klasses = @action.dependencies.collect {|dep| dep.class}
+    klasses.should == [BattleReadyPartyMenuSelector, BattleTargetsMenuSelector]
   end
 end

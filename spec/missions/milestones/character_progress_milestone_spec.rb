@@ -3,10 +3,10 @@ require 'spec/rspec_helper'
 
 describe CharacterProgressMilestone do
   before(:each) do
-    @character_progress_milestone = CharacterProgressMilestone.new
+    @milestone = CharacterProgressMilestone.new(@game, 34)
   end
 
   it "should be described" do
-    fail
+    #TODO not yet implemented
   end
 end

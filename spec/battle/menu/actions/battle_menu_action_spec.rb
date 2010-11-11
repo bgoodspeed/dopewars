@@ -3,10 +3,11 @@ require 'spec/rspec_helper'
 
 describe BattleMenuAction do
   before(:each) do
-    @battle_menu_action = BattleMenuAction.new
+    @action = BattleMenuAction.new(@game, "battlename", [])
   end
 
-  it "should be described" do
-    fail
+  it "should add selector deps implicitly" do
+    klasses = @action.dependencies.collect {|dep| dep.class}
+    klasses.should == [BattleReadyPartyMenuSelector,  BattleTargetsMenuSelector]
   end
 end
