@@ -84,7 +84,9 @@ module DomainExpectations
   def expect_world_change(uni)
     uni.should_receive(:set_current_world_by_index)
   end
-
+  def expect_replace_pallette(m)
+    m.should_receive(:replace_pallette)
+  end
   def expect_fades_out_bg_music(uni)
     uni.should_receive(:fade_out_bg_music)
   end
@@ -176,7 +178,14 @@ module DomainExpectations
   def expect_event_handled(m)
     m.should_receive(:handle)
   end
+  def expect_blit_foreground(m)
+    m.should_receive(:blit_foreground)
+  end
 
+  def expect_nearby_and_drawn(m)
+    m.should_receive(:nearby?).and_return true
+    m.should_receive(:draw)
+  end
   def expect_enter_current_cursor_location(m)
     m.should_receive(:enter_current_cursor_location)
   end

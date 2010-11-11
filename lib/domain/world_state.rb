@@ -1,6 +1,6 @@
 
 class WorldState
-  attr_reader :topo_interpreter, :interaction_interpreter,:npcs, :background_surface, :background_music
+  attr_accessor :topo_interpreter, :interaction_interpreter,:npcs, :background_surface, :background_music
 
   extend Forwardable
   def_delegator :@topo_interpreter, :update, :update_topo_map
@@ -55,7 +55,6 @@ class WorldState
       npc.draw(screen, player.px, player.py, sx, sy) if npc.nearby?(player.px, player.py, ext_x, ext_y)
     }
   end
-
 
   def replace_bgsurface(orig_world)
     @background_surface = orig_world.background_surface
