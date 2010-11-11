@@ -22,43 +22,9 @@ class Hero
     @world_weapon = world_weapon
   end
 
+  include JsonHelper
 
-  def free_inventory_slots
-    @inventory.free_slots
-  end
-
-  def earn(amount)
-    @money += amount
-  end
-
-  def spend(amount)
-    raise InsufficientMoneyException if amount > @money
-    @money -= amount
-  end
-
-  def quantity_of(drug)
-    @inventory.quantity_of(drug)
-  end
-
-  
-
-  def acquire_drug(drug, quantity)
-    @inventory.add_item(quantity, drug)
-  end
-
-  def remove_drug(drug, quantity)
-    @inventory.remove_item(quantity, drug)
-  end
-
-  alias_method :add_item, :acquire_drug
-
-  def to_json(*a)
-     {
-      'json_class' => self.class.name,
-      'data' => [ @name, @readiness_helper.starting_points, @readiness_helper.growth_rate, @character_attribution ]
-    }.to_json(*a)
-  end
-  def self.json_create(o)
-    new(*o['data'])
+  def json_params
+    [@name, @world_weapon, @readiness_helper.starting_points, @readiness_helper.growth_rate, @character_attribution]
   end
 end

@@ -5,7 +5,7 @@ class SBPResult < ISBPResult
   end
 
   def is_blocking?
-    @actionable
+    @actionable.is_blocking?
   end
 
 end

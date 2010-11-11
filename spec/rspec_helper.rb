@@ -78,7 +78,9 @@ module DomainExpectations
     hero.should_receive(:consume_item).with(item)
   end
 
-
+  def expect_set_frame_from(m, key)
+    m.should_receive(:set_frame_from).with(key)
+  end
   def expect_world_change(uni)
     uni.should_receive(:set_current_world_by_index)
   end
@@ -93,7 +95,41 @@ module DomainExpectations
 
   def expect_sound_effect(uni, effect)
     uni.should_receive(:play_sound_effect).with(effect)
+  end
+  def expect_set_timed_keypress(m, key, v)
+    m.should_receive(:set_timed_keypress).with(key, v)
+  end
 
+  def expect_replace_bgmusic(m)
+    m.should_receive(:replace_bgmusic)
+  end
+  def expect_replace_bgsurface(m)
+    m.should_receive(:replace_bgsurface)
+  end
+  def expect_replace_pallettes(m)
+    m.should_receive(:replace_pallettes)
+  end
+
+  def expect_reblit_background(m)
+    m.should_receive(:reblit_background)
+  end
+  def expect_set_timed_keypress_in_ms(m, key, v)
+    m.should_receive(:set_timed_keypress_in_ms).with(key, v)
+  end
+  def expect_set_position(m,x,y)
+    m.should_receive(:px=).with(x)
+    m.should_receive(:py=).with(y)
+  end
+
+  def expect_add_key(m, key)
+    m.should_receive(:add_key).with(key)
+  end
+  def expect_delete_key(m, key)
+    m.should_receive(:delete_key).with(key)
+  end
+
+  def expect_replace_avatar(m)
+    m.should_receive(:replace_avatar)
   end
 
   def expect_interaction_update(world)
@@ -128,6 +164,9 @@ module DomainExpectations
   end
   def expect_blitted(m)
     m.should_receive(:blit)
+  end
+  def expect_current_battle_participant_offset(m, posn)
+    m.should_receive(:current_battle_participant_offset).with(posn).and_return :expected_offset
   end
 
   def expect_draw_weapon(m)
@@ -172,11 +211,29 @@ module DomainExpectations
     m.should_receive(:make_hud).and_return v
   end
 
+  def expect_rotozoom(m)
+    m.should_receive(:rotozoom).and_return m
+  end
+  def expect_colorkey_set(m)
+    m.should_receive(:get_at).with(0,0).and_return :foo
+    m.should_receive(:colorkey=).with(:foo)
+  end
+
   def expect_start_battle(m, game, monster)
     m.should_receive(:start_battle).with(game, monster)
   end
   def expect_keys_cleared(m)
     m.should_receive(:clear_keys)
+  end
+
+  def expect_fade_out(m)
+    m.should_receive(:fade_out)
+  end
+  def expect_pause(m)
+    m.should_receive(:pause)
+  end
+  def expect_play(m)
+    m.should_receive(:play)
   end
 
 end
@@ -210,6 +267,10 @@ module DomainStubs
     m.stub!(:hooks).and_return hooks
   end
 
+  def stub_music_playing(m, rv=true)
+    m.stub!(:playing?).and_return rv
+  end
+
 end
 
 module DomainMocks
@@ -230,6 +291,13 @@ module DomainMocks
     m
   end
 
+  def mock_surface
+    m = mock("surface")
+    m.stub!(:surface).and_return m
+    m.stub!(:w).and_return 240
+    m.stub!(:h).and_return 110
+    m
+  end
   def mock_trigger_factory
     m = mock("trigger_factory")
     m.stub!(:make_key_press_event_hook).and_return mock_event_hook
@@ -315,9 +383,10 @@ module DomainMocks
     m
   end
 
-  def mock_event
+  def mock_event(key=:left, secs=0.02)
     m = mock("event")
-    m.stub!(:seconds).and_return 0.02
+    m.stub!(:seconds).and_return secs
+    m.stub!(:key).and_return key
     m
   end
   def mock_item

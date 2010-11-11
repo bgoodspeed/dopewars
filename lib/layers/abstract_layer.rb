@@ -1,7 +1,7 @@
 
 class AbstractLayer
   include ResourceLoader
-  attr_accessor :active
+  attr_accessor :active, :layer
 
   def initialize(screen, layer_width, layer_height, surface_factory=SurfaceFactory.new)
     @screen = screen

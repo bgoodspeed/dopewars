@@ -1,7 +1,7 @@
 
 class Player
 
-  attr_accessor :universe, :party
+  attr_accessor :universe, :party, :animated_sprite_helper, :coordinate_helper
 
   extend Forwardable
 
@@ -21,7 +21,7 @@ class Player
   def_delegator :@party, :members, :party_members
 
 
-  attr_reader :filename, :hero_x_dim, :hero_y_dim
+  attr_reader :filename, :hero_x_dim, :hero_y_dim, :keys
   def initialize( position,  universe, party, filename, sx, sy, game)
     @game = game
     @universe = universe

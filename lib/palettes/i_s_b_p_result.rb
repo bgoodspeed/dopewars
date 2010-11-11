@@ -3,6 +3,7 @@ class ISBPResult
   include ScreenOffsetHelper
 
   attr_reader :surface
+  attr_accessor :actionable
   def initialize(sdl_surface, actionable, wrapped_surface)
     @surface=  sdl_surface
     @actionable = actionable

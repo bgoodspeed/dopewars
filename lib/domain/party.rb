@@ -13,6 +13,14 @@ class Party
   def collect
     @members.collect {|member| yield member}
   end
+  def earn(amount)
+    @money += amount
+  end
+
+  def spend(amount)
+    raise InsufficientMoneyException if amount > @money
+    @money -= amount
+  end
 
   def leader
     @members.first

@@ -23,15 +23,10 @@ class InventoryItem
     @quantity -= 1
   end
 
-  def to_json(*a)
-   {
-      'json_class' => self.class.name,
-      'data' => [ @quantity, @item ]
-    }.to_json(*a)
 
-  end
-  def self.json_create(o)
-    new(*o['data'])
+  include JsonHelper
+  def json_params
+    [ @quantity, @item ]
   end
 
 end
@@ -98,16 +93,11 @@ class Inventory
     @items[item].quantity
   end
 
-  def to_json(*a)
-   {
-      'json_class' => self.class.name,
-      'data' => [ @max_slots, @items ]
-    }.to_json(*a)
 
+  include JsonHelper
+  def json_params
+    [ @max_slots, @items ]
   end
 
-  def self.json_create(o)
-    new(*o['data'])
-  end
 
 end
