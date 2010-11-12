@@ -19,10 +19,7 @@ class Game
     key_press_hooks([:left, left], [:down, down], [:right, right], [:up, up], [:i, enter], [:b, cancel])
   end
 
-  def initialize(factory=GameInternalsFactory.new, trigger_factory = TriggerFactory.new)
-    @factory = factory
-    @screen = @factory.make_screen
-    
+  def make_domain_data
     world1 = @factory.make_world1
     world2 = @factory.make_world2
     world3 = @factory.make_world3
@@ -32,17 +29,13 @@ class Game
     @player = @factory.make_player(@screen, @universe, self)
     world1.add_npc(@factory.make_npc(@player, @universe))
     world1.add_npc(@factory.make_monster(@player, @universe))
-    @hud = @factory.make_hud(@screen, @player, @universe)
-    @trigger_factory = trigger_factory
+  end
 
-    #TODO FIXMENOW TODOFIXMENOW 
-#    QuitRequestedFacade.quit_request_type => :quit, #TODO i'd rather not see direct references to facade objects, hide in a factory
-
-
-    always_on_keymap = key_press_hooks( [:escape, :quit], [ :q, :quit],
+  def make_hook_and_event_bindings
+        always_on_keymap = key_press_hooks( [:escape, :quit], [ :q, :quit],
         [ :c, :capture_ss], [ :d, :toggle_dialog_layer], [ :m, :toggle_menu], [ :p, :pause]
       )
-    
+
     menu_killed_hooks = key_press_hooks( [ :i, :interact_with_facing],
         [ :space, :use_weapon], [ :b, :toggle_bg_music]
     )
@@ -50,7 +43,7 @@ class Game
     menu_active_hooks = standard_keymap(:menu_left, :menu_down, :menu_right, :menu_up, :menu_enter, :menu_cancel)
     battle_hooks = standard_keymap(:battle_left, :battle_down, :battle_right, :battle_up, :battle_enter, :battle_cancel)
 
-    
+
     battle_layer_hooks = [
       event_hook(battle_layer, :tick, :update)
     ]
@@ -69,10 +62,16 @@ class Game
     @event_manager = @factory.make_event_manager
     @event_system = @factory.make_event_system(self, always_on_keymap, menu_killed_hooks, menu_active_hooks, battle_hooks, battle_layer_hooks, player_hooks, npc_hooks)
 
-#    @event_helper = @factory.make_event_hooks(self, always_on_hooks, menu_killed_hooks, menu_active_hooks, battle_hooks)
-#    @clock = @factory.make_clock
-#    @queue = @factory.make_queue
+  end
 
+  def initialize(factory=GameInternalsFactory.new, trigger_factory = TriggerFactory.new)
+    @factory = factory
+    @screen = @factory.make_screen
+    make_domain_data
+    @hud = @factory.make_hud(@screen, @player, @universe)
+    @trigger_factory = trigger_factory
+
+    make_hook_and_event_bindings
   end
 
   def go

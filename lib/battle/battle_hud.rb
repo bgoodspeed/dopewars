@@ -11,24 +11,36 @@ class BattleHud
     1.upto(10).collect {|i| i <= r ? :blue : :red }
   end
 
+  def fill_in_sub(s, sub, color, hi, idx, ready_colors)
+    sub.fill(color)
+    sub.blit(s, [hi * 100 + idx * 10, 5])
+    sub.fill(ready_colors[idx])
+    sub.blit(s, [hi * 100 + idx * 10, 25])
+  end
+
+  def health_rates(heroes)
+    heroes.collect {|h| h.hp_ratio * 10}
+  end
+  def ready_rates(heroes)
+    heroes.collect {|h| h.ready_ratio * 10}
+  end
+
+  def build_sub(s,hr,hi,heroes)
+    sub = @surface_factory.make_surface([10, 10])
+    colors = map_to_colors(hr)
+    ready_colors = map_to_colors(ready_rates(heroes)[hi])
+    colors.each_with_index do |color, idx|
+      fill_in_sub(s, sub, color, hi, idx, ready_colors)
+    end
+  end
+
   def draw(menu_layer_config, game, battle)
     heroes = battle.heroes
-    hpr = heroes.collect {|h| h.hp_ratio}
-    health_rates = heroes.collect {|h| h.hp_ratio * 10}
-    ready_rates = heroes.collect {|h| h.ready_ratio * 10}
 
     s = @surface_factory.make_surface([500, 50])
     s.fill(:green)
-    health_rates.each_with_index do |hr, hi|
-      sub = @surface_factory.make_surface([10, 10])
-      colors = map_to_colors(hr)
-      ready_colors = map_to_colors(ready_rates[hi])
-      colors.each_with_index do |color, idx|
-        sub.fill(color)
-        sub.blit(s, [hi * 100 + idx * 10, 5])
-        sub.fill(ready_colors[idx])
-        sub.blit(s, [hi * 100 + idx * 10, 25])
-      end
+    health_rates(heroes).each_with_index do |hr, hi|
+      build_sub(s, hr, hi, heroes)
     end
     s.blit(@screen, [40,400])
 

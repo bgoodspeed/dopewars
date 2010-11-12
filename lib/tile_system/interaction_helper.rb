@@ -40,16 +40,21 @@ class InteractionHelper
     calculate_facing([:left, :right], [:up], tile)
   end
 
+  def abs_dist(a,b)
+    (a - b).abs
+  end
+
   def facing_tile_distance_for(game, tilex, tiley, px, py)
-    facing_tile_dist = nil
+    interp = game.universe.current_world.interaction_interpreter
+    
     if @facing == :down
-      facing_tile_dist = (game.universe.current_world.interaction_interpreter.top_side(tiley + 1) - py).abs
+      facing_tile_dist = abs_dist(interp.top_side(tiley + 1), py)
     elsif @facing == :up
-      facing_tile_dist = (game.universe.current_world.interaction_interpreter.bottom_side(tiley - 1) - py).abs
+      facing_tile_dist = abs_dist(interp.bottom_side(tiley - 1), py)
     elsif @facing == :left
-      facing_tile_dist = (game.universe.current_world.interaction_interpreter.right_side(tilex - 1) - px).abs
+      facing_tile_dist = abs_dist(interp.right_side(tilex - 1), px)
     else
-      facing_tile_dist = (game.universe.current_world.interaction_interpreter.left_side(tilex + 1) - px).abs
+      facing_tile_dist = abs_dist(interp.left_side(tilex + 1), px)
     end
     facing_tile_dist
   end
@@ -78,17 +83,21 @@ class InteractionHelper
     true
   end
 
-  def interact_with_facing(game, px,py)
-    puts "mapped key to interaction helper"
-    return if attempt_interaction_with_dialog(game.universe.dialog_layer) and @policy.return_after_dialog
 
+  def handle_dialog(game, px, py)
+    attempt_interaction_with_dialog(game.universe.dialog_layer) 
+  end
+  def handle_current_tile(game, px, py)
     tilex = game.universe.current_world.x_offset_for_interaction(px)
     tiley = game.universe.current_world.y_offset_for_interaction(py)
     this_tile_interacts = game.universe.current_world.interaction_interpreter.interpret(tilex, tiley)
     facing_tile_interacts = false
-    
-    return if attempt_interaction_with_tile(game, tilex, tiley, this_tile_interacts) and @policy.return_after_current
 
+    attempt_interaction_with_tile(game, tilex, tiley, this_tile_interacts) 
+  end
+  def handle_facing_tile(game, px, py)
+    tilex = game.universe.current_world.x_offset_for_interaction(px)
+    tiley = game.universe.current_world.y_offset_for_interaction(py)
     facing_tilex = facing_tilex_for(tilex)
     facing_tiley = facing_tiley_for(tiley)
     facing_tile_dist = facing_tile_distance_for(game, tilex, tiley, px, py)
@@ -96,10 +105,19 @@ class InteractionHelper
     facing_tile_interacts = game.universe.current_world.interaction_interpreter.interpret(facing_tilex, facing_tiley)
     facing_tile_close_enough = facing_tile_dist < @@INTERACTION_DISTANCE_THRESHOLD
 
-    return if attempt_interaction_with_facing(game, facing_tilex, facing_tiley, facing_tile_interacts, facing_tile_close_enough) and @policy.return_after_facing
-
+    attempt_interaction_with_facing(game, facing_tilex, facing_tiley, facing_tile_interacts, facing_tile_close_enough) 
+  end
+  
+  def handle_npcs(game, px, py)
     interactable_npcs = game.universe.current_world.npcs.select {|npc| npc.nearby?(px,py, @@INTERACTION_DISTANCE_THRESHOLD, @@INTERACTION_DISTANCE_THRESHOLD)  }
     attempt_interaction_with_npcs(game, interactable_npcs)
+  end
 
+  def interact_with_facing(game, px,py)
+    return if handle_dialog(game, px, py) and @policy.return_after_dialog
+    return if handle_current_tile(game, px, py) and @policy.return_after_current
+    return if handle_facing_tile(game, px, py) and @policy.return_after_facing
+
+    handle_npcs(game, px, py)
   end
 end

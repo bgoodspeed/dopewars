@@ -72,21 +72,33 @@ class BattleLayer < AbstractLayer
     mlc
   end
 
-  def draw()
-    @layer.fill(:orange)
-    if @battle.over?
-      if @battle.player_alive?
-        @end_menu.draw(end_battle_menu_layer_config, @cursor_helper.path, @cursor_helper.currently_selected)
-      else
-        puts "you died ... game should be over... whatever"
-        @end_menu.draw(end_battle_menu_layer_config,@cursor_helper.path, @cursor_helper.currently_selected)
-      end
+  def draw_regular_battle
+    @battle.monster.draw_to(@layer)
+    rebuild_menu
+    menu.draw(menu_layer_config, @cursor_helper.path, @cursor_helper.currently_selected)
+  end
+
+  
+  def draw_battle_over
+    if @battle.player_alive?
+      @end_menu.draw(end_battle_menu_layer_config, @cursor_helper.path, @cursor_helper.currently_selected)
     else
-      @battle.monster.draw_to(@layer)
-      rebuild_menu
-      menu.draw(menu_layer_config, @cursor_helper.path, @cursor_helper.currently_selected)
+      puts "you died ... game should be over... whatever"
+      @end_menu.draw(end_battle_menu_layer_config,@cursor_helper.path, @cursor_helper.currently_selected)
+    end
+  end
+
+  def draw_battle
+    if @battle.over?
+      draw_battle_over
+    else
+      draw_regular_battle
     end
 
+  end
+  def draw()
+    @layer.fill(:orange)
+    draw_battle
     @cursor_helper.draw_at_depth(@layer, menu_layer_config, @game, nil)
     @layer.blit(@screen, menu_layer_config.layer_inset_on_screen)
     @battle_hud.draw(menu_layer_config, @game, @battle) unless @battle.over?
