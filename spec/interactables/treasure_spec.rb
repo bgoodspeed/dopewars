@@ -21,4 +21,8 @@ describe Treasure do
     expect_inventory_added(@player)
     @treasure.activate(@game, @player, @world, 11, 22)
   end
+
+  it "should be json ified" do
+    @treasure.json_params.should be_an_instance_of(Array)
+  end
 end

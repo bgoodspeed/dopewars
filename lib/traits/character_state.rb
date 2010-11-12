@@ -1,6 +1,6 @@
 
 class CharacterState
-  attr_accessor :current_hp, :current_mp, :status_effects, :experience, :level_points
+  attr_accessor :current_hp, :current_mp, :status_effects, :experience, :level_points, :attributes
   extend Forwardable
   def_delegators :@attributes, :hp, :mp, :add_attributes
   def initialize(attributes, exp=nil, chp=nil, cmp=nil, statii=nil, lvp=nil)

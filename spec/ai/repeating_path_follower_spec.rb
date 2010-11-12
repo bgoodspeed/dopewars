@@ -34,5 +34,9 @@ describe RepeatingPathFollower do
     keys.should include(:right)
 
   end
+
+  it "should be json ified" do
+    @repeating_path_follower.json_params.should be_an_instance_of(Array)
+  end
 end
 

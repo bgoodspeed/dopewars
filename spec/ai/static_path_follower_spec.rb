@@ -11,5 +11,9 @@ describe StaticPathFollower do
   it "should do nothing" do
     @static_path_follower.update(nil)
   end
+
+  it "is json ified" do
+    @static_path_follower.json_params.should be_an_instance_of Array
+  end
 end
 

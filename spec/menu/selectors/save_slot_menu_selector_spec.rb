@@ -14,4 +14,8 @@ describe SaveSlotMenuSelector do
     names = elems.collect {|e| e.name }
     names.should == ["Slot 1", "Slot 2", "Slot 3", "Slot 4", "Slot 5", "Slot 6"]
   end
+
+  it "should select save slots" do
+    @selector.selection_type.should == SaveSlot
+  end
 end

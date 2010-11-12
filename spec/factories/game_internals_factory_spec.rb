@@ -88,4 +88,7 @@ describe GameInternalsFactory do
   it "can make the hud" do
     @factory.make_hud(@screen, @player, @universe).should be_an_instance_of(Hud)
   end
+  it "can make the universe" do
+    @factory.make_universe([mock_world], mock("gl"), mock("sfx"), mock_game)
+  end
 end

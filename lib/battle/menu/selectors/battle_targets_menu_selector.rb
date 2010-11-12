@@ -3,7 +3,7 @@
 
 class BattleTargetsMenuSelector
   include DrawableElementMenuSelectorHelper
-
+  
   def initialize(game)
     @game = game
   end

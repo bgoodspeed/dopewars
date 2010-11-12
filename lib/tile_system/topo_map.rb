@@ -85,14 +85,10 @@ class TopoMap
     
   end
 
-  def to_json(*a)
-    {
-      'json_class' => self.class.name,
-      'data' => [  @x, @y, @world_x, @world_y, @data]
-    }.to_json(*a)
-  end
-  def self.json_create(o)
-    new(*o['data'])
+  include JsonHelper
+
+  def json_params
+    [  @x, @y, @world_x, @world_y, @data]
   end
 
 end

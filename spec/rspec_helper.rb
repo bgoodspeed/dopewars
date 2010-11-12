@@ -77,6 +77,22 @@ module DomainExpectations
   def expect_item_consumed(hero, item)
     hero.should_receive(:consume_item).with(item)
   end
+  def expect_weapon_fired_once(m)
+    m.should_receive(:fired_from).with(1122, 3344, :down)
+  end
+
+  def expect_weapon_displayed_once(m)
+    m.should_receive(:displayed)
+  end
+  def expect_weapon_unconsumed(m)
+    m.should_receive(:consumed?).and_return false
+  end
+  def expect_weapon_consumed(m)
+    m.should_receive(:consumed?).and_return true
+  end
+  def expect_die(m)
+    m.should_receive(:die)
+  end
 
   def expect_set_frame_from(m, key)
     m.should_receive(:set_frame_from).with(key)
@@ -86,6 +102,10 @@ module DomainExpectations
   end
   def expect_replace_pallette(m)
     m.should_receive(:replace_pallette)
+  end
+  def expect_render(m,surf=mock_surface)
+    m.should_receive(:render).and_return surf
+    surf
   end
   def expect_fades_out_bg_music(uni)
     uni.should_receive(:fade_out_bg_music)
@@ -123,6 +143,23 @@ module DomainExpectations
     m.should_receive(:py=).with(y)
   end
 
+  def expect_update_animation(m)
+    m.should_receive(:update_animation)
+  end
+  def expect_update_accel(m)
+    m.should_receive(:update_accel)
+  end
+
+  def expect_update_vel(m)
+    m.should_receive(:update_vel)
+  end
+  def expect_update_pos(m)
+    m.should_receive(:update_pos)
+  end
+  def expect_update(m)
+    m.should_receive(:update)
+  end
+
   def expect_add_key(m, key)
     m.should_receive(:add_key).with(key)
   end
@@ -152,7 +189,9 @@ module DomainExpectations
   def expect_swap_event_sets(m, game, active)
     m.should_receive(:swap_event_sets).with(game, active, anything, anything)
   end
-
+  def expect_render_lines_to_layer(m)
+    m.should_receive(:render_lines_to_layer)
+  end
   def expect_warp_sound_effect(uni)
     expect_sound_effect(uni, "warp")
   end
@@ -215,11 +254,22 @@ module DomainExpectations
   def expect_hook_removed(m,value)
     m.should_receive(:remove_hook).with(value)
   end
-
+  def expect_add_effects(m)
+    m.should_receive(:add_effects)
+  end
+  def expect_consumed(m)
+    m.should_receive(:consumed)
+  end
   def expect_make_hud(m, v)
     m.should_receive(:make_hud).and_return v
   end
-
+  def expect_add_attributes(m)
+    m.should_receive(:add_attributes)
+  end
+  def expect_subtract_level_points(m)
+    m.should_receive(:subtract_level_points)
+  end
+  
   def expect_rotozoom(m)
     m.should_receive(:rotozoom).and_return m
   end
@@ -245,9 +295,57 @@ module DomainExpectations
     m.should_receive(:play)
   end
 
+
+  def expect_data_query(topo, x,y)
+    topo.should_receive(:data_at).with(x,y).and_return :data_at_x_y
+    :data_at_x_y
+  end
+  def expect_pallette_conversion(pal, datum, rv=:converted)
+    pal.should_receive(:[]).with(datum).and_return rv
+  end
+
+  def expect_add_readiness(m)
+    m.should_receive(:add_readiness)
+  end
+
+  def expect_take_battle_turn(m, mon, battle)
+    m.should_receive(:take_battle_turn).with(mon, battle)
+  end
+  def expect_activate(m)
+    m.should_receive(:activate)
+  end
+  def expect_interact(m)
+    m.should_receive(:interact)
+  end
+
 end
 
 module DomainStubs
+  def stub_battle_ready_party_members(m, members)
+    m.stub!(:battle_ready_party_members).and_return members
+  end
+  
+  def stub_battle_members(m, members)
+    m.stub!(:battle_members).and_return members
+  end
+
+  def stub_dead(m, is_dead=true)
+    m.stub!(:dead?).and_return is_dead
+  end
+  def stub_active(m, is_active=true)
+    m.stub!(:active?).and_return is_active
+    m.stub!(:active).and_return is_active #XXX bad api here 
+  end
+
+  def stub_inventory_count(m, count)
+    m.stub!(:inventory_count).and_return count
+  end
+
+  def stub_effects(m, effects=mock("effects"))
+    m.stub!(:effects).and_return effects
+    effects
+  end
+
   def stub_menu_layer_active(m, is_active=true)
     m.stub!(:active?).and_return is_active
   end
@@ -272,12 +370,20 @@ module DomainStubs
     m.stub!(:battle).and_return battle
   end
 
+  def stub_strength(m, str)
+    m.stub!(:strength).and_return str
+  end
+
   def stub_all_hooks(m, hooks)
     m.stub!(:hooks).and_return hooks
   end
 
   def stub_music_playing(m, rv=true)
     m.stub!(:playing?).and_return rv
+  end
+
+  def stub_ready(m, rv=true)
+    m.stub!(:ready?).and_return rv
   end
 
 end
@@ -292,6 +398,11 @@ module DomainMocks
 
   def mock_event_hook
     m = mock("event_hook")
+    m
+  end
+
+  def mock_ai
+    m = mock("ai")
     m
   end
 
@@ -420,6 +531,7 @@ module DomainMocks
 
   def mock_hero
     h = mock("hero")
+    h.stub!(:name).and_return "heromockman"
     h
   end
 
@@ -460,6 +572,9 @@ module DomainMocks
     m = mock("interpreter")
     m.stub!(:interpret)
     m.stub!(:top_side).and_return 3
+    m.stub!(:bottom_side).and_return 7
+    m.stub!(:left_side).and_return 60
+    m.stub!(:right_side).and_return 18
     m.stub!(:can_walk_at?).and_return walking
     m
   end

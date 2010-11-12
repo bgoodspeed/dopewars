@@ -6,6 +6,9 @@ describe EventHelper do
 
   before(:each) do
     @game = mock_game
+
+    expect_constructor_hooks
+    @event_helper = EventHelper.new(@game, [:always, :on, :hooks], [:menu, :killed], [:menulayer, :active], [:battle], [:battle_layer], [:player], [:npc1, :npc2])
   end
 
   def expect_hook_appended(g, what)
@@ -15,7 +18,7 @@ describe EventHelper do
     g.should_receive(:remove_hook).with(what).and_return what
   end
 
-  it "should be described" do
+  def expect_constructor_hooks
     expect_hook_appended(@game, :always)
     expect_hook_appended(@game, :on)
     expect_hook_appended(@game, :hooks)
@@ -33,7 +36,16 @@ describe EventHelper do
     expect_hook_removed(@game, :active)
     expect_hook_removed(@game, :battle)
 
-    @event_helper = EventHelper.new(@game, [:always, :on, :hooks], [:menu, :killed], [:menulayer, :active], [:battle], [:battle_layer], [:player], [:npc1, :npc2])
+  end
+
+  it "should bind hooks" do
     @event_helper.always_on_hooks.size.should == 3
   end
+
+  it "should define non menu hooks" do
+    @event_helper.non_menu_hooks.size.should == 5
+  end
+
+  
+
 end

@@ -6,6 +6,7 @@ require 'spec/rspec_helper'
 describe TargetMatcher do
   before(:each) do
     @target_matcher = TargetMatcher.new("Enemy")
+    @non_enemy_matcher = TargetMatcher.new("Foo")
   end
 
   it "should discern enemy targets" do
@@ -21,6 +22,7 @@ describe TargetMatcher do
   end
 
   it "should be able to determine if it matches" do
+    @non_enemy_matcher.matches?(hero, hero).should be_true
     @target_matcher.matches?(monster, hero).should be_true
     @target_matcher.matches?(monster, monster).should be_false
   end

@@ -128,8 +128,10 @@ describe TopoMap do
     @topo.top_side(1).should == 100
     @topo.bottom_side(0).should == 100
     @topo.bottom_side(1).should == 200
+  end
 
-
+  it "is json ified" do
+    @topo.json_params.should be_an_instance_of(Array)
   end
 
 end

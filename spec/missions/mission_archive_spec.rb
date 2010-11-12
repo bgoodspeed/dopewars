@@ -5,8 +5,16 @@ require 'spec/rspec_helper'
 
 describe MissionArchive do
   include DomainMocks
+
+  def mock_mission
+    m = mock("mission")
+    m.stub!(:id_token).and_return(:a_mission_id_token)
+    m
+  end
+
   before(:each) do
     @game = mock_game
+    @mission = mock_mission
     @mission_archive = MissionArchive.new(@game)
   end
 
@@ -33,6 +41,12 @@ describe MissionArchive do
     ms.should be_an_instance_of Array
 
     ms.size.should == 3
+  end
+
+  it "should tell if a mission is achieved" do
+    @mission_archive.mission_achieved?(@mission.id_token).should be_false
+    @mission_archive.mark_completed(@mission)
+    @mission_archive.mission_achieved?(@mission.id_token).should be_true
   end
 end
 

@@ -9,7 +9,8 @@ class Monster
   def_delegator :@readiness_helper, :points, :readiness_points
 
 
-  attr_reader :inventory, :player
+  attr_reader :inventory, :player, :animated_sprite_helper, :animation_helper,
+    :coordinate_helper, :ai, :readiness_helper
   def initialize(player, universe, filename, position, inventory=Inventory.new(255), character_attrib=nil, ai=nil)
     @npc_x = position.dimension.x
     @npc_y = position.dimension.y

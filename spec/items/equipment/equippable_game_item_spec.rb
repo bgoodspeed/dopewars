@@ -9,4 +9,10 @@ describe EquippableGameItem do
   it "should not be consumable" do
     @item.consumeable?.should be_false
   end
+
+  it "should be equippable" do
+    @item.equippable?.should be_true
+  end
+
+  
 end

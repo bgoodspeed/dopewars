@@ -14,4 +14,10 @@ describe FilteredInventoryMenuSelector do
     names = elems.collect {|e| e.name }
     names.should == ["item 1"]
   end
+
+  it "should be able to select an element at an index" do
+    @selector.select_element_at(0, @selections)
+  end
+
+  
 end

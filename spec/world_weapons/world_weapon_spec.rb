@@ -29,4 +29,11 @@ describe WorldWeapon do
   it "should respond to draw weapon" do
     @world_weapon.respond_to?(:draw_weapon).should be_true
   end
+
+  it "should track where it is fired from" do
+    @world_weapon.fired_from(33,44, :facing_foo)
+    @world_weapon.startx.should == 33
+    @world_weapon.starty.should == 44
+    @world_weapon.facing.should == :facing_foo
+  end
 end

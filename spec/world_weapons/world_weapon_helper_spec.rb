@@ -8,16 +8,7 @@ describe WorldWeaponHelper do
     @game.player.world_weapon
   end
 
-  def expect_weapon_fired_once
-    weapon.should_receive(:fired_from).with(1122, 3344, :down)
-  end
-  
-  def expect_weapon_displayed_once
-    weapon.should_receive(:displayed)
-  end
-  def expect_weapon_unconsumed
-    weapon.should_receive(:consumed?).and_return false
-  end
+
   
   before(:each) do
     @game = mock_game
@@ -31,13 +22,13 @@ describe WorldWeaponHelper do
   end
   
   it "should know when its active" do
-    expect_weapon_fired_once
+    expect_weapon_fired_once(weapon)
     @world_weapon_helper.use_weapon
     @world_weapon_helper.using_weapon?.should be_true
   end
 
   it "should know only use weapon if not in use" do
-    expect_weapon_fired_once
+    expect_weapon_fired_once(weapon)
     @world_weapon_helper.use_weapon
     @world_weapon_helper.use_weapon
     
@@ -45,15 +36,27 @@ describe WorldWeaponHelper do
 
 
   it "should update if active -- active case" do
-    expect_weapon_fired_once
+    expect_weapon_fired_once(weapon)
     @world_weapon_helper.use_weapon
-    expect_weapon_displayed_once
-    expect_weapon_unconsumed
+    expect_weapon_displayed_once(weapon)
+    expect_weapon_unconsumed(weapon)
     @interaction_helper.should_receive(:interact_with_facing).with(@game, 1122, 3344)
     @world_weapon_helper.update_weapon_if_active
   end
 
+  it "should die when consumed" do
+    expect_weapon_fired_once(weapon)
+    @world_weapon_helper.use_weapon
+    expect_weapon_displayed_once(weapon)
+    expect_weapon_consumed(weapon)
+    expect_die((weapon))
+    @world_weapon_helper.update_weapon_if_active
+    @world_weapon_helper.weapon.should be_nil
+  end
+
+
   it "should update if active -- inactive case" do
     @world_weapon_helper.update_weapon_if_active
   end
+
 end

@@ -7,6 +7,7 @@ describe Player do
     @position = PositionedTileCoordinate.new(SdlCoordinate.new(1,2), SdlCoordinate.new(16,64))
     @game = mock_game
     @universe = mock_universe
+    @party = mock_party
     @player = Player.new(@position, @universe, @party, "Charactern8.png", 123, 435, @game)
   end
 
@@ -58,6 +59,11 @@ describe Player do
   it "should set key presses for time" do
     expect_set_timed_keypress_in_ms(@player.keys, :foo, 12)
     @player.set_key_pressed_for_time(:foo, 12)
+  end
+
+  it "can get inventory size" do
+    stub_inventory_count(@player.party, 19)
+    @player.inventory_count.should == 19
   end
 
   #TODO make a json matcher

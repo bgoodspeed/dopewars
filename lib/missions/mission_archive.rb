@@ -2,14 +2,18 @@
 # and open the template in the editor.
 
 class MissionArchive
+  
   def initialize(game)
     @game = game
     @achieved_mission_tokens = []
   end
 
+  def mark_completed(mission)
+    @achieved_mission_tokens << mission.id_token
+  end
+
   def mission_achieved?(mission_id_token)
-    @achieved_mission_tokens.include?(:fooasdf)
-    
+    @achieved_mission_tokens.include?(mission_id_token)
   end
 
   def missions

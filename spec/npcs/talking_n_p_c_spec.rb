@@ -19,4 +19,11 @@ describe TalkingNPC do
     expect_text_bound_to_layer(@universe.dialog_layer, "foobarbaz")
     @npc.interact(@game, @universe, @player)
   end
+
+  it "should be blocking" do
+    @npc.is_blocking?.should be_true
+  end
+  it "is json ified" do
+    @npc.json_params.should be_an_instance_of(Array)
+  end
 end

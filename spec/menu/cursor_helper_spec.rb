@@ -126,7 +126,33 @@ describe CursorHelper do
     @mock_action.should_receive(:perform)
     @cursor_helper.activate(@menu)
     @cursor_helper.current_selected_menu_entry_name(@menu).should == "person a"
+  end
 
+  it "should be able to get position at depth" do
+
+    @cursor_helper.position_at_depth(0).should == 0
+    @cursor_helper.move_cursor_down(@menu)
+    @cursor_helper.activate(@menu)
+    @cursor_helper.activate(@menu)
+    @cursor_helper.position_at_depth(0).should == 1
+    @cursor_helper.position_at_depth(1).should == 0
+  end
+
+
+  it "should be able to cancel" do
+    @cursor_helper.activate(@menu)
+    @cursor_helper.move_cursor_down(@menu)
+    @cursor_helper.activate(@menu)
+    @cursor_helper.path.should == [0,1]
+    @cursor_helper.cancel
+    @cursor_helper.path.should == [0]
+  end
+
+  it "can get a path element at an index" do
+    @cursor_helper.activate(@menu)
+    @cursor_helper.move_cursor_down(@menu)
+    @cursor_helper.activate(@menu)
+    @cursor_helper.path_element_at_index(0).should == 0
   end
 
 end

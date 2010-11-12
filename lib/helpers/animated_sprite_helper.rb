@@ -1,6 +1,6 @@
 
 class AnimatedSpriteHelper
-  attr_reader :image, :rect, :px, :py
+  attr_reader :image, :rect, :px, :py, :last_direction_offset
   include ColorKeyHelper
 
   def initialize(filename, position, surface_factory=SurfaceFactory.new)

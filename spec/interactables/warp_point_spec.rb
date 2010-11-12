@@ -25,4 +25,9 @@ describe WarpPoint do
     expect_fades_in_bg_music(@game.universe)
     @warp_point.activate(@game, @player, mock_world, 69, 96)
   end
+
+  it "should be json ified" do
+    @warp_point.json_params.should be_an_instance_of(Array)
+  end
+
 end

@@ -62,4 +62,9 @@ describe Inventory do
     @inventory.gain_inventory(@inventory_with_stuff)
     @inventory.inventory_count.should == 9
   end
+
+
+  it "should be json ified" do
+    @inventory.json_params.should be_an_instance_of(Array)
+  end
 end

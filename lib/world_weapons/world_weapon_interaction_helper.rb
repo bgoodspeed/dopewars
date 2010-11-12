@@ -4,7 +4,7 @@ class WorldWeaponInteractionHelper < InteractionHelper
     #TODO revisit this class
   end
 
-  def interact_with_dialog
+  def interact_with_dialog(layer)
     puts "noop dialog"
   end
 

@@ -28,7 +28,7 @@ class FilteredInventoryMenuSelector
   end
 
   def select_element_at(idx, selections)
-    rv = elements[idx]
+    rv = elements(selections)[idx]
     rv
   end
 

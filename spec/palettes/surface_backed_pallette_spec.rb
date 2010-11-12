@@ -10,4 +10,8 @@ describe SurfaceBackedPallette do
     @pallette.tile_x.should == 20
     @pallette.tile_y.should == 20
   end
+
+  it "should calculate offsets" do
+    @pallette.offsets(:foo).should be_nil
+  end
 end

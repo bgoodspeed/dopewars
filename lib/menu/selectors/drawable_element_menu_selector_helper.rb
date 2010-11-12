@@ -2,7 +2,7 @@
 # and open the template in the editor.
 
 module DrawableElementMenuSelectorHelper
-
+  attr_reader :game
   def element_names(selections)
     elements(selections).collect {|el| el.name }
   end

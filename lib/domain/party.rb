@@ -4,10 +4,11 @@ class Party
   def_delegators :@inventory, :add_item, :gain_inventory, :inventory_info, 
     :inventory_item_at, :inventory_count
   def_delegators :leader, :world_weapon
-  attr_reader :members, :inventory
-  def initialize(members, inventory)
+  attr_reader :members, :inventory, :money
+  def initialize(members, inventory, money=0)
     @members = members
     @inventory = inventory
+    @money = money
   end
 
   def collect

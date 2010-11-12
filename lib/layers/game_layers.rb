@@ -13,7 +13,7 @@ class GameLayers
 
 
 
-  attr_reader :dialog_layer, :menu_layer, :battle_layer, :notifications_layer
+  attr_accessor :dialog_layer, :menu_layer, :battle_layer, :notifications_layer
   def initialize(dialog_layer=nil, menu_layer=nil, battle_layer=nil, notif_layer=nil)
     @dialog_layer = dialog_layer
     @menu_layer = menu_layer

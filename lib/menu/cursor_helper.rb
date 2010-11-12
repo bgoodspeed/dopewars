@@ -22,10 +22,6 @@ class CursorHelper
     @currently_selected = Selections.new
   end
 
-  def selected_amongst(sections)
-    current_section_in(sections).section_by_index(@position)
-  end
-
 
   def path
     @path.clone
@@ -74,7 +70,10 @@ class CursorHelper
   end
 
   def cancel
-    @path.shift
+    reved = @path.reverse
+    reved.shift
+
+    @path = reved.reverse
     @depth = reduce_only_to_zero(@depth)
   end
 
@@ -103,18 +102,7 @@ class CursorHelper
     ([@position] + @path)[idx]
   end
 
-  def should_display_submenu_for?(index, depth)
-    (depth < @path.size) && @path.first == index
-  end
-
-  def selections_made
-    @path.size - 1
-  end
-
-  def selector_menus_to_draw_at_depth(depth, needed)
-    needed - selections_made
-  end
-  
+   
   def color_for_current_section_cursor
     @current_color
   end

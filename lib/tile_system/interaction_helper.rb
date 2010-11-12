@@ -10,18 +10,14 @@ class InteractionHelper
     @policy = policy
   end
 
-  def interact_with_current_tile(game, tilex, tiley, this_tile_interacts)
-    this_tile_interacts.activate(game, game.player, game.universe.current_world, tilex, tiley)
+  def interact_with_tile(game, tilex, tiley, tile)
+    tile.activate(game, game.player, game.universe.current_world, tilex, tiley)
   end
 
-  def interact_with_dialog
-    @universe.dialog_layer.toggle_activity
+  def interact_with_dialog(layer)
+    layer.toggle_activity
   end
-
-  def interact_with_facing_tile(game, facing_tilex, facing_tiley, facing_tile_interacts)
-    facing_tile_interacts.activate(game, game.player, game.universe.current_world, facing_tilex, facing_tiley)
-  end
-
+ 
   def interact_with_npc(game, interactable_npcs)
     npc = interactable_npcs[0] #TODO what if there are multiple npcs to interact w/? one at a time? all of them?
     npc.interact(game, game.universe, game.player) #TODO change the expected signature for interact and make interactable api tests
@@ -58,24 +54,40 @@ class InteractionHelper
     facing_tile_dist
   end
 
+  def attempt_interaction_with_dialog(layer)
+    return false unless layer.active
+    interact_with_dialog(layer)
+    true
+  end
+
+  def attempt_interaction_with_tile(game, tilex, tiley, tile)
+    return false unless tile
+    interact_with_tile(game, tilex, tiley, tile)
+    true
+  end
+
+  def attempt_interaction_with_facing(game, tilex, tiley, tile, close_enough)
+    return false unless tile and close_enough
+    interact_with_tile(game, tilex, tiley, tile)
+    true
+  end
+  
+  def attempt_interaction_with_npcs(game, npcs)
+    return false if npcs.empty?
+    interact_with_npc(game, npcs)
+    true
+  end
+
   def interact_with_facing(game, px,py)
     puts "mapped key to interaction helper"
-
-    if game.universe.dialog_layer.active
-      puts "confirming/closing/paging dialog"
-      interact_with_dialog
-      return if @policy.return_after_dialog
-    end
+    return if attempt_interaction_with_dialog(game.universe.dialog_layer) and @policy.return_after_dialog
 
     tilex = game.universe.current_world.x_offset_for_interaction(px)
     tiley = game.universe.current_world.y_offset_for_interaction(py)
     this_tile_interacts = game.universe.current_world.interaction_interpreter.interpret(tilex, tiley)
     facing_tile_interacts = false
-
-    if this_tile_interacts
-      interact_with_current_tile(game, tilex, tiley, this_tile_interacts)
-      return if @policy.return_after_current
-    end
+    
+    return if attempt_interaction_with_tile(game, tilex, tiley, this_tile_interacts) and @policy.return_after_current
 
     facing_tilex = facing_tilex_for(tilex)
     facing_tiley = facing_tiley_for(tiley)
@@ -84,16 +96,10 @@ class InteractionHelper
     facing_tile_interacts = game.universe.current_world.interaction_interpreter.interpret(facing_tilex, facing_tiley)
     facing_tile_close_enough = facing_tile_dist < @@INTERACTION_DISTANCE_THRESHOLD
 
-    if facing_tile_close_enough and facing_tile_interacts
-      interact_with_facing_tile(game, facing_tilex, facing_tiley, facing_tile_interacts)
-
-      return if @policy.return_after_facing
-    end
+    return if attempt_interaction_with_facing(game, facing_tilex, facing_tiley, facing_tile_interacts, facing_tile_close_enough) and @policy.return_after_facing
 
     interactable_npcs = game.universe.current_world.npcs.select {|npc| npc.nearby?(px,py, @@INTERACTION_DISTANCE_THRESHOLD, @@INTERACTION_DISTANCE_THRESHOLD)  }
-    unless interactable_npcs.empty?
-      interact_with_npc(game, interactable_npcs)
-    end
+    attempt_interaction_with_npcs(game, interactable_npcs)
 
   end
 end

@@ -15,4 +15,12 @@ describe StatLineMenuSelector do
     names = elems.collect {|e| e.name }
     names.should == ["HP: 10/10", "MP: 1/1", "EXP: 0", "LVP: 0"]
   end
+
+  it "should fetch an element" do
+    @selections << hero("bob")
+    elem = @selector.select_element_at(0, @selections)
+    
+    elem.should be_an_instance_of(StatLine)
+    elem.name.should == "HP: 10/10"
+  end
 end

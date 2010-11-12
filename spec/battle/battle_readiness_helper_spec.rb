@@ -12,5 +12,17 @@ describe BattleReadinessHelper do
   it "should grow by growth rate" do
     @helper.add_readiness(1)
     @helper.points.should == 15
+
   end
+  it "should consume readiness" do
+    @helper.consume_readiness(7)
+    @helper.points.should == 3
+  end
+
+  it "should know when it is ready" do
+    @helper.ready?.should be_false
+    @helper.add_readiness(1000)
+    @helper.ready?.should be_true
+  end
+
 end

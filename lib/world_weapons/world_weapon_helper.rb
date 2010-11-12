@@ -5,6 +5,7 @@ class WorldWeaponHelper
   def_delegators :@weapon, :draw_weapon
   def_delegators :@interaction_helper, :facing, :facing=
 
+  attr_reader :weapon
   def initialize(game, helper = WorldWeaponInteractionHelper.new(game, InteractionPolicy.process_all))
     @game = game
     @player = game.player

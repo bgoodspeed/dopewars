@@ -14,4 +14,8 @@ describe MonsterCoordinateHelper do
     @coordinate_helper.px.should == 123
     @coordinate_helper.py.should == 987
   end
+
+  it "can filter candidate npcs" do
+    @coordinate_helper.candidate_npcs.should == []
+  end
 end

@@ -1,13 +1,13 @@
 
 class AbstractLayer
   include ResourceLoader
-  attr_accessor :active, :layer
+  attr_accessor :active, :layer, :font
 
   def initialize(screen, layer_width, layer_height, surface_factory=SurfaceFactory.new)
     @screen = screen
     @active = false
     @layer = surface_factory.make_surface([layer_width, layer_height])
-    @font = load_font("FreeSans.ttf")
+    @font = load_font("FreeSans.ttf") #XXX this should come from a factory and not use resource loader
     @text_rendering_helper = TextRenderingHelper.new(@layer, @font)
   end
 
