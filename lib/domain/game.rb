@@ -32,36 +32,17 @@ class Game
   end
 
   def make_hook_and_event_bindings
-        always_on_keymap = key_press_hooks( [:escape, :quit], [ :q, :quit],
-        [ :c, :capture_ss], [ :d, :toggle_dialog_layer], [ :m, :toggle_menu], [ :p, :pause]
-      )
-
-    menu_killed_hooks = key_press_hooks( [ :i, :interact_with_facing],
-        [ :space, :use_weapon], [ :b, :toggle_bg_music]
-    )
-
+    always_on_keymap = key_press_hooks( [:escape, :quit], [ :q, :quit], [ :c, :capture_ss], [ :d, :toggle_dialog_layer], [ :m, :toggle_menu], [ :p, :pause] )
+    menu_killed_hooks = key_press_hooks( [ :i, :interact_with_facing], [ :space, :use_weapon], [ :b, :toggle_bg_music] )
     menu_active_hooks = standard_keymap(:menu_left, :menu_down, :menu_right, :menu_up, :menu_enter, :menu_cancel)
     battle_hooks = standard_keymap(:battle_left, :battle_down, :battle_right, :battle_up, :battle_enter, :battle_cancel)
-
-
-    battle_layer_hooks = [
-      event_hook(battle_layer, :tick, :update)
-    ]
-
-    player_hooks = [
-      event_hook(player, :key_press, :key_pressed),
-      event_hook(player, :key_release, :key_released),
-      event_hook(player, :tick, :update)
-    ]
-
-    npc_hooks = npcs.collect {|npc|
-      event_hook(npc, :tick, :update)
-    }
+    battle_layer_hooks = [ event_hook(battle_layer, :tick, :update) ]
+    player_hooks = [ event_hook(player, :key_press, :key_pressed), event_hook(player, :key_release, :key_released), event_hook(player, :tick, :update) ]
+    npc_hooks = npcs.collect {|npc| event_hook(npc, :tick, :update) }
 
     @event_handler = @trigger_factory.make_event_handler
     @event_manager = @factory.make_event_manager
     @event_system = @factory.make_event_system(self, always_on_keymap, menu_killed_hooks, menu_active_hooks, battle_hooks, battle_layer_hooks, player_hooks, npc_hooks)
-
   end
 
   def initialize(factory=GameInternalsFactory.new, trigger_factory = TriggerFactory.new)

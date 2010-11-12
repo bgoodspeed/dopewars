@@ -61,6 +61,13 @@ class TopoMap
     end
   end
 
+  def blit_datum(palette, screen, px, py, xi, yi)
+    datum = palette[data_at(xi,yi)]
+    unless datum.nil?
+      datum.blit(screen, px,py, xi, yi)
+    end
+  end
+
   def blit_foreground(palette, screen, px, py)
     xoff = x_offset_for_world(px)
     yoff = x_offset_for_world(py)
@@ -74,12 +81,7 @@ class TopoMap
 
     starty.upto(endy) do |yi|
       startx.upto(endx) do |xi|
-
-        datum = palette[data_at(xi,yi)]
-        unless datum.nil?
-
-          datum.blit(screen, px,py, xi, yi)
-        end
+        blit_datum(palette, screen, px, py, xi, yi)
       end
     end
     

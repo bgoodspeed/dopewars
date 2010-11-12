@@ -20,14 +20,14 @@ class MissionArchive
     all_missions.select {|m| m.available? }
   end
 
+  #XXX anything of type Milestone must be able to generate events
+  # so that we can check for new mission availability
+  # per dialog/city visitation/battle/stat upgrade seems reasonable times to
+  # fire the recalculation of the available missions
+  # on the other hand, checking every tick or every step taken implies
+  # scheduling & polling rather than event driven
+  # or the events have to run really fast?
   def all_missions(game=@game)
-    #XXX anything of type Milestone must be able to generate events
-    # so that we can check for new mission availability
-    # per dialog/city visitation/battle/stat upgrade seems reasonable times to
-    # fire the recalculation of the available missions
-    # on the other hand, checking every tick or every step taken implies
-    # scheduling & polling rather than event driven
-    # or the events have to run really fast?
     [
       Mission.new(:ten_upgrades, "Upgrade yourself",
             [],
