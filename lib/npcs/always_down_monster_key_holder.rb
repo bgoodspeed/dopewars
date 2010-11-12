@@ -1,7 +1,7 @@
 
 class AlwaysDownMonsterKeyHolder < KeyHolder
-  @@DOWNKEY = :always_down
-  def initialize(key=@@DOWNKEY)
+  
+  def initialize(key=GameSettings::DOWNKEY)
     super()
     add_key(key)
   end

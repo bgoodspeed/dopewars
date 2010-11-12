@@ -1,7 +1,7 @@
 
 #TODO rename this to process
 class ItemAction
-  def initialize(action_cost=@@ITEM_ACTION_COST)
+  def initialize(action_cost=GameSettings::ITEM_ACTION_COST)
     @action_cost = action_cost
   end
   def perform(src, dest, item)

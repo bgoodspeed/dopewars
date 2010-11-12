@@ -10,8 +10,8 @@ class GameInternalsFactory
 
   def make_screen
     #@screen = Screen.open( [640, 480] )
-    screen = ScreenFacade.new([@@SCREEN_X, @@SCREEN_Y])
-    screen.title = @@GAME_TITLE
+    screen = ScreenFacade.new([GameSettings::SCREEN_X, GameSettings::SCREEN_Y])
+    screen.title = GameSettings::GAME_TITLE
     screen
   end
   def make_clock
@@ -56,7 +56,7 @@ class GameInternalsFactory
     CharacterAttributionFactory.new.make_attribution
   end
 
-  def make_hero(name, weapon, default_start_pts=@@HERO_START_BATTLE_PTS, default_rate=@@HERO_BATTLE_PTS_RATE, attr=make_attribution)
+  def make_hero(name, weapon, default_start_pts=GameSettings::HERO_START_BATTLE_PTS, default_rate=GameSettings::HERO_BATTLE_PTS_RATE, attr=make_attribution)
     Hero.new(name,  weapon, default_start_pts, default_rate, attr)
   end
 
@@ -83,7 +83,7 @@ class GameInternalsFactory
   end
 
   def make_world(bg_filename, inter_filename, pal, inter_pal, bgm)
-    WorldStateFactory.build_world_state(bg_filename,inter_filename, pal, inter_pal, @@BGX, @@BGY, [], bgm)
+    WorldStateFactory.build_world_state(bg_filename,inter_filename, pal, inter_pal, GameSettings::BGX, GameSettings::BGY, [], bgm)
   end
 
   def make_world1

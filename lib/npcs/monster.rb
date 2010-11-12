@@ -23,7 +23,7 @@ class Monster
     
     @coordinate_helper = MonsterCoordinateHelper.new(position, @keys, @universe ,100, 300,200)
     @animation_helper = AnimationHelper.new(@keys, 3)
-    @readiness_helper = BattleReadinessHelper.new(@@MONSTER_START_BATTLE_PTS, @@MONSTER_BATTLE_PTS_RATE)
+    @readiness_helper = BattleReadinessHelper.new(GameSettings::MONSTER_START_BATTLE_PTS, GameSettings::MONSTER_BATTLE_PTS_RATE)
     @character_attribution = character_attrib
     @inventory = inventory
   end

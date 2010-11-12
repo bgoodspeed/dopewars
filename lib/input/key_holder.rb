@@ -10,7 +10,7 @@ class KeyHolder
   end
 
 
-  @@MS_PER_SEC = 1000
+  
   extend Forwardable
   def_delegators :@keys, :include?, :empty?, :size
 
@@ -45,7 +45,7 @@ class KeyHolder
       end
     }
     @ms_ttl_map.each {|k,v|
-      newv = v - dt * @@MS_PER_SEC
+      newv = v - dt * GameSettings::MS_PER_SEC
       if newv <= 0
         delete_key(k)
         @ms_ttl_map.delete(k)

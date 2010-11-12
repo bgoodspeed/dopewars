@@ -43,32 +43,32 @@ class BattleLayer < AbstractLayer
     @battle.end_battle
   end
   def battle_text_config_with_actions(actions)
-    BattleParticipantCursorTextRenderingConfig.new(actions , 2 * @@MENU_TEXT_INSET + 4*@@MENU_TEXT_WIDTH, 0, @@MENU_TEXT_INSET, @@MENU_LINE_SPACING)
+    BattleParticipantCursorTextRenderingConfig.new(actions , 2 * GameSettings::MENU_TEXT_INSET + 4*GameSettings::MENU_TEXT_WIDTH, 0, GameSettings::MENU_TEXT_INSET, GameSettings::MENU_LINE_SPACING)
   end
 
   def menu_layer_config
 
     mlc = MenuLayerConfig.new
-    mlc.main_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, @layer.h - 125, 0)
-    mlc.section_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, @layer.h - 150, 0)
-    mlc.in_section_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH, @layer.h - 175, 0)
+    mlc.main_menu_text = TextRenderingConfig.new(GameSettings::MENU_TEXT_INSET, GameSettings::MENU_TEXT_WIDTH, @layer.h - 125, 0)
+    mlc.section_menu_text = TextRenderingConfig.new(GameSettings::MENU_TEXT_INSET, GameSettings::MENU_TEXT_WIDTH, @layer.h - 150, 0)
+    mlc.in_section_cursor = TextRenderingConfig.new(GameSettings::MENU_TEXT_INSET , GameSettings::MENU_TEXT_WIDTH, @layer.h - 175, 0)
     mlc.in_subsection_cursor = battle_text_config_with_actions([AttackBattleMenuAction])
     mlc.in_option_section_cursor = battle_text_config_with_actions([UseBattleItemBattleMenuAction])
-    mlc.main_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH, @layer.h - 100, 0)
-    mlc.layer_inset_on_screen = [@@LAYER_INSET,@@LAYER_INSET]
-    mlc.details_inset_on_layer = [@@MENU_DETAILS_INSET_X, @@MENU_DETAILS_INSET_Y]
-    mlc.options_inset_on_layer = [@@MENU_OPTIONS_INSET_X, @@MENU_OPTIONS_INSET_Y]
+    mlc.main_cursor = TextRenderingConfig.new(GameSettings::MENU_TEXT_INSET , GameSettings::MENU_TEXT_WIDTH, @layer.h - 100, 0)
+    mlc.layer_inset_on_screen = [GameSettings::LAYER_INSET,GameSettings::LAYER_INSET]
+    mlc.details_inset_on_layer = [GameSettings::MENU_DETAILS_INSET_X, GameSettings::MENU_DETAILS_INSET_Y]
+    mlc.options_inset_on_layer = [GameSettings::MENU_OPTIONS_INSET_X, GameSettings::MENU_OPTIONS_INSET_Y]
 
     mlc
   end
   def end_battle_menu_layer_config
 
     mlc = MenuLayerConfig.new
-    mlc.main_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, 50, 0)
-    mlc.section_menu_text = TextRenderingConfig.new(@@MENU_TEXT_INSET, @@MENU_TEXT_WIDTH, 150, 0)
-    mlc.in_section_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH,200, 0)
-    mlc.main_cursor = TextRenderingConfig.new(@@MENU_TEXT_INSET , @@MENU_TEXT_WIDTH,100, 0)
-    mlc.layer_inset_on_screen = [@@LAYER_INSET,@@LAYER_INSET]
+    mlc.main_menu_text = TextRenderingConfig.new(GameSettings::MENU_TEXT_INSET, GameSettings::MENU_TEXT_WIDTH, 50, 0)
+    mlc.section_menu_text = TextRenderingConfig.new(GameSettings::MENU_TEXT_INSET, GameSettings::MENU_TEXT_WIDTH, 150, 0)
+    mlc.in_section_cursor = TextRenderingConfig.new(GameSettings::MENU_TEXT_INSET , GameSettings::MENU_TEXT_WIDTH,200, 0)
+    mlc.main_cursor = TextRenderingConfig.new(GameSettings::MENU_TEXT_INSET , GameSettings::MENU_TEXT_WIDTH,100, 0)
+    mlc.layer_inset_on_screen = [GameSettings::LAYER_INSET,GameSettings::LAYER_INSET]
     mlc
   end
 

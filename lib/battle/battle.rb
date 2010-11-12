@@ -13,7 +13,7 @@ class Battle
   end
 
   def accumulate_readiness(dt)
-    points = dt * @@READINESS_POINTS_PER_SECOND
+    points = dt * GameSettings::READINESS_POINTS_PER_SECOND
     @player.add_readiness(points)
     @monster.add_readiness(points, self)
   end

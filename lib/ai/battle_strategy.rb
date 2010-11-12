@@ -38,7 +38,7 @@ class BattleStrategy
     if tactic.matches?
       tactic.perform
     else
-      actor.consume_readiness(@@NOOP_ACTION_COST)
+      actor.consume_readiness(GameSettings::NOOP_ACTION_COST)
     end
   end
 end

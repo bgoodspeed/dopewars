@@ -6,7 +6,7 @@ class BattleReadinessHelper
     @starting_points = starting_points
     @points = starting_points
     @growth_rate = growth_rate
-    @points_needed_for_ready = @@READINESS_POINTS_NEEDED_TO_ACT
+    @points_needed_for_ready = GameSettings::READINESS_POINTS_NEEDED_TO_ACT
   end
 
   def add_readiness(points)

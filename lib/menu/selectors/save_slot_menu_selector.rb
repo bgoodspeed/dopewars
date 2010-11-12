@@ -12,7 +12,6 @@ end
 class SaveSlotMenuSelector
   attr_accessor :menu_item
   include DrawableElementMenuSelectorHelper
-  @@NUM_SLOTS = 5
 
   def initialize(game)
     @game = game
@@ -23,7 +22,7 @@ class SaveSlotMenuSelector
   end
 
   def elements(selections)
-    (0..@@NUM_SLOTS).collect {|i| save_slot(i)}
+    (0..GameSettings::NUM_SLOTS).collect {|i| save_slot(i)}
   end
   def save_slot(idx)
     SaveSlot.new("Slot #{idx + 1}" ,"save-slot-#{idx}.json", idx)

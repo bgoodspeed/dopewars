@@ -2,9 +2,9 @@
 class NotificationsLayer < AbstractLayer
   attr_reader :notifications
   def initialize(screen, game)
-    super(screen, @@NOTIFICATION_LAYER_WIDTH, @@NOTIFICATION_LAYER_HEIGHT)
+    super(screen, GameSettings::NOTIFICATION_LAYER_WIDTH, GameSettings::NOTIFICATION_LAYER_HEIGHT)
     @notifications = []
-    @config = TextRenderingConfig.new(@@NOTIFICATION_TEXT_INSET, 0, @@NOTIFICATION_TEXT_INSET, @@NOTIFICATION_LINE_SPACING )
+    @config = TextRenderingConfig.new(GameSettings::NOTIFICATION_TEXT_INSET, 0, GameSettings::NOTIFICATION_TEXT_INSET, GameSettings::NOTIFICATION_LINE_SPACING )
   end
 
   def add_notification(notification)
@@ -13,7 +13,7 @@ class NotificationsLayer < AbstractLayer
   end
 
   def config_for(idx)
-    TextRenderingConfig.new(@@NOTIFICATION_TEXT_INSET, 0, @@NOTIFICATION_TEXT_INSET, @@NOTIFICATION_LINE_SPACING * idx)
+    TextRenderingConfig.new(GameSettings::NOTIFICATION_TEXT_INSET, 0, GameSettings::NOTIFICATION_TEXT_INSET, GameSettings::NOTIFICATION_LINE_SPACING * idx)
   end
 
   def draw

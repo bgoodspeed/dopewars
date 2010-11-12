@@ -126,10 +126,10 @@ class CoordinateHelper
     miny = @py - y_ext
     maxy = @py + y_ext
     @px = x_ext if minx < 0
-    @px = @@BGX - x_ext if maxx > @@BGX #TODO this should come from the current world
+    @px = GameSettings::BGX - x_ext if maxx > GameSettings::BGX #TODO this should come from the current world
 
     @py = y_ext if miny < 0
-    @py = @@BGY - y_ext if maxy > @@BGY
+    @py = GameSettings::BGY - y_ext if maxy > GameSettings::BGY
   end
   def check_corners(interp, x1, y1, x2, y2)
     c1 = interp.can_walk_at?(x1,y1)

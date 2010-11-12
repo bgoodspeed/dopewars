@@ -8,7 +8,7 @@ class MonsterFactory
     monattrib = CharacterAttributionFactory.new.make_attribution(CharacterAttributes.new(3, 0, 1, 0, 0, 0, 0, 0))
     monai = ArtificialIntelligence.new(RepeatingPathFollower.new("DRUL", 80), BattleStrategy.new([BattleTactic.new("Enemy: Any -> Attack")]))
 
-    posn = PositionedTileCoordinate.new(SdlCoordinate.new(400, 660), SdlCoordinate.new(@@MONSTER_X, @@MONSTER_Y))
+    posn = PositionedTileCoordinate.new(SdlCoordinate.new(400, 660), SdlCoordinate.new(GameSettings::MONSTER_X, GameSettings::MONSTER_Y))
     Monster.new(player,universe,"monster.png", posn, monster_inv, monattrib, monai)
   end
 end

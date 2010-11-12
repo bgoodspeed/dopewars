@@ -760,14 +760,15 @@ end
 
 module WorldMapMatchers
   class NearEnoughToMatcher
-    @@NEARNESS_THRESHOLD= 1.5
-    def initialize(base)
+    DEFAULT_NEARNESS_THRESHOLD= 1.5
+    def initialize(base, threshold = NEARNESS_THRESHOLD)
       @base = base
+      @threshold = threshold
     end
 
     def cmp_axis(idx, target)
       error = (@base[idx] - target[idx]).abs
-      error < @@NEARNESS_THRESHOLD
+      error < @threshold
     end
 
     def matches?(target)
@@ -780,7 +781,7 @@ module WorldMapMatchers
     end
 
     def failure_msg(is_not="")
-      "#{fmt(@base)} expected #{is_not} to be within #{@@NEARNESS_THRESHOLD} of #{fmt(@target)}"
+      "#{fmt(@base)} expected #{is_not} to be within #{@threshold} of #{fmt(@target)}"
     end
     def failure_message_for_should
       failure_msg
@@ -800,7 +801,6 @@ end
 
 module UtilityMatchers
   class ContainingMatcher
-    @@NEARNESS_THRESHOLD= 1.5
     def initialize(base)
       @base = base
     end

@@ -1,5 +1,4 @@
 class InteractionHelper
-  @@INTERACTION_DISTANCE_THRESHOLD = 80 #XXX tweak this, currently set to 1/2 a tile
 
   attr_accessor :facing
   def initialize(game, policy)
@@ -103,13 +102,13 @@ class InteractionHelper
     facing_tile_dist = facing_tile_distance_for(game, tilex, tiley, px, py)
     #puts "i am on #{tilex},#{tiley}, i am facing #{@facing} -> #{facing_tilex}"
     facing_tile_interacts = game.universe.current_world.interaction_interpreter.interpret(facing_tilex, facing_tiley)
-    facing_tile_close_enough = facing_tile_dist < @@INTERACTION_DISTANCE_THRESHOLD
+    facing_tile_close_enough = facing_tile_dist < GameSettings::INTERACTION_DISTANCE_THRESHOLD
 
     attempt_interaction_with_facing(game, facing_tilex, facing_tiley, facing_tile_interacts, facing_tile_close_enough) 
   end
   
   def handle_npcs(game, px, py)
-    interactable_npcs = game.universe.current_world.npcs.select {|npc| npc.nearby?(px,py, @@INTERACTION_DISTANCE_THRESHOLD, @@INTERACTION_DISTANCE_THRESHOLD)  }
+    interactable_npcs = game.universe.current_world.npcs.select {|npc| npc.nearby?(px,py, GameSettings::INTERACTION_DISTANCE_THRESHOLD, GameSettings::INTERACTION_DISTANCE_THRESHOLD)  }
     attempt_interaction_with_npcs(game, interactable_npcs)
   end
 

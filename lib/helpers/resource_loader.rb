@@ -2,7 +2,6 @@ class MissingResourceError < RuntimeError
 end
 
 module ResourceLoader
-  @@FONT_DEPTH = 24
 
   def resource_path(elem)
     File.join(Dir.pwd, 'resources', elem)
@@ -12,7 +11,7 @@ module ResourceLoader
     resource_path('fonts')
   end
   def load_font(name)
-    FontFacade.new(check_file(font_path, name), @@FONT_DEPTH)
+    FontFacade.new(check_file(font_path, name), GameSettings::FONT_DEPTH)
   end
 
   def surface_path

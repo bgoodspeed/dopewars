@@ -2,7 +2,7 @@
 
 #TODO rename this to process
 class AttackAction
-  def initialize(action_cost=@@ATTACK_ACTION_COST)
+  def initialize(action_cost=GameSettings::ATTACK_ACTION_COST)
     @action_cost = action_cost
   end
   def perform(src, dest)
