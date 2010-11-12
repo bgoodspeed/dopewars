@@ -171,27 +171,35 @@ class GameInternalsFactory
     pal
 
   end
+  def walkable
+    Walkable.new
+  end
+  def blocking
+    Blocking.new
+  end
+
   def pallette
     pal = SurfaceBackedPallette.new("scaled-background-20x20.png", 20, 20)
-    pal['G'] = SBPEntry.new([1,4], false)
-    pal['M'] = SBPEntry.new([0,2], true)
-    pal['g'] = SBPEntry.new([0,6], false)
-    pal['O'] = SBPEntry.new([1,3], true) #TODO this should not be open treasure
-    pal['T'] = SBPEntry.new([1,3], true) #TODO this should not be treasure
-    pal['w'] = SBPEntry.new([0,5], false) #TODO this should not be warp
-    pal['W'] = SBPEntry.new([0,5], false) #TODO this should not be warp
+    
+    pal['G'] = SBPEntry.new([1,4], walkable)
+    pal['M'] = SBPEntry.new([0,2], blocking)
+    pal['g'] = SBPEntry.new([0,6], walkable)
+    pal['O'] = SBPEntry.new([1,3], blocking) #TODO this should not be open treasure
+    pal['T'] = SBPEntry.new([1,3], blocking) #TODO this should not be treasure
+    pal['w'] = SBPEntry.new([0,5], walkable) #TODO this should not be warp
+    pal['W'] = SBPEntry.new([0,5], walkable) #TODO this should not be warp
     pal
 
   end
   def pallette_160
     pal = Pallette.new(tile(:blue))
-    pal['O'] = JsonLoadableSurface.new("open-treasure-on-grass-bg-160.png", true)
-    pal['T'] = JsonLoadableSurface.new("treasure-on-grass-bg-160.png", true)
-    pal['w'] = JsonLoadableSurface.new("water-bg-160.png", true)
-    pal['W'] = JsonLoadableSurface.new("town-on-grass-bg-160.png", false)
-    pal['M'] = JsonLoadableSurface.new("mountain-bg-160.png", true)
-    pal['G'] = JsonLoadableSurface.new("grass-bg-160.png", false)
-    pal['g'] = JsonLoadableSurface.new("real-grass-bg-160.png", false)
+    pal['O'] = JsonLoadableSurface.new("open-treasure-on-grass-bg-160.png", blocking)
+    pal['T'] = JsonLoadableSurface.new("treasure-on-grass-bg-160.png", blocking)
+    pal['w'] = JsonLoadableSurface.new("water-bg-160.png", blocking)
+    pal['W'] = JsonLoadableSurface.new("town-on-grass-bg-160.png", walkable)
+    pal['M'] = JsonLoadableSurface.new("mountain-bg-160.png", blocking)
+    pal['G'] = JsonLoadableSurface.new("grass-bg-160.png", walkable)
+    pal['g'] = JsonLoadableSurface.new("real-grass-bg-160.png", walkable)
     pal
   end
 

@@ -31,6 +31,8 @@ require 'lib/helpers/screen_offset_helper'
 require 'lib/helpers/animation_helper'
 require 'lib/helpers/animated_sprite_helper'
 
+require 'lib/tile_system/blocking'
+require 'lib/tile_system/walkable'
 require 'lib/tile_system/json_surface'
 require 'lib/tile_system/json_loadable_surface'
 require 'lib/tile_system/coordinate_helper'
