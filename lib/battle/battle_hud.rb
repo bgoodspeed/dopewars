@@ -4,6 +4,8 @@ class BattleHud
     @text_rendering_helper = text_rendering_helper
     @layer = layer
     @surface_factory = surface_factory
+    @sub_surface = @surface_factory.make_surface([10, 10])
+    @surface = @surface_factory.make_surface([500, 50])
   end
 
   def map_to_colors(rate)
@@ -26,23 +28,21 @@ class BattleHud
   end
 
   def build_sub(s,hr,hi,heroes)
-    sub = @surface_factory.make_surface([10, 10])
     colors = map_to_colors(hr)
     ready_colors = map_to_colors(ready_rates(heroes)[hi])
     colors.each_with_index do |color, idx|
-      fill_in_sub(s, sub, color, hi, idx, ready_colors)
+      fill_in_sub(s, @sub_surface, color, hi, idx, ready_colors)
     end
   end
 
   def draw(menu_layer_config, game, battle)
     heroes = battle.heroes
 
-    s = @surface_factory.make_surface([500, 50])
-    s.fill(:green)
+    @surface.fill(:green)
     health_rates(heroes).each_with_index do |hr, hi|
-      build_sub(s, hr, hi, heroes)
+      build_sub(@surface, hr, hi, heroes)
     end
-    s.blit(@screen, [40,400])
+    @surface.blit(@screen, [40,400])
 
   end
 

@@ -13,6 +13,7 @@ class CompositeInteractableSurfaceBackedPallette
   end
 
   def [](key)
+    
     @backing.each {|k,v|
       r = v[key]
       return r unless r.nil?
